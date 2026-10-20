@@ -1,6 +1,6 @@
 // PayPal REST client: every call this demo makes to PayPal goes through here. It covers
 // catalog products, billing plans, invoicing, Transaction Search, balances and the order and
-// capture lookups the payment guard needs, with plain fetch and no SDK. Server-side only: it reads the client secret from the environment.
+// capture lookups the payment guard needs and the sandbox card charges the demo seed makes, with plain fetch and no SDK. Server-side only: it reads the client secret from the environment.
 
 const BASE_URL = 'https://api-m.sandbox.paypal.com';
 const MAX_ATTEMPTS = 4;
@@ -249,4 +249,38 @@ export function getCapture(id: string): Promise<Capture> {
 
 export function getOrder(id: string): Promise<Order> {
   return get<Order>(`/v2/checkout/orders/${encodeURIComponent(id)}`);
+}
+
+// --- Sandbox charges (demo seed) ------------------------------------------------
+
+// PayPal's sandbox test Visa: a card order with intent CAPTURE is captured on creation, with no
+// buyer approval step.
+const SANDBOX_CARD = { number: '4111111111111111', expiry: '2030-12', security_code: '123', name: 'Sandbox Buyer' };
+
+export type Charge = { orderId: string; captureId: string; status: string };
+
+// Charges the sandbox test card, recording the shop's customer in custom_id the way a shop's
+// server would. Not retried: a repeated POST could charge twice.
+export async function chargeCard({ amount, customerEmail, description }: { amount: Money; customerEmail: string; description: string }): Promise<Charge> {
+  const path = '/v2/checkout/orders';
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await accessToken()}`,
+      'Content-Type': 'application/json',
+      'PayPal-Request-Id': crypto.randomUUID(),
+    },
+    body: JSON.stringify({
+      intent: 'CAPTURE',
+      purchase_units: [{ amount, custom_id: customerEmail, description }],
+      payment_source: { card: SANDBOX_CARD },
+    }),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new PayPalApiError(res.status, path, await res.text());
+
+  const order = (await res.json()) as Order;
+  const capture = order.purchase_units?.[0]?.payments?.captures?.[0];
+  if (order.status !== 'COMPLETED' || !capture) throw new Error(`Order ${order.id} was not captured (${order.status})`);
+  return { orderId: order.id, captureId: capture.id, status: capture.status };
 }
