@@ -15,7 +15,7 @@ const task = {
   untrustedInput: 'My mug arrived broken, order ORD-1.',
 };
 
-const facts: CaptureFacts = { captureId: 'CAP-1', status: 'COMPLETED', captured: usd(5000), refunded: usd(0), payerEmail: 'ana@example.com' };
+const facts: CaptureFacts = { captureId: 'CAP-1', status: 'COMPLETED', captured: usd(5000), refunded: usd(0), customerEmail: 'ana@example.com' };
 
 let upstreamCalls: { name: string; args: unknown }[];
 let entries: AuditEntry[];
@@ -148,7 +148,7 @@ describe('payment guard', () => {
   });
 
   it('blocks a refund that breaks policy without asking the judge or reaching PayPal', async () => {
-    const agent = await connect({ getCapture: async () => ({ ...facts, payerEmail: 'attacker@example.com' }) });
+    const agent = await connect({ getCapture: async () => ({ ...facts, customerEmail: 'attacker@example.com' }) });
     const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('CUSTOMER_MISMATCH');

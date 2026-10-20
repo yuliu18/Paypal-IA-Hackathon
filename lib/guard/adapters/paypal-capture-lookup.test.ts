@@ -12,9 +12,10 @@ const capture: Capture = {
 const order: Order = {
   id: 'ORD-1',
   status: 'COMPLETED',
-  payer: { email_address: 'ana@example.com' },
+  payer: { email_address: 'someone-else@example.com' },
   purchase_units: [
     {
+      custom_id: 'ana@example.com',
       payments: {
         captures: [capture],
         refunds: [
@@ -42,18 +43,24 @@ describe('toMinor', () => {
 });
 
 describe('toCaptureFacts', () => {
-  it('maps the capture, its payer and the refunds that hold money', () => {
+  it('maps the capture, the customer the shop recorded and the refunds that hold money', () => {
     expect(toCaptureFacts(capture, order)).toEqual({
       captureId: 'CAP-1',
       status: 'PARTIALLY_REFUNDED',
       captured: { minor: 4999, currency: 'USD' },
       refunded: { minor: 1550, currency: 'USD' },
-      payerEmail: 'ana@example.com',
+      customerEmail: 'ana@example.com',
     });
   });
 
-  it('reports an unknown payer as null so the policy blocks it', () => {
-    expect(toCaptureFacts(capture, { ...order, payer: undefined }).payerEmail).toBeNull();
+  it('reports a purchase unit without custom_id as an unknown customer so the policy blocks it', () => {
+    const [unit] = order.purchase_units!;
+    expect(toCaptureFacts(capture, { ...order, purchase_units: [{ ...unit, custom_id: undefined }] }).customerEmail).toBeNull();
+  });
+
+  it('takes the customer from the purchase unit that holds the capture', () => {
+    const other = { custom_id: 'mallory@example.com', payments: { captures: [{ ...capture, id: 'CAP-9' }] } };
+    expect(toCaptureFacts(capture, { ...order, purchase_units: [other, ...(order.purchase_units ?? [])] }).customerEmail).toBe('ana@example.com');
   });
 
   it('ignores refunds of other purchase units', () => {

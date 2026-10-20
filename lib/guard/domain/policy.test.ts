@@ -6,7 +6,7 @@ const usd = (minor: number) => ({ minor, currency: 'USD' });
 function context(overrides: Partial<RefundContext> = {}): RefundContext {
   return {
     request: { captureId: 'CAP-1', amount: usd(2500) },
-    capture: { captureId: 'CAP-1', status: 'COMPLETED', captured: usd(5000), refunded: usd(0), payerEmail: 'ana@example.com' },
+    capture: { captureId: 'CAP-1', status: 'COMPLETED', captured: usd(5000), refunded: usd(0), customerEmail: 'ana@example.com' },
     mandate: { customerEmail: 'ana@example.com' },
     limits: { perRefund: usd(10000), daily: usd(20000) },
     refundedToday: usd(0),
@@ -57,7 +57,7 @@ describe('evaluateRefund', () => {
 
   it('compares customer emails case-insensitively and blocks an unknown payer', () => {
     expect(codes(context({ mandate: { customerEmail: ' ANA@Example.com ' } }))).toEqual([]);
-    expect(codes(context({ capture: { ...context().capture, payerEmail: null } }))).toEqual(['CUSTOMER_MISMATCH']);
+    expect(codes(context({ capture: { ...context().capture, customerEmail: null } }))).toEqual(['CUSTOMER_MISMATCH']);
   });
 
   it('blocks a refund above the per-refund limit', () => {

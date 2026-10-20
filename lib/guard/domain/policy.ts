@@ -31,7 +31,7 @@ export type CaptureFacts = {
   status: string;
   captured: Money;
   refunded: Money;
-  payerEmail: string | null;
+  customerEmail: string | null;
 };
 
 // What the business authorized the agent to do for the task at hand.
@@ -72,8 +72,8 @@ export function evaluateRefund({ request, capture, mandate, limits, refundedToda
     violations.push({ code: 'AMOUNT_EXCEEDS_REFUNDABLE', message: `Refund ${format(amount)} exceeds refundable ${format(refundable)}` });
   }
 
-  if (!capture.payerEmail || normalizeEmail(capture.payerEmail) !== normalizeEmail(mandate.customerEmail)) {
-    violations.push({ code: 'CUSTOMER_MISMATCH', message: `Capture payer is not the ticket customer ${mandate.customerEmail}` });
+  if (!capture.customerEmail || normalizeEmail(capture.customerEmail) !== normalizeEmail(mandate.customerEmail)) {
+    violations.push({ code: 'CUSTOMER_MISMATCH', message: `Capture customer is not the ticket customer ${mandate.customerEmail}` });
   }
 
   if (exceeds(amount, limits.perRefund)) {

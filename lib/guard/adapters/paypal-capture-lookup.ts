@@ -1,5 +1,5 @@
 // CaptureLookup backed by the PayPal REST API: a capture plus its order give the amount,
-// what is already refunded, and who paid.
+// what is already refunded, and which customer the shop charged.
 
 import { getCapture, getOrder, type Capture, type Money as PayPalMoney, type Order } from '@/lib/paypal';
 import type { CaptureFacts, Money } from '../domain/policy';
@@ -30,7 +30,9 @@ export function toCaptureFacts(capture: Capture, order: Order): CaptureFacts {
     status: capture.status,
     captured,
     refunded: { minor: refunded, currency: captured.currency },
-    payerEmail: order.payer?.email_address ?? null,
+    // The shop's server writes the customer into custom_id when it charges; card payments carry
+    // no payer email, and the buyer can't change custom_id.
+    customerEmail: unit?.custom_id ?? null,
   };
 }
 

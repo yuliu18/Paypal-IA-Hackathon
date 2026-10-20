@@ -238,6 +238,7 @@ export type Order = {
   status: string;
   payer?: { email_address?: string };
   purchase_units?: {
+    custom_id?: string;
     payments?: { captures?: Capture[]; refunds?: Refund[] };
   }[];
 };
