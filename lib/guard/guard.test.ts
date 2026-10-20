@@ -68,7 +68,7 @@ function fakePayPal() {
   return server;
 }
 
-async function connect(captures = { getCapture: async () => facts }, { upstreamThrows = false } = {}) {
+async function connect(captures = { getCapture: async () => facts }, { upstreamThrows = false, upstreamHangs = false } = {}) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
   const upstream = new Client({ name: 'guard-upstream', version: '0.0.0' });
@@ -80,6 +80,12 @@ async function connect(captures = { getCapture: async () => facts }, { upstreamT
       throw new Error('socket hang up');
     };
   }
+  if (upstreamHangs) {
+    upstream.callTool = (params) => {
+      upstreamCalls.push({ name: params.name, args: params.arguments });
+      return new Promise(() => undefined);
+    };
+  }
 
   const guard = createPaymentGuard({
     upstream,
@@ -89,6 +95,7 @@ async function connect(captures = { getCapture: async () => facts }, { upstreamT
     audit,
     limits: { perRefund: usd(10000), daily: usd(20000) },
     now: () => new Date('2026-10-20T12:00:00Z'),
+    timeoutMs: 50,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -234,6 +241,31 @@ describe('payment guard', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'executed' });
     expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('times out a hung PayPal refund, keeps counting it, and frees the queue', async () => {
+    const agent = await connect(undefined, { upstreamHangs: true });
+    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
+    const first = await agent.callTool({ name: 'create_refund', arguments: big });
+    expect(text(first)).toContain('timed out');
+    expect(entries[0]).toMatchObject({ outcome: 'error', moved: usd(5000) });
+    await agent.callTool({ name: 'create_refund', arguments: big });
+    expect(upstreamCalls).toHaveLength(2);
+  });
+
+  it('blocks a refund whose capture lookup hangs', async () => {
+    const agent = await connect({ getCapture: () => new Promise(() => undefined) });
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
+    expect(text(result)).toContain('CAPTURE_LOOKUP_FAILED');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('returns a structured error and logs a read whose PayPal call fails', async () => {
+    const agent = await connect(undefined, { upstreamThrows: true });
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('PayPal call failed');
+    expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'error', detail: 'socket hang up' });
   });
 
   it('blocks bulk reads outside the read allowlist', async () => {

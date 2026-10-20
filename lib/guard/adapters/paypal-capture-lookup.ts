@@ -8,7 +8,11 @@ import type { CaptureLookup } from '../ports';
 // Refunds in these states no longer hold money back from the capture.
 const RELEASED_REFUND_STATUSES = new Set(['FAILED', 'CANCELLED']);
 
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
+// Anything but a plain decimal would become NaN, and NaN comparisons pass every limit check.
 export function toMinor(m: PayPalMoney): Money {
+  if (!DECIMAL.test(m.value)) throw new Error(`Invalid PayPal amount "${m.value}"`);
   const [whole, fraction = ''] = m.value.split('.');
   const sign = whole.startsWith('-') ? -1 : 1;
   return { minor: sign * (Math.abs(Number(whole)) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2))), currency: m.currency_code };

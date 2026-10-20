@@ -33,6 +33,12 @@ describe('toMinor', () => {
     expect(toMinor({ value: '49.99', currency_code: 'USD' })).toEqual({ minor: 4999, currency: 'USD' });
     expect(toMinor({ value: '0.1', currency_code: 'EUR' })).toEqual({ minor: 10, currency: 'EUR' });
   });
+
+  it('rejects amounts that are not plain decimals instead of producing NaN', () => {
+    for (const value of ['', 'abc', '1e3', '1.2.3', ' 5']) {
+      expect(() => toMinor({ value, currency_code: 'USD' })).toThrow('Invalid PayPal amount');
+    }
+  });
 });
 
 describe('toCaptureFacts', () => {

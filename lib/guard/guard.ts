@@ -23,7 +23,17 @@ export type GuardDeps = {
   audit: AuditLog;
   limits: Limits;
   now?: () => Date;
+  // Bound on each PayPal lookup and call, so one hung request can't stall the write queue.
+  timeoutMs?: number;
 };
+
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
 
 // Writes run one at a time across every guard in the process, so the daily total read by one
 // refund already includes the refund before it; otherwise concurrent calls, even from different
@@ -52,10 +62,24 @@ function parseRefund(args: Record<string, unknown>): RefundRequest | undefined {
   return { captureId: args.capture_id, amount: toMinor({ value: amount.value, currency_code: amount.currency_code }) };
 }
 
-export function createPaymentGuard({ upstream, task, judge, captures, audit, limits, now = () => new Date() }: GuardDeps): Server {
+export function createPaymentGuard({
+  upstream,
+  task,
+  judge,
+  captures,
+  audit,
+  limits,
+  now = () => new Date(),
+  timeoutMs = 20_000,
+}: GuardDeps): Server {
   const server = new Server({ name: 'paypal-payment-guard', version: '0.1.0' }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, (request) => upstream.listTools(request.params));
+
+  const callPayPal = (name: string, args: Record<string, unknown>) =>
+    withTimeout(upstream.callTool({ name, arguments: args }) as Promise<CallToolResult>, timeoutMs, `PayPal ${name}`);
+  const failedResult = (detail: string): CallToolResult => ({ isError: true, content: [{ type: 'text', text: `PayPal call failed: ${detail}` }] });
+  const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
   async function decideRefund(args: Record<string, unknown>): Promise<{ decision: Decision; moved?: Money }> {
     const request = parseRefund(args);
@@ -63,9 +87,9 @@ export function createPaymentGuard({ upstream, task, judge, captures, audit, lim
 
     let capture;
     try {
-      capture = await captures.getCapture(request.captureId);
+      capture = await withTimeout(captures.getCapture(request.captureId), timeoutMs, 'Capture lookup');
     } catch (error) {
-      return { decision: block('CAPTURE_LOOKUP_FAILED', error instanceof Error ? error.message : String(error)) };
+      return { decision: block('CAPTURE_LOOKUP_FAILED', message(error)) };
     }
 
     const moved = request.amount ?? { minor: capture.captured.minor - capture.refunded.minor, currency: capture.captured.currency };
@@ -102,9 +126,14 @@ export function createPaymentGuard({ upstream, task, judge, captures, audit, lim
 
     // Reads move no money, so they don't depend on the log: run them and log afterwards.
     if (isRead(name)) {
-      const result = (await upstream.callTool({ name, arguments: args })) as CallToolResult;
-      await audit.record({ at, tool: name, args, task, decision, outcome: result.isError ? 'error' : 'executed' }).catch(() => undefined);
-      return result;
+      try {
+        const result = await callPayPal(name, args);
+        await audit.record({ at, tool: name, args, task, decision, outcome: result.isError ? 'error' : 'executed' }).catch(() => undefined);
+        return result;
+      } catch (error) {
+        await audit.record({ at, tool: name, args, task, decision, outcome: 'error', detail: message(error) }).catch(() => undefined);
+        return failedResult(message(error));
+      }
     }
 
     // Write-ahead: log the call with the amount it may move before it runs. If that fails, the
@@ -113,21 +142,20 @@ export function createPaymentGuard({ upstream, task, judge, captures, audit, lim
     try {
       id = await audit.record({ at, tool: name, args, task, decision, outcome: 'pending', moved });
     } catch (error) {
-      return blockedResult(block('AUDIT_UNAVAILABLE', error instanceof Error ? error.message : String(error)));
+      return blockedResult(block('AUDIT_UNAVAILABLE', message(error)));
     }
 
     // Update failures are ignored: the pending entry already counts the amount, which errs safe.
     const settle = (patch: Parameters<AuditLog['update']>[1]) => audit.update(id, patch).catch(() => undefined);
     try {
-      const result = (await upstream.callTool({ name, arguments: args })) as CallToolResult;
+      const result = await callPayPal(name, args);
       // An explicit PayPal rejection moved nothing, so it stops counting toward limits.
       await settle(result.isError ? { outcome: 'error', moved: undefined } : { outcome: 'executed' });
       return result;
     } catch (error) {
-      // Transport failure: PayPal may have executed the call, so the amount keeps counting.
-      const detail = error instanceof Error ? error.message : String(error);
-      await settle({ outcome: 'error', detail });
-      return { isError: true, content: [{ type: 'text', text: `PayPal call failed: ${detail}` }] };
+      // Transport failure or timeout: PayPal may have executed the call, so the amount keeps counting.
+      await settle({ outcome: 'error', detail: message(error) });
+      return failedResult(message(error));
     }
   }
 
