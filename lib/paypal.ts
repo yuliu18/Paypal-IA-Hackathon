@@ -1,6 +1,6 @@
 // PayPal REST client: every call this demo makes to PayPal goes through here. It covers
-// catalog products, billing plans, invoicing, Transaction Search and balances, with plain
-// fetch and no SDK. Server-side only: it reads the client secret from the environment.
+// catalog products, billing plans, invoicing, Transaction Search, balances and the order and
+// capture lookups the payment guard needs, with plain fetch and no SDK. Server-side only: it reads the client secret from the environment.
 
 const BASE_URL = 'https://api-m.sandbox.paypal.com';
 const MAX_ATTEMPTS = 4;
@@ -18,7 +18,7 @@ export class PayPalApiError extends Error {
 
 let cachedToken: { value: string; expiresAt: number } | undefined;
 
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) return cachedToken.value;
 
   const { PAYPAL_CLIENT_ID: id, PAYPAL_SECRET: secret } = process.env;
@@ -220,4 +220,32 @@ export type Balances = {
 
 export function getBalances(): Promise<Balances> {
   return get<Balances>('/v1/reporting/balances');
+}
+
+// --- Orders & captures (payment guard) ---------------------------------------
+
+export type Refund = { id: string; status: string; amount?: Money };
+
+export type Capture = {
+  id: string;
+  status: string;
+  amount: Money;
+  supplementary_data?: { related_ids?: { order_id?: string } };
+};
+
+export type Order = {
+  id: string;
+  status: string;
+  payer?: { email_address?: string };
+  purchase_units?: {
+    payments?: { captures?: Capture[]; refunds?: Refund[] };
+  }[];
+};
+
+export function getCapture(id: string): Promise<Capture> {
+  return get<Capture>(`/v2/payments/captures/${encodeURIComponent(id)}`);
+}
+
+export function getOrder(id: string): Promise<Order> {
+  return get<Order>(`/v2/checkout/orders/${encodeURIComponent(id)}`);
 }
