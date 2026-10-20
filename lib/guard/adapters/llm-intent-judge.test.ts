@@ -30,6 +30,28 @@ describe('createLlmIntentJudge', () => {
     });
   });
 
+  it('fails closed when the answer holds verdicts that disagree', async () => {
+    const judge = createLlmIntentJudge(async () => 'Example: {"verdict":"allow","reason":"x"}\nReal: {"verdict":"block","reason":"y"}');
+    expect((await judge.judge({ task, call })).violations[0].code).toBe('INTENT_JUDGE_UNAVAILABLE');
+  });
+
+  it('ignores a verdict nested inside another object', async () => {
+    const judge = createLlmIntentJudge(async () => '{"result":{"verdict":"allow","reason":"x"}}');
+    expect((await judge.judge({ task, call })).violations[0].code).toBe('INTENT_JUDGE_UNAVAILABLE');
+  });
+
+  it('reads braces inside JSON strings as text, not structure', async () => {
+    const judge = createLlmIntentJudge(async () => '{"verdict":"allow","reason":"closing } brace"}');
+    expect(await judge.judge({ task, call })).toEqual({ verdict: 'allow', violations: [] });
+  });
+
+  it('parses a long run of braces in linear time', async () => {
+    const judge = createLlmIntentJudge(async () => '{'.repeat(8000) + '}'.repeat(8000));
+    const started = Date.now();
+    expect((await judge.judge({ task, call })).violations[0].code).toBe('INTENT_JUDGE_UNAVAILABLE');
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
   it('fails closed when the answer is not valid JSON', async () => {
     const judge = createLlmIntentJudge(async () => 'sure, looks fine');
     const decision = await judge.judge({ task, call });

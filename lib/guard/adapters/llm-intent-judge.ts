@@ -19,21 +19,46 @@ function unavailable(detail: string): Decision {
   return { verdict: 'block', violations: [{ code: 'INTENT_JUDGE_UNAVAILABLE', message: `Intent judge failed closed: ${detail}` }] };
 }
 
-// The model may wrap its JSON in prose that has braces of its own, so try each '{' ... '}' span
-// from the left and take the first one that parses to an object with a verdict.
-function parseAnswer(text: string): { verdict: string; reason: string } {
-  for (let start = text.indexOf('{'); start !== -1; start = text.indexOf('{', start + 1)) {
-    for (let end = text.indexOf('}', start); end !== -1; end = text.indexOf('}', end + 1)) {
-      let parsed: { verdict?: unknown; reason?: unknown };
-      try {
-        parsed = JSON.parse(text.slice(start, end + 1));
-      } catch {
-        continue;
-      }
-      if (parsed && typeof parsed === 'object' && 'verdict' in parsed) return { verdict: String(parsed.verdict), reason: String(parsed.reason ?? '') };
+// Top-level `{...}` spans of the answer, found in one pass that treats braces inside JSON strings
+// as text. Linear in the answer's length, so adversarial output can't stall the event loop.
+function topLevelObjects(text: string): string[] {
+  const spans: string[] = [];
+  let depth = 0;
+  let start = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"' && depth > 0) {
+      inString = true;
+    } else if (ch === '{') {
+      if (depth++ === 0) start = i;
+    } else if (ch === '}' && depth > 0 && --depth === 0) {
+      spans.push(text.slice(start, i + 1));
     }
   }
-  throw new Error('no JSON verdict in answer');
+  return spans;
+}
+
+// The model may wrap its JSON in prose with braces of its own. Exactly one verdict must come out
+// of the top-level objects: none, or verdicts that disagree (e.g. an injected example), fail closed.
+function parseAnswer(text: string): { verdict: string; reason: string } {
+  const answers: { verdict: string; reason: string }[] = [];
+  for (const span of topLevelObjects(text)) {
+    try {
+      const parsed = JSON.parse(span) as { verdict?: unknown; reason?: unknown };
+      if (parsed && typeof parsed === 'object' && 'verdict' in parsed) answers.push({ verdict: String(parsed.verdict), reason: String(parsed.reason ?? '') });
+    } catch {
+      // Prose in braces, not JSON.
+    }
+  }
+  if (!answers.length) throw new Error('no JSON verdict in answer');
+  if (answers.some((a) => a.verdict !== answers[0].verdict)) throw new Error('answer holds conflicting verdicts');
+  return answers[0];
 }
 
 export function createLlmIntentJudge(complete: ChatCompletion): IntentJudge {
