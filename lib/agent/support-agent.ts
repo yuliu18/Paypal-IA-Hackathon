@@ -41,12 +41,24 @@ function parseArguments(raw: string): Record<string, unknown> | undefined {
   }
 }
 
+const OUT_OF_TIME = Symbol('out of time');
+
+// Resolves with OUT_OF_TIME once `ms` pass, so a hung model can't keep the request open.
+function beforeDeadline<T>(work: Promise<T>, ms: number): Promise<T | typeof OUT_OF_TIME> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<typeof OUT_OF_TIME>((resolve) => {
+    timer = setTimeout(() => resolve(OUT_OF_TIME), Math.max(0, ms));
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+}
+
 export async function runSupportAgent({
   chat,
   tools,
   ticket,
   instructions,
   maxSteps = 8,
+  deadlineMs = 90_000,
 }: {
   chat: ToolChat;
   tools: Client;
@@ -54,7 +66,11 @@ export async function runSupportAgent({
   instructions: string;
   // Bound on tool calls, so a model that keeps calling tools can't run (or spend) forever.
   maxSteps?: number;
+  // Bound on the whole ticket, so one request stays within the hosting platform's request timeout.
+  // Tool calls are already bounded by the guard's own PayPal timeouts.
+  deadlineMs?: number;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
+  const deadline = Date.now() + deadlineMs;
   const offered: AgentTool[] = (await tools.listTools()).tools.map((t) => ({
     name: t.name,
     description: t.description,
@@ -67,7 +83,8 @@ export async function runSupportAgent({
   const steps: AgentStep[] = [];
 
   while (steps.length < maxSteps) {
-    const answer = await chat(messages, offered);
+    const answer = await beforeDeadline(chat(messages, offered), deadline - Date.now());
+    if (answer === OUT_OF_TIME) return { reply: `The agent ran out of time after ${steps.length} tool calls without a final answer.`, steps };
     messages.push(answer);
     if (!answer.tool_calls?.length) return { reply: answer.content ?? '', steps };
 

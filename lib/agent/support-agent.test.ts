@@ -118,4 +118,28 @@ describe('runSupportAgent', () => {
     expect(result.steps).toHaveLength(3);
     expect(result.reply).toBe('The agent stopped after 3 tool calls without a final answer.');
   });
+
+  it('gives up when the model does not answer before the overall deadline', async () => {
+    const chat: ToolChat = () => new Promise(() => undefined);
+    const started = Date.now();
+
+    const result = await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions, deadlineMs: 50 });
+
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result).toEqual({ reply: 'The agent ran out of time after 0 tool calls without a final answer.', steps: [] });
+  });
+
+  it('keeps the steps already taken when the deadline passes between model calls', async () => {
+    let calls = 0;
+    const chat: ToolChat = async () => {
+      calls++;
+      if (calls === 1) return callTool('c1', 'get_order', { id: 'ORD-1' });
+      return new Promise(() => undefined);
+    };
+
+    const result = await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions, deadlineMs: 50 });
+
+    expect(result.steps).toHaveLength(1);
+    expect(result.reply).toBe('The agent ran out of time after 1 tool calls without a final answer.');
+  });
 });
