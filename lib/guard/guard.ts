@@ -7,7 +7,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { toMinor } from './adapters/paypal-capture-lookup';
-import { evaluateRefund, isMandateCustomer, mergeDecisions, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
+import { evaluateRefund, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type { AgentTask, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
 // Single-record reads a support agent needs, each returned only when it belongs to the ticket
@@ -111,7 +111,7 @@ export function createPaymentGuard({
       return { decision: block('CAPTURE_LOOKUP_FAILED', message(error)) };
     }
 
-    const moved = request.amount ?? { minor: capture.captured.minor - capture.refunded.minor, currency: capture.captured.currency };
+    const moved = request.amount ?? refundableOf(capture);
     const startOfDay = new Date(now());
     startOfDay.setUTCHours(0, 0, 0, 0);
     const refundedToday = await audit.movedSince(startOfDay, moved.currency);

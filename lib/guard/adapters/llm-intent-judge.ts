@@ -4,6 +4,7 @@
 
 import type { Decision } from '../domain/policy';
 import type { IntentJudge } from '../ports';
+import { requestCompletion, type OpenAiCompatibleConfig } from '@/lib/llm/openai-compatible';
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 export type ChatCompletion = (messages: ChatMessage[]) => Promise<string>;
@@ -18,11 +19,21 @@ function unavailable(detail: string): Decision {
   return { verdict: 'block', violations: [{ code: 'INTENT_JUDGE_UNAVAILABLE', message: `Intent judge failed closed: ${detail}` }] };
 }
 
+// The model may wrap its JSON in prose that has braces of its own, so try each '{' ... '}' span
+// from the left and take the first one that parses to an object with a verdict.
 function parseAnswer(text: string): { verdict: string; reason: string } {
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) throw new Error('no JSON object in answer');
-  const parsed = JSON.parse(json) as { verdict?: unknown; reason?: unknown };
-  return { verdict: String(parsed.verdict), reason: String(parsed.reason ?? '') };
+  for (let start = text.indexOf('{'); start !== -1; start = text.indexOf('{', start + 1)) {
+    for (let end = text.indexOf('}', start); end !== -1; end = text.indexOf('}', end + 1)) {
+      let parsed: { verdict?: unknown; reason?: unknown };
+      try {
+        parsed = JSON.parse(text.slice(start, end + 1));
+      } catch {
+        continue;
+      }
+      if (parsed && typeof parsed === 'object' && 'verdict' in parsed) return { verdict: String(parsed.verdict), reason: String(parsed.reason ?? '') };
+    }
+  }
+  throw new Error('no JSON verdict in answer');
 }
 
 export function createLlmIntentJudge(complete: ChatCompletion): IntentJudge {
@@ -53,29 +64,11 @@ export function createLlmIntentJudge(complete: ChatCompletion): IntentJudge {
 // Chat completion against any OpenAI-compatible `/chat/completions` endpoint. The timeout keeps
 // a hung provider from stalling the guard's write queue; the judge turns it into a block.
 export function openAiCompatibleChat({
-  baseUrl,
-  apiKey,
-  model,
   timeoutMs = 15_000,
-  headers = {},
-}: {
-  baseUrl: string;
-  apiKey: string;
-  model: string;
-  timeoutMs?: number;
-  // Provider-specific headers, e.g. OpenCode Go asks for a client user agent and `x-opencode-session`.
-  headers?: Record<string, string>;
-}): ChatCompletion {
+  ...config
+}: Omit<OpenAiCompatibleConfig, 'timeoutMs'> & { timeoutMs?: number }): ChatCompletion {
   return async (messages) => {
-    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, temperature: 0 }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = body.choices?.[0]?.message?.content;
+    const { content } = await requestCompletion({ ...config, timeoutMs }, { messages });
     if (!content) throw new Error('empty completion');
     return content;
   };

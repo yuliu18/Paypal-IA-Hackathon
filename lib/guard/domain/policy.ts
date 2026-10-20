@@ -59,9 +59,15 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 export const isMandateCustomer = (customerEmail: string | null | undefined, mandate: TaskMandate) =>
   !!customerEmail && normalizeEmail(customerEmail) === normalizeEmail(mandate.customerEmail);
 
+// What PayPal can still refund on a capture: an omitted refund amount means all of it.
+export const refundableOf = (capture: CaptureFacts): Money => ({
+  minor: capture.captured.minor - capture.refunded.minor,
+  currency: capture.captured.currency,
+});
+
 export function evaluateRefund({ request, capture, mandate, limits, refundedToday }: RefundContext): Decision {
   const violations: Violation[] = [];
-  const refundable: Money = { minor: capture.captured.minor - capture.refunded.minor, currency: capture.captured.currency };
+  const refundable = refundableOf(capture);
   const amount = request.amount ?? refundable;
 
   if (request.captureId !== capture.captureId) {

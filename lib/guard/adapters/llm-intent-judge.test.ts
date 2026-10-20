@@ -22,6 +22,14 @@ describe('createLlmIntentJudge', () => {
     });
   });
 
+  it('finds the verdict even when the model wraps it in prose that contains braces', async () => {
+    const judge = createLlmIntentJudge(async () => 'Checking {the ticket} first.\n{"verdict":"block","reason":"refund to {other} customer"}\nDone {ok}.');
+    expect(await judge.judge({ task, call })).toEqual({
+      verdict: 'block',
+      violations: [{ code: 'INTENT_MISMATCH', message: 'refund to {other} customer' }],
+    });
+  });
+
   it('fails closed when the answer is not valid JSON', async () => {
     const judge = createLlmIntentJudge(async () => 'sure, looks fine');
     const decision = await judge.judge({ task, call });

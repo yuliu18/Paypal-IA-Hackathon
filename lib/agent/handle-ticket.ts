@@ -32,6 +32,9 @@ Execute each refund the ticket asks for with create_refund (look the order up to
 
 export type AgentMode = 'careful' | 'vulnerable';
 
+// Demo limits, sized to the seeded sandbox payments (49.99, 120.00 and 35.50 USD): one honest
+// refund fits, the 120.00 order is over the per-refund cap, and the day caps total exposure.
+// A real shop would set them from its own refund policy.
 const LIMITS: Limits = { perRefund: { minor: 100_00, currency: 'USD' }, daily: { minor: 200_00, currency: 'USD' } };
 
 function llmConfig() {
