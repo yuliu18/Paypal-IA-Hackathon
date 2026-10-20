@@ -22,6 +22,7 @@ let entries: AuditEntry[];
 let judgeDecision: Decision;
 let judgeCalls: number;
 let auditFails: boolean;
+let auditUpdateFails: boolean;
 let rejectRefunds: boolean;
 
 const audit: AuditLog = {
@@ -31,6 +32,7 @@ const audit: AuditLog = {
     return String(entries.length - 1);
   },
   async update(id, patch) {
+    if (auditUpdateFails) throw new Error('disk full');
     Object.assign(entries[Number(id)], patch);
   },
   async movedSince() {
@@ -103,6 +105,7 @@ beforeEach(() => {
   judgeDecision = { verdict: 'allow', violations: [] };
   judgeCalls = 0;
   auditFails = false;
+  auditUpdateFails = false;
   rejectRefunds = false;
 });
 
@@ -205,6 +208,32 @@ describe('payment guard', () => {
     const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
     expect(text(result)).toContain('AUDIT_UNAVAILABLE');
     expect(upstreamCalls).toEqual([]);
+  });
+
+  it('keeps counting a refund whose log entry cannot be settled after it ran', async () => {
+    auditUpdateFails = true;
+    const agent = await connect();
+    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
+    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big });
+    const fifth = await agent.callTool({ name: 'create_refund', arguments: big });
+    expect(text(fifth)).toContain('DAILY_LIMIT');
+    expect(upstreamCalls).toHaveLength(4);
+    expect(entries.slice(0, 4).every((e) => e.outcome === 'pending')).toBe(true);
+  });
+
+  it('serves allowlisted reads even when the audit log is down', async () => {
+    auditFails = true;
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
+    expect(text(result)).toBe('get_order ok');
+  });
+
+  it('logs a read once, after it ran, with no amount', async () => {
+    const agent = await connect();
+    await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'executed' });
+    expect(entries[0].moved).toBeUndefined();
   });
 
   it('blocks bulk reads outside the read allowlist', async () => {

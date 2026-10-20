@@ -100,6 +100,13 @@ export function createPaymentGuard({ upstream, task, judge, captures, audit, lim
       return blockedResult(decision);
     }
 
+    // Reads move no money, so they don't depend on the log: run them and log afterwards.
+    if (isRead(name)) {
+      const result = (await upstream.callTool({ name, arguments: args })) as CallToolResult;
+      await audit.record({ at, tool: name, args, task, decision, outcome: result.isError ? 'error' : 'executed' }).catch(() => undefined);
+      return result;
+    }
+
     // Write-ahead: log the call with the amount it may move before it runs. If that fails, the
     // call can't be accounted for, so it doesn't run.
     let id: string;
