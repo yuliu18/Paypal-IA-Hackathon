@@ -26,7 +26,8 @@ export async function POST(request: Request) {
   try {
     return Response.json(await handleTicket({ customerEmail, message }, agent));
   } catch (cause) {
+    // The cause can carry provider responses or configuration names, so it stays in the server log.
     console.error('Support agent failed', cause);
-    return error(502, cause instanceof Error ? cause.message : 'The support agent failed.');
+    return error(502, 'The support agent failed. Details are in the server log.');
   }
 }
