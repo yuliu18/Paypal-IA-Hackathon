@@ -39,4 +39,7 @@ export interface AuditLog {
   record(entry: AuditEntry): Promise<string>;
   update(id: string, patch: Partial<Pick<AuditEntry, 'outcome' | 'moved' | 'detail'>>): Promise<void>;
   movedSince(since: Date, currency: string): Promise<Money>;
+  // Whether a refund of this capture may have moved money but never settled (pending, or failed
+  // with its amount still counting), so a retry could refund twice.
+  hasUnsettledRefund(captureId: string): Promise<boolean>;
 }

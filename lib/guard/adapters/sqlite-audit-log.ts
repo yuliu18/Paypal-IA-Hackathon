@@ -61,6 +61,10 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
     `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit WHERE at >= ? AND moved_currency = ?`,
   );
   const latest = db.prepare(`SELECT * FROM audit ORDER BY id DESC LIMIT ?`);
+  const unsettled = db.prepare(
+    `SELECT 1 FROM audit WHERE tool = 'create_refund' AND json_extract(args, '$.capture_id') = ?
+       AND moved_minor IS NOT NULL AND outcome IN ('pending', 'error') LIMIT 1`,
+  );
 
   return {
     async record(entry) {
@@ -101,6 +105,10 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
     async movedSince(since, currency): Promise<Money> {
       const { total } = sumSince.get(since.toISOString(), currency) as { total: number };
       return { minor: total, currency };
+    },
+
+    async hasUnsettledRefund(captureId) {
+      return unsettled.get(captureId) !== undefined;
     },
 
     list(limit) {

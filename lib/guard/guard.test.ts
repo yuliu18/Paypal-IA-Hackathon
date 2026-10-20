@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
 import { createPaymentGuard } from './guard';
-import type { AuditEntry, AuditLog, IntentJudge } from './ports';
+import type { AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -37,6 +37,9 @@ const audit: AuditLog = {
   },
   async movedSince() {
     return usd(entries.reduce((sum, e) => sum + (e.moved?.minor ?? 0), 0));
+  },
+  async hasUnsettledRefund(captureId) {
+    return entries.some((e) => e.tool === 'create_refund' && e.args.capture_id === captureId && e.moved && (e.outcome === 'pending' || e.outcome === 'error'));
   },
 };
 
@@ -82,7 +85,7 @@ function fakePayPal() {
 }
 
 async function connect(
-  captures = { getCapture: async () => facts },
+  captures: CaptureLookup = { getCapture: async (captureId) => ({ ...facts, captureId }) },
   { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
@@ -226,9 +229,9 @@ describe('payment guard', () => {
 
   it('enforces the daily limit across refunds already executed', async () => {
     const agent = await connect();
-    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
-    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big });
-    const fifth = await agent.callTool({ name: 'create_refund', arguments: big });
+    const big = (i: number) => ({ capture_id: `CAP-${i}`, amount: { currency_code: 'USD', value: '50.00' } });
+    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big(i) });
+    const fifth = await agent.callTool({ name: 'create_refund', arguments: big(4) });
     expect(text(fifth)).toContain('DAILY_LIMIT');
     expect(upstreamCalls).toHaveLength(4);
   });
@@ -249,9 +252,9 @@ describe('payment guard', () => {
 
   it('counts a refund whose PayPal call failed ambiguously toward the daily limit', async () => {
     const agent = await connect(undefined, { upstreamThrows: true });
-    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
-    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big });
-    const fifth = await agent.callTool({ name: 'create_refund', arguments: big });
+    const big = (i: number) => ({ capture_id: `CAP-${i}`, amount: { currency_code: 'USD', value: '50.00' } });
+    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big(i) });
+    const fifth = await agent.callTool({ name: 'create_refund', arguments: big(4) });
     expect(text(fifth)).toContain('DAILY_LIMIT');
     expect(upstreamCalls).toHaveLength(4);
     expect(entries.slice(0, 4).map((e) => e.outcome)).toEqual(['error', 'error', 'error', 'error']);
@@ -277,9 +280,9 @@ describe('payment guard', () => {
   it('keeps counting a refund whose log entry cannot be settled after it ran', async () => {
     auditUpdateFails = true;
     const agent = await connect();
-    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
-    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big });
-    const fifth = await agent.callTool({ name: 'create_refund', arguments: big });
+    const big = (i: number) => ({ capture_id: `CAP-${i}`, amount: { currency_code: 'USD', value: '50.00' } });
+    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big(i) });
+    const fifth = await agent.callTool({ name: 'create_refund', arguments: big(4) });
     expect(text(fifth)).toContain('DAILY_LIMIT');
     expect(upstreamCalls).toHaveLength(4);
     expect(entries.slice(0, 4).every((e) => e.outcome === 'pending')).toBe(true);
@@ -306,7 +309,28 @@ describe('payment guard', () => {
     const first = await agent.callTool({ name: 'create_refund', arguments: big });
     expect(text(first)).toContain('timed out');
     expect(entries[0]).toMatchObject({ outcome: 'error', moved: usd(5000) });
-    await agent.callTool({ name: 'create_refund', arguments: big });
+    await agent.callTool({ name: 'create_refund', arguments: { ...big, capture_id: 'CAP-2' } });
+    expect(upstreamCalls).toHaveLength(2);
+  });
+
+  it('blocks another refund of a capture whose earlier refund is still unconfirmed', async () => {
+    const agent = await connect(undefined, { upstreamHangs: true });
+    const args = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '20.00' } };
+    await agent.callTool({ name: 'create_refund', arguments: args });
+    const retry = await agent.callTool({ name: 'create_refund', arguments: args });
+    expect(text(retry)).toContain('REFUND_UNCONFIRMED');
+    expect(upstreamCalls).toHaveLength(1);
+    expect(entries[1]).toMatchObject({ outcome: 'blocked' });
+  });
+
+  it('allows a new refund of a capture once PayPal explicitly rejected the earlier one', async () => {
+    rejectRefunds = true;
+    const agent = await connect();
+    const args = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '20.00' } };
+    await agent.callTool({ name: 'create_refund', arguments: args });
+    rejectRefunds = false;
+    const retry = await agent.callTool({ name: 'create_refund', arguments: args });
+    expect(retry.isError).toBeFalsy();
     expect(upstreamCalls).toHaveLength(2);
   });
 
@@ -324,6 +348,8 @@ describe('payment guard', () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(entries[0]).toMatchObject({ outcome: 'error', detail: 'PayPal rejected the call after the guard timed out' });
     expect(entries[0].moved).toBeUndefined();
+    await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '20.00' } } });
+    expect(upstreamCalls).toHaveLength(2);
   });
 
   it('blocks a refund whose capture lookup hangs', async () => {

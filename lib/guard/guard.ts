@@ -98,6 +98,11 @@ export function createPaymentGuard({
   async function decideRefund(args: Record<string, unknown>): Promise<{ decision: Decision; moved?: Money }> {
     const request = parseRefund(args);
     if (!request) return { decision: block('INVALID_ARGUMENTS', 'create_refund needs capture_id and an optional {currency_code, value} amount') };
+    // A refund of this capture timed out or never settled: PayPal may have executed it, so a
+    // retry (which an agent reading "failed" is likely to try) could refund the customer twice.
+    if (await audit.hasUnsettledRefund(request.captureId)) {
+      return { decision: block('REFUND_UNCONFIRMED', `An earlier refund of capture ${request.captureId} is not confirmed yet; a person must check it in PayPal before another refund`) };
+    }
 
     let capture;
     try {

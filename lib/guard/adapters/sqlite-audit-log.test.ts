@@ -65,4 +65,22 @@ describe('sqlite audit log', () => {
     await log.update(id, { outcome: 'error', detail: 'socket hang up' });
     expect(log.list(1)[0]).toMatchObject({ outcome: 'error', detail: 'socket hang up' });
   });
+
+  it('reports an unsettled refund of a capture: pending, or failed with its amount still counting', async () => {
+    expect(await log.hasUnsettledRefund('CAP-1')).toBe(false);
+    const id = await log.record(entry());
+    expect(await log.hasUnsettledRefund('CAP-1')).toBe(true);
+    expect(await log.hasUnsettledRefund('CAP-2')).toBe(false);
+    await log.update(id, { outcome: 'error', detail: 'timed out' });
+    expect(await log.hasUnsettledRefund('CAP-1')).toBe(true);
+  });
+
+  it('treats executed, blocked and explicitly rejected refunds as settled', async () => {
+    await log.record(entry({ outcome: 'executed' }));
+    await log.record(entry({ outcome: 'blocked', moved: undefined }));
+    const id = await log.record(entry());
+    await log.update(id, { outcome: 'error', moved: undefined });
+    await log.record(entry({ tool: 'get_order', args: { capture_id: 'CAP-1' } }));
+    expect(await log.hasUnsettledRefund('CAP-1')).toBe(false);
+  });
 });
