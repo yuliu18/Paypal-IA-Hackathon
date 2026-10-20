@@ -3,9 +3,6 @@
 // Server-side only: it reads the PayPal and LLM credentials from the environment.
 
 import { randomUUID } from 'node:crypto';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
 import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
@@ -13,6 +10,7 @@ import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup'
 import type { Limits } from '@/lib/guard/domain/policy';
 import { createPaymentGuard } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
+import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
 import { runSupportAgent, type AgentStep, type SupportTicket } from './support-agent';
 
@@ -45,14 +43,6 @@ function llmConfig() {
   return { baseUrl, apiKey, agentModel, judgeModel: judgeModel || agentModel, headers };
 }
 
-async function connected(server: { connect(transport: Transport): Promise<void> }, name: string): Promise<Client> {
-  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await server.connect(serverSide);
-  const client = new Client({ name, version: '0.1.0' });
-  await client.connect(clientSide);
-  return client;
-}
-
 export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'careful'): Promise<{ reply: string; steps: AgentStep[] }> {
   const llm = llmConfig();
   const paypal = new PayPalAgentToolkit({
@@ -62,27 +52,23 @@ export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'car
       context: { sandbox: true },
     },
   });
-  const upstream = await connected(paypal, 'payment-guard');
 
-  const guard = createPaymentGuard({
-    upstream,
-    task: { mandate: { customerEmail: ticket.customerEmail }, instructions: SHOP_INSTRUCTIONS, untrustedInput: ticket.message },
-    judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
-    captures: payPalCaptureLookup,
-    audit: auditLog(),
-    limits: LIMITS,
-  });
-  const tools = await connected(guard, 'support-agent');
-
-  try {
-    return await runSupportAgent({
-      chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers }),
-      tools,
-      ticket,
-      instructions: mode === 'vulnerable' ? VULNERABLE_INSTRUCTIONS : SHOP_INSTRUCTIONS,
+  return withClient(paypal, 'payment-guard', (upstream) => {
+    const guard = createPaymentGuard({
+      upstream,
+      task: { mandate: { customerEmail: ticket.customerEmail }, instructions: SHOP_INSTRUCTIONS, untrustedInput: ticket.message },
+      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
+      captures: payPalCaptureLookup,
+      audit: auditLog(),
+      limits: LIMITS,
     });
-  } finally {
-    await tools.close();
-    await upstream.close();
-  }
+    return withClient(guard, 'support-agent', (tools) =>
+      runSupportAgent({
+        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers }),
+        tools,
+        ticket,
+        instructions: mode === 'vulnerable' ? VULNERABLE_INSTRUCTIONS : SHOP_INSTRUCTIONS,
+      }),
+    );
+  });
 }
