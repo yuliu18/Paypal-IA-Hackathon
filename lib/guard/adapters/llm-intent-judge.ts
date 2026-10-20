@@ -57,16 +57,19 @@ export function openAiCompatibleChat({
   apiKey,
   model,
   timeoutMs = 15_000,
+  headers = {},
 }: {
   baseUrl: string;
   apiKey: string;
   model: string;
   timeoutMs?: number;
+  // Provider-specific headers, e.g. OpenCode Go asks for a client user agent and `x-opencode-session`.
+  headers?: Record<string, string>;
 }): ChatCompletion {
   return async (messages) => {
     const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages, temperature: 0 }),
       signal: AbortSignal.timeout(timeoutMs),
     });

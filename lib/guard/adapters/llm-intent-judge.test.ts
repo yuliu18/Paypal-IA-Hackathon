@@ -65,4 +65,22 @@ describe('openAiCompatibleChat', () => {
     const chat = openAiCompatibleChat({ baseUrl: 'https://llm.test/v1', apiKey: 'k', model: 'm', timeoutMs: 20 });
     await expect(chat([{ role: 'user', content: 'hi' }])).rejects.toThrow();
   });
+
+  it('sends extra headers such as a client user agent and session id', async () => {
+    let sent: Headers | undefined;
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      sent = new Headers(init.headers);
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'OK' } }] }));
+    });
+    const chat = openAiCompatibleChat({
+      baseUrl: 'https://llm.test/v1',
+      apiKey: 'k',
+      model: 'm',
+      headers: { 'User-Agent': 'payment-guard/0.1', 'x-opencode-session': 's-1' },
+    });
+    expect(await chat([{ role: 'user', content: 'hi' }])).toBe('OK');
+    expect(sent?.get('user-agent')).toBe('payment-guard/0.1');
+    expect(sent?.get('x-opencode-session')).toBe('s-1');
+    expect(sent?.get('authorization')).toBe('Bearer k');
+  });
 });
