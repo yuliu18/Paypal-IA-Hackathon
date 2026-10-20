@@ -47,13 +47,26 @@ const judge: IntentJudge = {
   },
 };
 
+// Orders as PayPal's get_order returns them: the shop's custom_id names the customer.
+const order = (id: string, customer: string) => JSON.stringify({ id, purchase_units: [{ custom_id: customer, payments: { captures: [{ id: `CAP-${id}` }] } }] });
+const ORDERS: Record<string, string> = {
+  'ORD-1': order('ORD-1', 'ana@example.com'),
+  'ORD-2': order('ORD-2', 'ben@example.com'),
+  'ORD-MIXED': JSON.stringify({ id: 'ORD-MIXED', purchase_units: [{ custom_id: 'ana@example.com' }, { custom_id: 'ben@example.com' }] }),
+  'ORD-GARBLED': 'not json',
+};
+
 function fakePayPal() {
   const server = new McpServer({ name: 'fake-paypal', version: '0.0.0' });
   const ok = (name: string) => async (args: unknown) => {
     upstreamCalls.push({ name, args });
     return { content: [{ type: 'text' as const, text: `${name} ok` }] };
   };
-  server.registerTool('get_order', { description: 'get', inputSchema: { id: z.string() } }, ok('get_order'));
+  server.registerTool('get_order', { description: 'get', inputSchema: { id: z.string() } }, async (args) => {
+    upstreamCalls.push({ name: 'get_order', args });
+    return { content: [{ type: 'text' as const, text: ORDERS[args.id] ?? 'not found' }] };
+  });
+  server.registerTool('get_refund', { description: 'get refund', inputSchema: { id: z.string() } }, ok('get_refund'));
   server.registerTool(
     'create_refund',
     { description: 'refund', inputSchema: { capture_id: z.string(), amount: z.object({ currency_code: z.string(), value: z.string() }).optional() } },
@@ -134,16 +147,46 @@ describe('payment guard', () => {
   it('exposes the upstream PayPal tools unchanged', async () => {
     const agent = await connect();
     const { tools } = await agent.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order', 'list_transactions']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order', 'get_refund', 'list_transactions']);
   });
 
-  it('passes read tools straight through and logs them', async () => {
+  it('returns an order of the ticket customer and logs the read', async () => {
     const agent = await connect();
     const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
-    expect(text(result)).toBe('get_order ok');
+    expect(text(result)).toBe(ORDERS['ORD-1']);
     expect(upstreamCalls).toEqual([{ name: 'get_order', args: { id: 'ORD-1' } }]);
     expect(entries.map((e) => e.outcome)).toEqual(['executed']);
     expect(judgeCalls).toBe(0);
+  });
+
+  it("withholds another customer's order and logs the read as blocked", async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-2' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+    expect(text(result)).not.toContain('ben@example.com');
+    expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'blocked', decision: { verdict: 'block' } });
+  });
+
+  it('withholds an order when any of its purchase units belongs to someone else', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-MIXED' } });
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+  });
+
+  it('withholds an order whose customer cannot be read from the PayPal answer', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-GARBLED' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+    expect(text(result)).not.toContain('not json');
+  });
+
+  it('blocks get_refund, whose answer does not say which customer it belongs to', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_refund', arguments: { id: 'REF-1' } });
+    expect(text(result)).toContain('TOOL_NOT_ALLOWED');
+    expect(upstreamCalls).toEqual([]);
   });
 
   it('forwards a refund that passes policy and the judge, recording the money moved', async () => {
@@ -246,7 +289,7 @@ describe('payment guard', () => {
     auditFails = true;
     const agent = await connect();
     const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
-    expect(text(result)).toBe('get_order ok');
+    expect(text(result)).toBe(ORDERS['ORD-1']);
   });
 
   it('logs a read once, after it ran, with no amount', async () => {

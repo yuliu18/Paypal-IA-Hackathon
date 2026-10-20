@@ -7,12 +7,13 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { toMinor } from './adapters/paypal-capture-lookup';
-import { evaluateRefund, mergeDecisions, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
+import { evaluateRefund, isMandateCustomer, mergeDecisions, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type { AgentTask, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
-// Single-record reads a support agent needs. Bulk reads such as list_transactions would expose
-// every customer's data, so they stay blocked like any tool not listed here.
-const READ_TOOLS = new Set(['get_order', 'get_refund']);
+// Single-record reads a support agent needs, each returned only when it belongs to the ticket
+// customer. Bulk reads such as list_transactions would expose every customer's data, and
+// get_refund's answer doesn't say whose refund it is, so they stay blocked like any tool not listed.
+const READ_TOOLS = new Set(['get_order']);
 const isRead = (tool: string) => READ_TOOLS.has(tool);
 
 export type GuardDeps = {
@@ -50,6 +51,19 @@ const block = (code: string, message: string): Decision => ({ verdict: 'block', 
 function blockedResult(decision: Decision): CallToolResult {
   const reasons = decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ');
   return { isError: true, content: [{ type: 'text', text: `Blocked by payment guard. ${reasons}` }] };
+}
+
+// get_order answers with the order JSON; every purchase unit's custom_id (the customer the shop
+// charged) must be the ticket customer. An answer that can't be read is withheld too.
+function orderBelongsTo(result: CallToolResult, mandate: AgentTask['mandate']): boolean {
+  const part = result.content[0];
+  try {
+    const order = JSON.parse(part?.type === 'text' ? part.text : '') as { purchase_units?: { custom_id?: string }[] };
+    const units = order.purchase_units ?? [];
+    return units.length > 0 && units.every((unit) => isMandateCustomer(unit.custom_id, mandate));
+  } catch {
+    return false;
+  }
 }
 
 const MONEY_VALUE = /^\d+(\.\d{1,2})?$/;
@@ -128,6 +142,11 @@ export function createPaymentGuard({
     if (isRead(name)) {
       try {
         const result = await callPayPal(name, args);
+        if (!result.isError && !orderBelongsTo(result, task.mandate)) {
+          const withheld = block('CUSTOMER_MISMATCH', `Order is not one of the ticket customer ${task.mandate.customerEmail}`);
+          await audit.record({ at, tool: name, args, task, decision: withheld, outcome: 'blocked' }).catch(() => undefined);
+          return blockedResult(withheld);
+        }
         await audit.record({ at, tool: name, args, task, decision, outcome: result.isError ? 'error' : 'executed' }).catch(() => undefined);
         return result;
       } catch (error) {

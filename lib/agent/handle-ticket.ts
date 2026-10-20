@@ -55,7 +55,7 @@ export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'car
   const paypal = new PayPalAgentToolkit({
     accessToken: await accessToken(),
     configuration: {
-      actions: { orders: { get: true }, payments: { createRefund: true, getRefunds: true } },
+      actions: { orders: { get: true }, payments: { createRefund: true } },
       context: { sandbox: true },
     },
   });

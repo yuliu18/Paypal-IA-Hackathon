@@ -55,6 +55,10 @@ const exceeds = (amount: Money, limit: Money) => amount.currency !== limit.curre
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+// Whether a customer recorded by the shop is the one the agent works for. Unknown never matches.
+export const isMandateCustomer = (customerEmail: string | null | undefined, mandate: TaskMandate) =>
+  !!customerEmail && normalizeEmail(customerEmail) === normalizeEmail(mandate.customerEmail);
+
 export function evaluateRefund({ request, capture, mandate, limits, refundedToday }: RefundContext): Decision {
   const violations: Violation[] = [];
   const refundable: Money = { minor: capture.captured.minor - capture.refunded.minor, currency: capture.captured.currency };
@@ -75,7 +79,7 @@ export function evaluateRefund({ request, capture, mandate, limits, refundedToda
     violations.push({ code: 'AMOUNT_EXCEEDS_REFUNDABLE', message: `Refund ${format(amount)} exceeds refundable ${format(refundable)}` });
   }
 
-  if (!capture.customerEmail || normalizeEmail(capture.customerEmail) !== normalizeEmail(mandate.customerEmail)) {
+  if (!isMandateCustomer(capture.customerEmail, mandate)) {
     violations.push({ code: 'CUSTOMER_MISMATCH', message: `Capture customer is not the ticket customer ${mandate.customerEmail}` });
   }
 

@@ -12,7 +12,7 @@ export default async function GuardLogPage() {
   return (
     <EndpointPage
       title="Payment guard log"
-      calls={['MCP create_refund', 'MCP get_order', 'MCP get_refund']}
+      calls={['MCP create_refund', 'MCP get_order']}
       source="lib/guard/guard.ts"
       note="Every tool call the AI agent made through the payment guard, newest first. Blocked calls never reached PayPal; pending means the call was logged before running and never settled, so its amount still counts toward the daily limit."
       rows={entries.map((e) => ({
