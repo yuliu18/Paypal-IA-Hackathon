@@ -50,13 +50,25 @@ export function createLlmIntentJudge(complete: ChatCompletion): IntentJudge {
   };
 }
 
-// Chat completion against any OpenAI-compatible `/chat/completions` endpoint.
-export function openAiCompatibleChat({ baseUrl, apiKey, model }: { baseUrl: string; apiKey: string; model: string }): ChatCompletion {
+// Chat completion against any OpenAI-compatible `/chat/completions` endpoint. The timeout keeps
+// a hung provider from stalling the guard's write queue; the judge turns it into a block.
+export function openAiCompatibleChat({
+  baseUrl,
+  apiKey,
+  model,
+  timeoutMs = 15_000,
+}: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  timeoutMs?: number;
+}): ChatCompletion {
   return async (messages) => {
     const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages, temperature: 0 }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };

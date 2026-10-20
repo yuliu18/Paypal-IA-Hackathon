@@ -27,13 +27,16 @@ export type AuditEntry = {
   args: Record<string, unknown>;
   task: AgentTask;
   decision: Decision;
-  // Amount that actually moved, present only for executed money-moving calls.
+  // Amount that moved or may have moved: set before execution and cleared only when PayPal
+  // explicitly rejects the call, so ambiguous failures still count toward limits.
   moved?: Money;
-  outcome: 'executed' | 'blocked' | 'error';
+  outcome: 'pending' | 'executed' | 'blocked' | 'error';
   detail?: string;
 };
 
 export interface AuditLog {
-  record(entry: AuditEntry): Promise<void>;
+  // Returns the entry id. Writes are logged as `pending` before they run (write-ahead).
+  record(entry: AuditEntry): Promise<string>;
+  update(id: string, patch: Partial<Pick<AuditEntry, 'outcome' | 'moved' | 'detail'>>): Promise<void>;
   movedSince(since: Date, currency: string): Promise<Money>;
 }

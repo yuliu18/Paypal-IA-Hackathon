@@ -1,6 +1,7 @@
 // The payment guard: an MCP server that sits between an AI agent and PayPal's MCP toolkit.
-// It exposes the same tools, passes reads through, evaluates refunds against the policy and
-// the intent judge, and blocks every other write by default. Blocked calls never reach PayPal.
+// It exposes the same tools, passes allowlisted reads through, evaluates refunds against the
+// policy and the intent judge, and blocks everything else by default. Blocked calls never
+// reach PayPal.
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -9,8 +10,10 @@ import { toMinor } from './adapters/paypal-capture-lookup';
 import { evaluateRefund, mergeDecisions, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type { AgentTask, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
-const READ_PREFIXES = ['get_', 'list_', 'show_'];
-const isRead = (tool: string) => READ_PREFIXES.some((prefix) => tool.startsWith(prefix));
+// Single-record reads a support agent needs. Bulk reads such as list_transactions would expose
+// every customer's data, so they stay blocked like any tool not listed here.
+const READ_TOOLS = new Set(['get_order', 'get_refund']);
+const isRead = (tool: string) => READ_TOOLS.has(tool);
 
 export type GuardDeps = {
   upstream: Client;
@@ -92,18 +95,31 @@ export function createPaymentGuard({ upstream, task, judge, captures, audit, lim
     else decision = block('TOOL_NOT_ALLOWED', `${name} is not covered by the guard policy`);
 
     if (decision.verdict === 'block') {
-      await audit.record({ at, tool: name, args, task, decision, outcome: 'blocked' });
+      // The call is refused either way; a failed log write must not turn a block into an error.
+      await audit.record({ at, tool: name, args, task, decision, outcome: 'blocked' }).catch(() => undefined);
       return blockedResult(decision);
     }
 
+    // Write-ahead: log the call with the amount it may move before it runs. If that fails, the
+    // call can't be accounted for, so it doesn't run.
+    let id: string;
+    try {
+      id = await audit.record({ at, tool: name, args, task, decision, outcome: 'pending', moved });
+    } catch (error) {
+      return blockedResult(block('AUDIT_UNAVAILABLE', error instanceof Error ? error.message : String(error)));
+    }
+
+    // Update failures are ignored: the pending entry already counts the amount, which errs safe.
+    const settle = (patch: Parameters<AuditLog['update']>[1]) => audit.update(id, patch).catch(() => undefined);
     try {
       const result = (await upstream.callTool({ name, arguments: args })) as CallToolResult;
-      const failed = Boolean(result.isError);
-      await audit.record({ at, tool: name, args, task, decision, outcome: failed ? 'error' : 'executed', moved: failed ? undefined : moved });
+      // An explicit PayPal rejection moved nothing, so it stops counting toward limits.
+      await settle(result.isError ? { outcome: 'error', moved: undefined } : { outcome: 'executed' });
       return result;
     } catch (error) {
+      // Transport failure: PayPal may have executed the call, so the amount keeps counting.
       const detail = error instanceof Error ? error.message : String(error);
-      await audit.record({ at, tool: name, args, task, decision, outcome: 'error', detail });
+      await settle({ outcome: 'error', detail });
       return { isError: true, content: [{ type: 'text', text: `PayPal call failed: ${detail}` }] };
     }
   }

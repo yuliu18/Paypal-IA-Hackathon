@@ -21,10 +21,17 @@ let upstreamCalls: { name: string; args: unknown }[];
 let entries: AuditEntry[];
 let judgeDecision: Decision;
 let judgeCalls: number;
+let auditFails: boolean;
+let rejectRefunds: boolean;
 
 const audit: AuditLog = {
   async record(entry) {
-    entries.push(entry);
+    if (auditFails) throw new Error('disk full');
+    entries.push({ ...entry });
+    return String(entries.length - 1);
+  },
+  async update(id, patch) {
+    Object.assign(entries[Number(id)], patch);
   },
   async movedSince() {
     return usd(entries.reduce((sum, e) => sum + (e.moved?.minor ?? 0), 0));
@@ -48,17 +55,29 @@ function fakePayPal() {
   server.registerTool(
     'create_refund',
     { description: 'refund', inputSchema: { capture_id: z.string(), amount: z.object({ currency_code: z.string(), value: z.string() }).optional() } },
-    ok('create_refund'),
+    async (args) => {
+      if (!rejectRefunds) return ok('create_refund')(args);
+      upstreamCalls.push({ name: 'create_refund', args });
+      return { isError: true, content: [{ type: 'text' as const, text: 'UNPROCESSABLE_ENTITY' }] };
+    },
   );
+  server.registerTool('list_transactions', { description: 'list', inputSchema: {} }, ok('list_transactions'));
   server.registerTool('cancel_subscription', { description: 'cancel', inputSchema: { id: z.string() } }, ok('cancel_subscription'));
   return server;
 }
 
-async function connect(captures = { getCapture: async () => facts }) {
+async function connect(captures = { getCapture: async () => facts }, { upstreamThrows = false } = {}) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
   const upstream = new Client({ name: 'guard-upstream', version: '0.0.0' });
   await upstream.connect(upClient);
+  if (upstreamThrows) {
+    // A transport failure after PayPal may already have executed the call.
+    upstream.callTool = async (params) => {
+      upstreamCalls.push({ name: params.name, args: params.arguments });
+      throw new Error('socket hang up');
+    };
+  }
 
   const guard = createPaymentGuard({
     upstream,
@@ -83,13 +102,15 @@ beforeEach(() => {
   entries = [];
   judgeDecision = { verdict: 'allow', violations: [] };
   judgeCalls = 0;
+  auditFails = false;
+  rejectRefunds = false;
 });
 
 describe('payment guard', () => {
   it('exposes the upstream PayPal tools unchanged', async () => {
     const agent = await connect();
     const { tools } = await agent.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order', 'list_transactions']);
   });
 
   it('passes read tools straight through and logs them', async () => {
@@ -157,6 +178,41 @@ describe('payment guard', () => {
     const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
     await Promise.all(agents.map((agent) => agent.callTool({ name: 'create_refund', arguments: big })));
     expect(upstreamCalls).toHaveLength(4);
+  });
+
+  it('counts a refund whose PayPal call failed ambiguously toward the daily limit', async () => {
+    const agent = await connect(undefined, { upstreamThrows: true });
+    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
+    for (let i = 0; i < 4; i++) await agent.callTool({ name: 'create_refund', arguments: big });
+    const fifth = await agent.callTool({ name: 'create_refund', arguments: big });
+    expect(text(fifth)).toContain('DAILY_LIMIT');
+    expect(upstreamCalls).toHaveLength(4);
+    expect(entries.slice(0, 4).map((e) => e.outcome)).toEqual(['error', 'error', 'error', 'error']);
+  });
+
+  it('does not count a refund PayPal explicitly rejected', async () => {
+    rejectRefunds = true;
+    const agent = await connect();
+    const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
+    for (let i = 0; i < 5; i++) await agent.callTool({ name: 'create_refund', arguments: big });
+    expect(upstreamCalls).toHaveLength(5);
+    expect(entries.every((e) => e.outcome === 'error' && e.moved === undefined)).toBe(true);
+  });
+
+  it('blocks a refund when it cannot be logged before execution', async () => {
+    auditFails = true;
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
+    expect(text(result)).toContain('AUDIT_UNAVAILABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks bulk reads outside the read allowlist', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'list_transactions', arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('TOOL_NOT_ALLOWED');
+    expect(upstreamCalls).toEqual([]);
   });
 
   it('blocks any other write tool by default', async () => {
