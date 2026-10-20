@@ -10,6 +10,7 @@ export type ViolationCode =
   | 'CAPTURE_MISMATCH'
   | 'CAPTURE_NOT_REFUNDABLE'
   | 'CURRENCY_MISMATCH'
+  | 'NOTHING_TO_REFUND'
   | 'AMOUNT_EXCEEDS_REFUNDABLE'
   | 'CUSTOMER_MISMATCH'
   | 'PER_REFUND_LIMIT'
@@ -68,6 +69,8 @@ export function evaluateRefund({ request, capture, mandate, limits, refundedToda
 
   if (amount.currency !== refundable.currency) {
     violations.push({ code: 'CURRENCY_MISMATCH', message: `Refund in ${amount.currency}, capture in ${refundable.currency}` });
+  } else if (amount.minor <= 0) {
+    violations.push({ code: 'NOTHING_TO_REFUND', message: `Refund ${format(amount)} moves no money; refundable is ${format(refundable)}` });
   } else if (amount.minor > refundable.minor) {
     violations.push({ code: 'AMOUNT_EXCEEDS_REFUNDABLE', message: `Refund ${format(amount)} exceeds refundable ${format(refundable)}` });
   }

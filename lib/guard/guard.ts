@@ -147,14 +147,26 @@ export function createPaymentGuard({
 
     // Update failures are ignored: the pending entry already counts the amount, which errs safe.
     const settle = (patch: Parameters<AuditLog['update']>[1]) => audit.update(id, patch).catch(() => undefined);
+    const call = upstream.callTool({ name, arguments: args }) as Promise<CallToolResult>;
     try {
-      const result = await callPayPal(name, args);
+      const result = await withTimeout(call, timeoutMs, `PayPal ${name}`);
       // An explicit PayPal rejection moved nothing, so it stops counting toward limits.
       await settle(result.isError ? { outcome: 'error', moved: undefined } : { outcome: 'executed' });
       return result;
     } catch (error) {
       // Transport failure or timeout: PayPal may have executed the call, so the amount keeps counting.
       await settle({ outcome: 'error', detail: message(error) });
+      // After a timeout the call is still in flight; when PayPal does answer, record what really
+      // happened. A call that never answers keeps counting, which errs safe.
+      call.then(
+        (late) =>
+          settle(
+            late.isError
+              ? { outcome: 'error', moved: undefined, detail: 'PayPal rejected the call after the guard timed out' }
+              : { outcome: 'executed', detail: 'PayPal completed the call after the guard timed out' },
+          ),
+        () => undefined,
+      );
       return failedResult(message(error));
     }
   }

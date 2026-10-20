@@ -68,7 +68,10 @@ function fakePayPal() {
   return server;
 }
 
-async function connect(captures = { getCapture: async () => facts }, { upstreamThrows = false, upstreamHangs = false } = {}) {
+async function connect(
+  captures = { getCapture: async () => facts },
+  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined } = {},
+) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
   const upstream = new Client({ name: 'guard-upstream', version: '0.0.0' });
@@ -84,6 +87,17 @@ async function connect(captures = { getCapture: async () => facts }, { upstreamT
     upstream.callTool = (params) => {
       upstreamCalls.push({ name: params.name, args: params.arguments });
       return new Promise(() => undefined);
+    };
+  }
+
+  if (upstreamLate) {
+    // PayPal answers, but only after the guard's timeout (50 ms) has already fired.
+    upstream.callTool = (params) => {
+      upstreamCalls.push({ name: params.name, args: params.arguments });
+      const result = upstreamLate === 'ok'
+        ? { content: [{ type: 'text' as const, text: 'refund ok' }] }
+        : { isError: true, content: [{ type: 'text' as const, text: 'UNPROCESSABLE_ENTITY' }] };
+      return new Promise((resolve) => setTimeout(() => resolve(result), 100));
     };
   }
 
@@ -251,6 +265,22 @@ describe('payment guard', () => {
     expect(entries[0]).toMatchObject({ outcome: 'error', moved: usd(5000) });
     await agent.callTool({ name: 'create_refund', arguments: big });
     expect(upstreamCalls).toHaveLength(2);
+  });
+
+  it('settles a timed-out refund as executed when PayPal completes it later', async () => {
+    const agent = await connect(undefined, { upstreamLate: 'ok' });
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '20.00' } } });
+    expect(text(result)).toContain('timed out');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(entries[0]).toMatchObject({ outcome: 'executed', moved: usd(2000), detail: 'PayPal completed the call after the guard timed out' });
+  });
+
+  it('stops counting a timed-out refund when PayPal later rejects it', async () => {
+    const agent = await connect(undefined, { upstreamLate: 'rejected' });
+    await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '20.00' } } });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(entries[0]).toMatchObject({ outcome: 'error', detail: 'PayPal rejected the call after the guard timed out' });
+    expect(entries[0].moved).toBeUndefined();
   });
 
   it('blocks a refund whose capture lookup hangs', async () => {

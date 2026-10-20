@@ -40,6 +40,10 @@ describe('toMinor', () => {
       expect(() => toMinor({ value, currency_code: 'USD' })).toThrow('Invalid PayPal amount');
     }
   });
+
+  it('rejects negative amounts, which would shrink the refunded total and inflate what is refundable', () => {
+    expect(() => toMinor({ value: '-10.00', currency_code: 'USD' })).toThrow('Invalid PayPal amount');
+  });
 });
 
 describe('toCaptureFacts', () => {

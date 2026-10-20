@@ -40,6 +40,15 @@ describe('evaluateRefund', () => {
     expect(codes(ctx)).toEqual(['PER_REFUND_LIMIT']);
   });
 
+  it('blocks a zero refund', () => {
+    expect(codes(context({ request: { captureId: 'CAP-1', amount: usd(0) } }))).toEqual(['NOTHING_TO_REFUND']);
+  });
+
+  it('blocks an omitted amount when nothing is left to refund on the capture', () => {
+    const ctx = context({ request: { captureId: 'CAP-1' }, capture: { ...context().capture, status: 'PARTIALLY_REFUNDED', refunded: usd(5000) } });
+    expect(codes(ctx)).toEqual(['NOTHING_TO_REFUND']);
+  });
+
   it('blocks a refund in a different currency, failing closed on limits it cannot compare', () => {
     const ctx = context({ request: { captureId: 'CAP-1', amount: { minor: 100, currency: 'EUR' } } });
     expect(codes(ctx)).toEqual(['CURRENCY_MISMATCH', 'PER_REFUND_LIMIT', 'DAILY_LIMIT']);
