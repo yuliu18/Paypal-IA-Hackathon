@@ -29,13 +29,26 @@ export type GuardDashboardRows = { guardDecisions: GuardDecisionRow[]; guardViol
 function requestedAmount(entry: AuditRow) {
   if (entry.tool !== 'create_refund') return null;
   const amount = entry.args.amount as { value?: unknown; currency_code?: unknown } | undefined;
+  // Only a stated amount counts: Number() would read null and blank strings as 0.
+  const stated = typeof amount?.value === 'number' || (typeof amount?.value === 'string' && amount.value.trim() !== '');
   const value = Number(amount?.value);
-  if (amount?.value === undefined || !Number.isFinite(value)) return null;
-  return { value, currency: typeof amount.currency_code === 'string' ? amount.currency_code : null };
+  if (!stated || !Number.isFinite(value)) return null;
+  return { value, currency: typeof amount?.currency_code === 'string' ? amount.currency_code : null };
+}
+
+// The newest `limit` entries as rows; an unreadable log leaves the guard page empty instead of
+// taking the PayPal pages of the dashboard down with it.
+export function readGuardDashboardRows(list: (limit: number) => AuditRow[], limit: number): GuardDashboardRows {
+  try {
+    return guardDashboardRows(list(limit));
+  } catch (error) {
+    console.error('Payment guard log could not be read for the dashboard', error);
+    return { guardDecisions: [], guardViolations: [] };
+  }
 }
 
 export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
-  const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
+  const decided = new Set(entries.map((e) => e.resolves).filter((id) => id !== undefined));
   return {
     guardDecisions: entries.map((e) => {
       const requested = requestedAmount(e);

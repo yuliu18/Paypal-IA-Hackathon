@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AuditRow } from './ports';
-import { guardDashboardRows } from './dashboard-rows';
+import { guardDashboardRows, readGuardDashboardRows } from './dashboard-rows';
 
 const task = { mandate: { customerEmail: 'ana@example.com' }, instructions: 'Refund damaged items only.', untrustedInput: 'Broken mug.' };
 
@@ -53,6 +53,13 @@ describe('guardDashboardRows', () => {
     expect(guardDashboardRows([full]).guardDecisions[0]).toMatchObject({ requested: null, protected: null, currency: null });
   });
 
+  it('leaves a null or blank requested amount empty instead of reading it as zero', () => {
+    for (const value of [null, '', '  ']) {
+      const blocked = row({ id: '8', args: { capture_id: 'CAP-1', amount: { value, currency_code: 'USD' } }, decision: { verdict: 'block', violations: [] }, outcome: 'blocked', moved: undefined });
+      expect(guardDashboardRows([blocked]).guardDecisions[0]).toMatchObject({ requested: null, protected: null });
+    }
+  });
+
   it('marks a held refund as awaiting approval until a later entry decides it', () => {
     const held = row({ id: '4', decision: { verdict: 'hold', violations: [] }, outcome: 'held', moved: undefined });
     expect(guardDashboardRows([held]).guardDecisions[0]).toMatchObject({ awaitingApproval: 1, moved: 0, protected: 0 });
@@ -85,5 +92,27 @@ describe('guardDashboardRows', () => {
       { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'other payer' },
       { id: '7-1', decisionId: '7', code: 'DAILY_LIMIT', message: 'over' },
     ]);
+  });
+});
+
+describe('readGuardDashboardRows', () => {
+  it('reads the newest entries up to the limit', () => {
+    let asked = 0;
+    const rows = readGuardDashboardRows((limit) => {
+      asked = limit;
+      return [row({ id: '1' })];
+    }, 5000);
+    expect(asked).toBe(5000);
+    expect(rows.guardDecisions).toHaveLength(1);
+  });
+
+  it('returns empty tables when the log cannot be read, so the rest of the dashboard still loads', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rows = readGuardDashboardRows(() => {
+      throw new Error('database is locked');
+    }, 5000);
+    expect(rows).toEqual({ guardDecisions: [], guardViolations: [] });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });

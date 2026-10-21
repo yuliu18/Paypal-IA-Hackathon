@@ -226,7 +226,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
         id: 'guardDecisions',
         name: 'Guard Decisions',
         description:
-          'Every tool call the AI support agent made through the payment guard, and every decision a person made on a held refund. ' +
+          'The newest 5,000 tool calls the AI support agent made through the payment guard, and the decisions people made on held refunds. ' +
           'Verdict is allow, hold or block. Money protected is the requested amount of blocked refunds; it is empty when the agent asked ' +
           'for a full refund without stating the amount. Refunded through guard is what may have left the account. Awaiting approval is 1 for held refunds no person has decided yet.',
         data: data.guardDecisions,
