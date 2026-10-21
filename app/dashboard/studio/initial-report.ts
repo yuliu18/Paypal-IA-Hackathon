@@ -1,5 +1,6 @@
-// The built-in "PayPal overview" report: pages for revenue, receivables, cash and catalogue, as
-// AG Studio report state. Field ids ('invoices.paidAmount') refer to the data sources in ./data.ts.
+// The built-in "PayPal overview" report: pages for revenue, receivables, cash, catalogue and the
+// payment guard, as AG Studio report state. Field ids ('invoices.paidAmount') refer to the data
+// sources in ./data.ts.
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from 'ag-studio';
 
@@ -395,8 +396,88 @@ const catalogue: AgPageState = {
     'catalogue-sunburst': at(16, 27, 8, 24),
   },
 };
+// What the payment guard did for the AI support agent: money it kept in the account, how it
+// decided, which rules were broken and what still waits for a person (lib/guard/dashboard-rows.ts).
+const guard: AgPageState = {
+  id: 'guard',
+  widgets: {
+    'kpi-protected': kpi('Money protected', sum('guardDecisions.protected')),
+    'kpi-refunded': kpi('Refunded through guard', sum('guardDecisions.moved')),
+    'kpi-awaiting': kpi('Awaiting approval', sum('guardDecisions.awaitingApproval')),
+    'kpi-decisions': kpi('Guard decisions', countd('guardDecisions.id')),
+    'by-verdict': {
+      type: 'donut-chart',
+      dataMapping: {
+        categoryKey: [{ id: 'guardDecisions.verdict' }],
+        valueKey: [countd('guardDecisions.id')],
+      },
+      format: {
+        ...title('Decisions by verdict'),
+        style: {
+          custom: {
+            pieDataLabel: { enabled: true },
+            totalLabel: { enabled: true },
+          },
+        },
+      },
+    },
+    'by-violation': {
+      type: 'bar-chart-grouped',
+      dataMapping: {
+        categoryKey: [{ id: 'guardViolations.code' }],
+        valueKey: [countd('guardViolations.id')],
+      },
+      sort: [{ field: countd('guardViolations.id'), direction: 'desc' }],
+      format: title('Rules broken'),
+    },
+    timeline: {
+      type: 'column-chart-stacked',
+      dataMapping: {
+        // The decision's own date, not the shared calendar: calendar days without a decision would
+        // show up as a blank verdict.
+        categoryKey: [{ id: 'guardDecisions.day' }],
+        valueKey: [countd('guardDecisions.id')],
+        legendKey: [{ id: 'guardDecisions.verdict' }],
+      },
+      format: {
+        ...title('Decisions per day by verdict'),
+        style: { theme: { common: { legend: { enabled: true } } } },
+      },
+    },
+    decisions: {
+      type: 'grid',
+      dataMapping: {
+        cols: [
+          { id: 'guardDecisions.at' },
+          { id: 'guardDecisions.tool' },
+          { id: 'guardDecisions.verdict' },
+          { id: 'guardDecisions.outcome' },
+          { id: 'guardDecisions.decidedBy' },
+          { id: 'guardDecisions.customer' },
+          sum('guardDecisions.requested'),
+          sum('guardDecisions.moved'),
+          sum('guardDecisions.protected'),
+          sum('guardDecisions.awaitingApproval'),
+        ],
+      },
+      sort: [{ field: { id: 'guardDecisions.at' }, direction: 'desc' }],
+      format: title('Guard decisions, newest first'),
+    },
+  },
+  widgetLayout: {
+    'kpi-protected': at(0, 0, 6, 7),
+    'kpi-refunded': at(6, 0, 6, 7),
+    'kpi-awaiting': at(12, 0, 6, 7),
+    'kpi-decisions': at(18, 0, 6, 7),
+    'by-verdict': at(0, 7, 8, 18),
+    'by-violation': at(8, 7, 16, 18),
+    timeline: at(0, 25, 24, 16),
+    decisions: at(0, 41, 24, 24),
+  },
+};
+
 // The report opens on its first page.
 export const dashboardReport: AgReportState = {
   selectedPageId: revenue.id,
-  pages: [revenue, receivables, cash, catalogue],
+  pages: [revenue, receivables, cash, catalogue, guard],
 };

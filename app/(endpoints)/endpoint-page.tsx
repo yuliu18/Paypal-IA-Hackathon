@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { ColDef } from 'ag-grid-community';
 import { DataGrid, type Row } from './data-grid';
 
@@ -11,6 +12,7 @@ export function EndpointPage({
   note,
   rows,
   columns,
+  children,
 }: {
   title: string;
   /** The REST calls behind the page, e.g. 'GET /v1/catalogs/products'. */
@@ -20,6 +22,8 @@ export function EndpointPage({
   note?: string;
   rows: Row[];
   columns: ColDef<Row>[];
+  /** Shown between the description and the grid. */
+  children?: ReactNode;
 }) {
   return (
     <main className="flex h-dvh flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
@@ -38,6 +42,7 @@ export function EndpointPage({
         </span>
       </div>
       {note && <p className="mt-2 max-w-4xl text-sm text-pp-muted">{note}</p>}
+      {children}
       <div className="mt-5 flex min-h-0 flex-1 flex-col">
         <DataGrid rows={rows} columns={columns} />
       </div>
