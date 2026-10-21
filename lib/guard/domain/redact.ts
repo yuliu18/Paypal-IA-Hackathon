@@ -47,3 +47,8 @@ export function maskEmail(email: string): string {
   const at = email.indexOf('@');
   return at < 1 ? email : `${email[0]}***${email.slice(at)}`;
 }
+
+// For log text shown on a screen (reasons, arguments): every email masked, every card number cut to its last 4.
+export function maskPersonalData(text: string): string {
+  return maskCards(text).text.replace(EMAIL, maskEmail);
+}

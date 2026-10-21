@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maskEmail, privateReply, privateTicket } from './redact';
+import { maskEmail, maskPersonalData, privateReply, privateTicket } from './redact';
 
 describe('privateTicket', () => {
   it('masks card numbers before the agent or the judge sees the ticket, keeping the last 4 digits', () => {
@@ -34,5 +34,14 @@ describe('maskEmail', () => {
   it('keeps the first letter and the domain, so a person can still tell customers apart', () => {
     expect(maskEmail('ana@example.com')).toBe('a***@example.com');
     expect(maskEmail('not an email')).toBe('not an email');
+  });
+});
+
+describe('maskPersonalData', () => {
+  it('masks every email and card number in text shown on a screen', () => {
+    expect(maskPersonalData('Order is not one of the ticket customer ana@example.com; card 4111111111111111')).toBe(
+      'Order is not one of the ticket customer a***@example.com; card [card •••• 1111]',
+    );
+    expect(maskPersonalData('{"capture_id":"CAP-1","amount":{"value":"49.99"}}')).toBe('{"capture_id":"CAP-1","amount":{"value":"49.99"}}');
   });
 });

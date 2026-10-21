@@ -1,6 +1,7 @@
 // The guard's audit log as flat tables for the AG Studio dashboard: one row per decision and one
-// per violation. Amounts are in major units, like the PayPal tables beside them.
+// per violation. Amounts are in major units, like the PayPal tables beside them; emails are masked.
 
+import { maskEmail, maskPersonalData } from './domain/redact';
 import type { AuditRow } from './ports';
 
 export type GuardDecisionRow = {
@@ -60,7 +61,7 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         tool: e.tool,
         verdict: e.decision.verdict,
         outcome: e.outcome,
-        customer: e.task.mandate.customerEmail,
+        customer: maskEmail(e.task.mandate.customerEmail),
         currency: e.moved?.currency ?? requested?.currency ?? null,
         requested: requested?.value ?? null,
         moved: e.moved ? e.moved.minor / 100 : 0,
@@ -70,7 +71,7 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
       };
     }),
     guardViolations: entries.flatMap((e) =>
-      e.decision.violations.map((v, i) => ({ id: `${e.id}-${i}`, decisionId: e.id, code: v.code, message: v.message })),
+      e.decision.violations.map((v, i) => ({ id: `${e.id}-${i}`, decisionId: e.id, code: v.code, message: maskPersonalData(v.message) })),
     ),
   };
 }

@@ -26,7 +26,7 @@ describe('guardDashboardRows', () => {
         tool: 'create_refund',
         verdict: 'allow',
         outcome: 'executed',
-        customer: 'ana@example.com',
+        customer: 'a***@example.com',
         currency: 'USD',
         requested: 25,
         moved: 25,
@@ -81,7 +81,7 @@ describe('guardDashboardRows', () => {
       decision: {
         verdict: 'block',
         violations: [
-          { code: 'CUSTOMER_MISMATCH', message: 'other payer' },
+          { code: 'CUSTOMER_MISMATCH', message: 'Order is not one of the ticket customer ana@example.com' },
           { code: 'DAILY_LIMIT', message: 'over' },
         ],
       },
@@ -89,7 +89,7 @@ describe('guardDashboardRows', () => {
       moved: undefined,
     });
     expect(guardDashboardRows([row({ id: '1' }), blocked]).guardViolations).toEqual([
-      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'other payer' },
+      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'Order is not one of the ticket customer a***@example.com' },
       { id: '7-1', decisionId: '7', code: 'DAILY_LIMIT', message: 'over' },
     ]);
   });
