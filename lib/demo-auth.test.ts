@@ -43,8 +43,18 @@ describe('demoAccess with a failed-attempt limit', () => {
     const failures = new FailedAttempts({ maxFailures: 10, windowMs: 15 * minute });
     for (let i = 0; i < 10; i++) expect(limited(failures, '1.1.1.1', 'nope', i)).toBe('challenge');
     expect(limited(failures, '1.1.1.1', 's3cret', 10)).toBe('locked');
-    expect(failures.retryAfterMs('1.1.1.1', 10)).toBe(15 * minute - 10);
-    expect(limited(failures, '1.1.1.1', 's3cret', 15 * minute)).toBe('allow');
+    expect(failures.retryAfterMs('1.1.1.1', 10)).toBe(15 * minute - 1);
+    expect(limited(failures, '1.1.1.1', 's3cret', 15 * minute + 9)).toBe('allow');
+  });
+
+  it('locks for the whole window from the failure that reaches the limit, however spread out the failures were', () => {
+    const failures = new FailedAttempts({ maxFailures: 10, windowMs: 15 * minute });
+    for (let i = 0; i < 9; i++) limited(failures, '1.1.1.1', 'nope', i);
+    const tenth = 15 * minute - 1;
+    limited(failures, '1.1.1.1', 'nope', tenth);
+    expect(failures.retryAfterMs('1.1.1.1', tenth)).toBe(15 * minute);
+    expect(limited(failures, '1.1.1.1', 's3cret', tenth + 15 * minute - 1)).toBe('locked');
+    expect(limited(failures, '1.1.1.1', 's3cret', tenth + 15 * minute)).toBe('allow');
   });
 
   it('does not lock other clients', () => {

@@ -19,10 +19,11 @@ function basicPassword(authorization: string | null): string | undefined {
   return colon === -1 ? undefined : decoded.slice(colon + 1);
 }
 
-// Wrong passwords per client within a window that starts at its first failure. Kept in memory: one
-// server process, and a restart only gives a guesser a fresh window.
+// Wrong passwords per client within a window that starts at its first failure; the failure that
+// reaches the limit locks the client for a full window from then. Kept in memory: one server
+// process, and a restart only gives a guesser a fresh window.
 export class FailedAttempts {
-  private readonly byClient = new Map<string, { count: number; since: number }>();
+  private readonly byClient = new Map<string, { count: number; since: number; lockedUntil?: number }>();
   private readonly maxFailures: number;
   private readonly windowMs: number;
   private readonly maxClients: number;
@@ -35,7 +36,8 @@ export class FailedAttempts {
 
   private current(client: string, now: number) {
     const entry = this.byClient.get(client);
-    if (entry && now - entry.since >= this.windowMs) {
+    const expired = entry && (entry.lockedUntil === undefined ? now - entry.since >= this.windowMs : now >= entry.lockedUntil);
+    if (expired) {
       this.byClient.delete(client);
       return undefined;
     }
@@ -45,18 +47,19 @@ export class FailedAttempts {
   // How long the client stays locked out; 0 when it may try.
   retryAfterMs(client: string, now: number): number {
     const entry = this.current(client, now);
-    return entry && entry.count >= this.maxFailures ? entry.since + this.windowMs - now : 0;
+    return entry?.lockedUntil === undefined ? 0 : entry.lockedUntil - now;
   }
 
   record(client: string, now: number) {
-    const entry = this.current(client, now);
-    if (entry) {
-      entry.count += 1;
-      return;
+    let entry = this.current(client, now);
+    if (!entry) {
+      // Map keeps insertion order, so the first key is the oldest window.
+      if (this.byClient.size >= this.maxClients) this.byClient.delete(this.byClient.keys().next().value!);
+      entry = { count: 0, since: now };
+      this.byClient.set(client, entry);
     }
-    // Map keeps insertion order, so the first key is the oldest window.
-    if (this.byClient.size >= this.maxClients) this.byClient.delete(this.byClient.keys().next().value!);
-    this.byClient.set(client, { count: 1, since: now });
+    entry.count += 1;
+    if (entry.count >= this.maxFailures) entry.lockedUntil ??= now + this.windowMs;
   }
 }
 
