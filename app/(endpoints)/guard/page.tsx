@@ -5,9 +5,12 @@ import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
 import { HeldQueue, type HeldRefund } from './held-queue';
 
+const FULL_CHECK_MS = 60_000;
+
 export const metadata: Metadata = { title: 'Payment guard log' };
 
-// The black box re-verified on every visit: each row's hash is recomputed and its link followed.
+// The black box checked on every visit: rows added since the last full check are re-hashed and
+// linked, and the whole chain at least once a minute (FULL_CHECK_MS).
 function ChainStatus({ check }: { check: ChainCheck }) {
   if (!check.intact) {
     return (
@@ -18,10 +21,12 @@ function ChainStatus({ check }: { check: ChainCheck }) {
   }
   return (
     <p className="mt-3 rounded border border-pp-success bg-pp-surface px-3 py-2 text-sm text-pp-success">
-      <strong>Black box intact:</strong> {check.records} hash-chained {check.records === 1 ? 'row' : 'rows'} verified
+      <strong>Black box intact:</strong> {check.records} hash-chained {check.records === 1 ? 'row' : 'rows'}, none altered, reordered
+      or removed
       {check.head && (
         <>
-          {' '}· head <code>{check.head.slice(0, 16)}…</code>
+          {' '}· head <code title={check.head}>{check.head.slice(0, 16)}…</code>. A log rewritten from scratch would also
+          chain; keep a copy of this head elsewhere to catch that.
         </>
       )}
     </p>
@@ -32,7 +37,7 @@ export default async function GuardLogPage() {
   await connection();
   const log = auditLog();
   const entries = log.list(500);
-  const chain = log.verifyChain();
+  const chain = log.verifyChain(FULL_CHECK_MS);
   const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
   const held: HeldRefund[] = entries
     .filter((e) => e.outcome === 'held' && !decided.has(e.id))

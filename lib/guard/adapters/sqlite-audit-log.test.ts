@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -186,5 +187,99 @@ describe('hash-chained black box', () => {
     const reopened = createSqliteAuditLog(path);
     await reopened.record(entry());
     expect(reopened.verifyChain()).toMatchObject({ intact: true, records: 4 });
+  });
+
+  it('reports the newest rows as removed when the end of the log was deleted', async () => {
+    const { second } = await sample();
+    tamper(`DELETE FROM audit_log WHERE id = ${second}`);
+    expect(file.verifyChain()).toEqual({ intact: false, brokenAt: second, reason: 'is missing: the newest rows were removed' });
+  });
+
+  it('reports a log emptied after rows were written', async () => {
+    await sample();
+    tamper(`DELETE FROM audit_log`);
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: '1' });
+  });
+
+  it('keeps one unbroken chain when several processes append to the same file at once', async () => {
+    file.verifyChain();
+    const child = join(dir, 'append.mjs');
+    writeFileSync(
+      child,
+      `const { createSqliteAuditLog } = await import(process.argv[2]);
+       const log = createSqliteAuditLog(process.argv[3]);
+       for (let i = 0; i < 40; i++) await log.record(${JSON.stringify(entry())});`,
+    );
+    const adapter = join(import.meta.dirname, 'sqlite-audit-log.ts');
+    const run = () =>
+      new Promise<number | null>((resolve) => spawn(process.execPath, ['--no-warnings', child, adapter, path], { stdio: 'inherit' }).on('exit', resolve));
+    expect(await Promise.all([run(), run(), run()])).toEqual([0, 0, 0]);
+    expect(file.verifyChain()).toMatchObject({ intact: true, records: 120 });
+  }, 30_000);
+
+  describe('reusing a recent full check', () => {
+    it('still checks rows added since, and counts every row', async () => {
+      await sample();
+      file.verifyChain(60_000, 0);
+      await file.record(entry());
+      expect(file.verifyChain(60_000, 1_000)).toMatchObject({ intact: true, records: 4 });
+      const added = await file.record(entry());
+      tamper(`UPDATE audit_log SET moved_minor = 1 WHERE id = ${added}`);
+      expect(file.verifyChain(60_000, 2_000)).toMatchObject({ intact: false, brokenAt: added });
+    });
+
+    it('checks the whole chain again once the full check is older than the window', async () => {
+      const { first } = await sample();
+      file.verifyChain(60_000, 0);
+      tamper(`UPDATE audit_log SET moved_minor = 1 WHERE id = ${first}`);
+      expect(file.verifyChain(60_000, 61_000)).toMatchObject({ intact: false, brokenAt: first });
+    });
+
+    it('checks the whole chain again when the last verified row changed', async () => {
+      await sample();
+      file.verifyChain(60_000, 0);
+      tamper(`UPDATE audit_log SET hash = '${'f'.repeat(64)}' WHERE id = (SELECT MAX(id) FROM audit_log)`);
+      expect(file.verifyChain(60_000, 1_000).intact).toBe(false);
+    });
+  });
+
+  describe('a log written before the chain (table `audit`)', () => {
+    const legacy = (withResolves: boolean) => {
+      tamper(`
+        DROP TABLE IF EXISTS audit;
+        CREATE TABLE audit (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, tool TEXT NOT NULL, args TEXT NOT NULL,
+          task TEXT NOT NULL, decision TEXT NOT NULL, moved_minor INTEGER, moved_currency TEXT, outcome TEXT NOT NULL, detail TEXT
+          ${withResolves ? ', resolves INTEGER' : ''});
+        INSERT INTO audit (id, at, tool, args, task, decision, moved_minor, moved_currency, outcome, detail${withResolves ? ', resolves' : ''}) VALUES
+          (3, '2026-10-20T09:00:00.000Z', 'create_refund', '{"capture_id":"CAP-1"}', '${JSON.stringify(task)}', '{"verdict":"allow","violations":[]}', 2500, 'USD', 'pending', NULL${withResolves ? ', NULL' : ''}),
+          (7, '2026-10-20T09:05:00.000Z', 'create_refund', '{"capture_id":"CAP-2"}', '${JSON.stringify(task)}', '{"verdict":"hold","violations":[]}', NULL, NULL, 'held', NULL${withResolves ? ', NULL' : ''}),
+          (9, '2026-10-20T09:10:00.000Z', 'create_refund', '{"capture_id":"CAP-2"}', '${JSON.stringify(task)}', '{"verdict":"block","violations":[]}', NULL, NULL, 'blocked', 'no'${withResolves ? ', 7' : ''});
+      `);
+    };
+
+    it('carries its rows into the chain with their ids, so limits and decisions keep counting them', async () => {
+      tamper('DROP TABLE audit_log; DROP VIEW audit_state;');
+      legacy(true);
+      const upgraded = createSqliteAuditLog(path);
+      expect(upgraded.list(10).map((e) => [e.id, e.outcome])).toEqual([['9', 'blocked'], ['7', 'held'], ['3', 'pending']]);
+      expect(await upgraded.hasUnsettledRefund('CAP-1')).toBe(true);
+      expect(await upgraded.movedSince(new Date('2026-10-20T00:00:00.000Z'), 'USD')).toEqual({ minor: 2500, currency: 'USD' });
+      expect(await upgraded.isResolved('7')).toBe(true);
+      expect(await upgraded.record(entry())).toBe('10');
+      expect(upgraded.verifyChain()).toMatchObject({ intact: true, records: 4 });
+    });
+
+    it('carries a log that predates approvals, which has no resolves column', async () => {
+      tamper('DROP TABLE audit_log; DROP VIEW audit_state;');
+      legacy(false);
+      expect(createSqliteAuditLog(path).list(10)).toHaveLength(3);
+    });
+
+    it('carries the rows once, not again on every open', async () => {
+      tamper('DROP TABLE audit_log; DROP VIEW audit_state;');
+      legacy(true);
+      createSqliteAuditLog(path);
+      expect(createSqliteAuditLog(path).verifyChain()).toMatchObject({ intact: true, records: 3 });
+    });
   });
 });
