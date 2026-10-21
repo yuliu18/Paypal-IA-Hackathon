@@ -47,3 +47,8 @@ export function minimizeOrder(order: unknown): { order: Record<string, unknown>;
   const kept = keep(order, ORDER, '', withheld);
   return { order: isRecord(kept) ? kept : {}, withheld };
 }
+
+// How a read's black box entry records what was withheld, and how the dashboard counts it back.
+const WITHHELD = 'Withheld from the agent: ';
+export const withheldDetail = (paths: string[]) => (paths.length ? `${WITHHELD}${paths.join(', ')}` : undefined);
+export const withheldCount = (detail: string | undefined) => (detail?.startsWith(WITHHELD) ? detail.slice(WITHHELD.length).split(', ').length : 0);

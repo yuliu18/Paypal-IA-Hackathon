@@ -356,7 +356,7 @@ describe('payment guard', () => {
     const agent = await connect();
     await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'executed' });
+    expect(entries[0]).toMatchObject({ tool: 'get_order', outcome: 'executed', detail: 'Withheld from the agent: purchase_units[0].custom_id' });
     expect(entries[0].moved).toBeUndefined();
   });
 

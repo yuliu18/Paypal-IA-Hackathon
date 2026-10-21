@@ -7,7 +7,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { toMinor } from './adapters/paypal-capture-lookup';
-import { minimizeOrder } from './domain/privacy';
+import { minimizeOrder, withheldDetail } from './domain/privacy';
 import { evaluateRefund, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type { AgentTask, AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
@@ -169,10 +169,10 @@ async function executeWrite(
 
 // The order the agent sees: only what a refund needs, plus the paths the guard withheld. Its owner
 // was already checked, and orderBelongsTo refuses an answer that isn't JSON.
-function withoutPersonalData(result: CallToolResult): CallToolResult {
+function withoutPersonalData(result: CallToolResult): { result: CallToolResult; withheld: string[] } {
   const part = result.content[0];
   const { order, withheld } = minimizeOrder(JSON.parse(part?.type === 'text' ? part.text : ''));
-  return { content: [{ type: 'text', text: JSON.stringify({ ...order, withheld_by_guard: withheld }) }] };
+  return { result: { content: [{ type: 'text', text: JSON.stringify({ ...order, withheld_by_guard: withheld }) }] }, withheld };
 }
 
 export type HeldRefundDecision = {
@@ -284,8 +284,14 @@ export function createPaymentGuard({
           await audit.record({ at, tool: name, args, task, decision: withheld, outcome: 'blocked' }).catch(() => undefined);
           return blockedResult(withheld);
         }
-        await audit.record({ at, tool: name, args, task, decision, outcome: result.isError ? 'error' : 'executed' }).catch(() => undefined);
-        return result.isError ? result : withoutPersonalData(result);
+        if (result.isError) {
+          await audit.record({ at, tool: name, args, task, decision, outcome: 'error' }).catch(() => undefined);
+          return result;
+        }
+        const minimized = withoutPersonalData(result);
+        const detail = withheldDetail(minimized.withheld);
+        await audit.record({ at, tool: name, args, task, decision, outcome: 'executed', ...(detail && { detail }) }).catch(() => undefined);
+        return minimized.result;
       } catch (error) {
         await audit.record({ at, tool: name, args, task, decision, outcome: 'error', detail: message(error) }).catch(() => undefined);
         return failedResult(message(error));

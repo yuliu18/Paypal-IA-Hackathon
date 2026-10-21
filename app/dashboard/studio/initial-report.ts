@@ -397,7 +397,8 @@ const catalogue: AgPageState = {
   },
 };
 // What the payment guard did for the AI support agent: money it kept in the account, how it
-// decided, which rules were broken and what still waits for a person (lib/guard/dashboard-rows.ts).
+// decided, which rules were broken, what still waits for a person and how much personal data it
+// kept from the agent (lib/guard/dashboard-rows.ts).
 const guard: AgPageState = {
   id: 'guard',
   widgets: {
@@ -405,6 +406,7 @@ const guard: AgPageState = {
     'kpi-refunded': kpi('Refunded through guard', sum('guardDecisions.moved')),
     'kpi-awaiting': kpi('Awaiting approval', sum('guardDecisions.awaitingApproval')),
     'kpi-decisions': kpi('Guard decisions', countd('guardDecisions.id')),
+    'kpi-withheld': kpi('Data withheld', sum('guardDecisions.withheld')),
     'by-verdict': {
       type: 'donut-chart',
       dataMapping: {
@@ -465,10 +467,11 @@ const guard: AgPageState = {
     },
   },
   widgetLayout: {
-    'kpi-protected': at(0, 0, 6, 7),
-    'kpi-refunded': at(6, 0, 6, 7),
-    'kpi-awaiting': at(12, 0, 6, 7),
-    'kpi-decisions': at(18, 0, 6, 7),
+    'kpi-protected': at(0, 0, 5, 7),
+    'kpi-refunded': at(5, 0, 5, 7),
+    'kpi-awaiting': at(10, 0, 5, 7),
+    'kpi-decisions': at(15, 0, 5, 7),
+    'kpi-withheld': at(20, 0, 4, 7),
     'by-verdict': at(0, 7, 8, 18),
     'by-violation': at(8, 7, 16, 18),
     timeline: at(0, 25, 24, 16),

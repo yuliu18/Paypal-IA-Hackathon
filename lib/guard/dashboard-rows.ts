@@ -1,6 +1,7 @@
 // The guard's audit log as flat tables for the AG Studio dashboard: one row per decision and one
 // per violation. Amounts are in major units, like the PayPal tables beside them; emails are masked.
 
+import { withheldCount } from './domain/privacy';
 import { maskEmail, maskPersonalData } from './domain/redact';
 import type { AuditRow } from './ports';
 
@@ -20,6 +21,8 @@ export type GuardDecisionRow = {
   protected: number | null;
   // 1 while a held refund waits for a person, so the dashboard can sum it.
   awaitingApproval: number;
+  // Personal data fields of a PayPal answer the guard kept from the agent (lib/guard/domain/privacy.ts).
+  withheld: number;
   decidedBy: 'guard' | 'person';
 };
 
@@ -67,6 +70,7 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         moved: e.moved ? e.moved.minor / 100 : 0,
         protected: e.tool !== 'create_refund' || !blocked ? 0 : (requested?.value ?? null),
         awaitingApproval: e.outcome === 'held' && !decided.has(e.id) ? 1 : 0,
+        withheld: withheldCount(e.detail),
         decidedBy: e.resolves ? 'person' : 'guard',
       };
     }),

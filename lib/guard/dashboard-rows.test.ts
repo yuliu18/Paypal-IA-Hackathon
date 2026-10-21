@@ -32,9 +32,15 @@ describe('guardDashboardRows', () => {
         moved: 25,
         protected: 0,
         awaitingApproval: 0,
+        withheld: 0,
         decidedBy: 'guard',
       },
     ]);
+  });
+
+  it('counts the personal data fields a read withheld from the agent', () => {
+    const lookup = row({ id: '9', tool: 'get_order', args: { id: 'O-1' }, moved: undefined, detail: 'Withheld from the agent: payment_source, payer, purchase_units[0].custom_id' });
+    expect(guardDashboardRows([lookup]).guardDecisions[0].withheld).toBe(3);
   });
 
   it('counts a blocked refund as money protected and moves nothing', () => {
