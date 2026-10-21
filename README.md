@@ -11,14 +11,15 @@
 
 # PayPal SDK data pages
 
-A Next.js app that reads PayPal sandbox data over the [PayPal REST API](https://developer.paypal.com/api/rest/) and shows it two ways:
+A Next.js app that reads PayPal sandbox data over the [PayPal REST API](https://developer.paypal.com/api/rest/), and puts a payment guard between an AI support agent and PayPal:
 
 - **Endpoint pages**: one [AG Grid](https://www.ag-grid.com/react-data-grid/) per PayPal endpoint the demo calls, showing what each returns.
 - **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over all of that data, joined together, which you can edit and save in the browser.
+- **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
 
 ## Run locally
 
-Requires Node.js 20.9 or later and a PayPal sandbox REST app ([developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)). The transactions and balances pages also need the app's **Transaction search** feature enabled.
+Requires Node.js 24 or later (the payment guard's log uses the built-in `node:sqlite`) and a PayPal sandbox REST app ([developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)). The transactions and balances pages also need the app's **Transaction search** feature enabled.
 
 ```bash
 npm install
@@ -57,6 +58,10 @@ lib/dashboard-data.ts    Turns those responses into the dashboard's related tabl
 app/(endpoints)/         One page per endpoint, each rendering an AG Grid
 app/dashboard/           The AG Studio dashboard
 app/api/ai/responses/    Server-side proxy for the dashboard's AI assistant
+lib/agent/               The AI support agent and the wiring of one ticket (handle-ticket.ts)
+lib/guard/               The payment guard: policy, intent judge, audit log, approvals
+app/support/             Support desk: send a ticket to the agent
+app/(endpoints)/guard/   Guard log, approval queue and black box check
 ```
 
 [`lib/paypal.ts`](lib/paypal.ts) calls the REST API with plain `fetch`, no SDK. It gets an OAuth access token with the client-credentials grant and caches it until just before it expires. It follows `page`/`total_pages` paging, and retries on 401, 429 and 5xx responses. Its types are hand-written for the fields this demo reads, in the API's own snake_case.
@@ -88,4 +93,46 @@ Pages are server components, so the column definitions they pass to the grid mus
 
 ## Dashboard
 
-[`/dashboard`](app/dashboard/page.tsx) fetches all five endpoints at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). Reports you create or edit are saved in the browser's localStorage.
+[`/dashboard`](app/dashboard/page.tsx) fetches all five endpoints at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. It adds the payment guard's decisions from its audit log ([`lib/guard/dashboard-rows.ts`](lib/guard/dashboard-rows.ts)) as two more tables, guard decisions and guard violations. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). Reports you create or edit are saved in the browser's localStorage; a browser that saved the built-in report keeps that copy, so use **Reset demo** to see pages added to it later, such as Payment guard.
+
+## Payment guard
+
+An AI agent with refund tools can be talked into refunding the wrong order, the wrong customer or too much: a ticket is untrusted text, and a prompt injection in it reaches the agent's instructions. The payment guard is an MCP server that sits between the agent and [PayPal's agent toolkit](https://github.com/paypal/agent-toolkit). The agent only ever talks to the guard; the guard decides what reaches PayPal.
+
+### Try it
+
+1. Fill in the LLM variables in `.env.local` (`LLM_BASE_URL`, `LLM_API_KEY`, `AGENT_MODEL`, optionally `JUDGE_MODEL`); any OpenAI-compatible endpoint works.
+2. `npm run seed` charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Run it again before each demo: a refunded order can't be refunded twice.
+3. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
+4. Open `/guard` to see every decision, approve or reject held refunds, and check the black box.
+
+### What it decides
+
+Reads pass through only for single records that belong to the ticket customer (`get_order`). Any tool not listed is blocked by default. A refund (`create_refund`) is checked against the shop's policy in [`lib/guard/domain/policy.ts`](lib/guard/domain/policy.ts), using the capture as PayPal reports it, and against an LLM intent judge that compares the call with the ticket and the shop's instructions. The stricter answer wins: block over hold over allow.
+
+| Refund | Result |
+|---|---|
+| Breaks a rule: other customer, more than is refundable, other currency, over the daily limit | Blocked |
+| Over 250 USD | Blocked |
+| Over 100 and up to 250 USD | Held for a person |
+| The judge is unsure (answers `review`) | Held for a person |
+| Up to 100 USD, no rule broken, judge agrees | Runs |
+
+The limits (100 / 250 USD per refund, 200 USD per day) are set in [`lib/agent/handle-ticket.ts`](lib/agent/handle-ticket.ts) for a small shop and the seeded payments. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
+
+### Approving a held refund
+
+A held refund moves no money; the agent is told a person will review it. On `/guard`, **Approve** checks the refund again against the policy as it is now (refundable amount, customer, the 250 USD ceiling, the daily limit, no other refund of that capture still unsettled) and only then calls PayPal. **Reject** records the rejection. Each held refund can be decided once, even if two people click at the same time (decisions are queued within the server process, so run one instance); if PayPal can't be reached during the check, nothing is recorded and the refund stays held. The page is behind `DEMO_PASSWORD`, so for this demo anyone with the password can approve.
+
+### The black box
+
+Every decision is written to a SQLite file (`data/guard-audit.db`, or `GUARD_AUDIT_DB`) before the call runs, and its outcome is appended as a separate row afterwards, so no row is ever rewritten. Each row stores `sha256` of the previous row's hash and its own content. `/guard` checks the chain on every visit and shows either **Black box intact** with the head hash, or **Black box tampered** with the first bad row:
+
+- an edited row no longer matches its hash;
+- a deleted row breaks the link of the row after it, or leaves a gap in the row ids when it was the newest.
+
+What it can't see: someone with write access who rewrites the whole chain with fresh hashes, or also edits SQLite's id counter. To catch that, keep a copy of the head hash somewhere else and compare. New rows are checked on every visit; older ones are re-checked in full at least once a minute, so an edit to an already verified row can take up to a minute to show.
+
+Several processes can write to the same file: each append locks the database before reading the last hash, so the chain can't fork. A log written before the chain existed (table `audit`) is copied into the chain once, renumbered from 1, the first time the new version opens it; the old table is left as it was.
+
+The **Payment guard** page of the dashboard report shows the same log as charts: money protected (the requested amount of blocked refunds; a full refund with no stated amount isn't counted), money refunded through the guard, refunds awaiting approval, decisions by verdict, rules broken, and decisions per day.
