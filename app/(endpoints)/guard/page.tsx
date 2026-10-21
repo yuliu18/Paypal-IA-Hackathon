@@ -1,14 +1,38 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
+import type { ChainCheck } from '@/lib/guard/adapters/sqlite-audit-log';
 import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
 import { HeldQueue, type HeldRefund } from './held-queue';
 
 export const metadata: Metadata = { title: 'Payment guard log' };
 
+// The black box re-verified on every visit: each row's hash is recomputed and its link followed.
+function ChainStatus({ check }: { check: ChainCheck }) {
+  if (!check.intact) {
+    return (
+      <p className="mt-3 rounded border border-pp-danger bg-pp-surface px-3 py-2 text-sm text-pp-danger">
+        <strong>Black box tampered:</strong> row #{check.brokenAt} {check.reason}. Entries from there on cannot be trusted.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-3 rounded border border-pp-success bg-pp-surface px-3 py-2 text-sm text-pp-success">
+      <strong>Black box intact:</strong> {check.records} hash-chained {check.records === 1 ? 'row' : 'rows'} verified
+      {check.head && (
+        <>
+          {' '}· head <code>{check.head.slice(0, 16)}…</code>
+        </>
+      )}
+    </p>
+  );
+}
+
 export default async function GuardLogPage() {
   await connection();
-  const entries = auditLog().list(500);
+  const log = auditLog();
+  const entries = log.list(500);
+  const chain = log.verifyChain();
   const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
   const held: HeldRefund[] = entries
     .filter((e) => e.outcome === 'held' && !decided.has(e.id))
@@ -29,7 +53,7 @@ export default async function GuardLogPage() {
       title="Payment guard log"
       calls={['MCP create_refund', 'MCP get_order']}
       source="lib/guard/guard.ts"
-      note="Every tool call the AI agent made through the payment guard, newest first, and every decision a person made on a held refund. Blocked and held calls never reached PayPal; pending means the call was logged before running and never settled, so its amount still counts toward the daily limit."
+      note="Every tool call the AI agent made through the payment guard, newest first, and every decision a person made on a held refund. Blocked and held calls never reached PayPal; pending means the call was logged before running and never settled, so its amount still counts toward the daily limit. The log is append-only and hash-chained, so any edited or deleted row shows up below."
       rows={entries.map((e) => ({
         id: e.id,
         at: e.at,
@@ -58,6 +82,7 @@ export default async function GuardLogPage() {
         { field: 'decides', headerName: 'Decides held entry' },
       ]}
     >
+      <ChainStatus check={chain} />
       <HeldQueue refunds={held} />
     </EndpointPage>
   );

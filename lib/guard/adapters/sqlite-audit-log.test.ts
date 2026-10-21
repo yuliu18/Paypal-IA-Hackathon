@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AuditEntry } from '../ports';
 import { createSqliteAuditLog, type SqliteAuditLog } from './sqlite-audit-log';
 
@@ -94,5 +98,87 @@ describe('sqlite audit log', () => {
     const approvalId = await log.record(entry({ resolves: heldId, outcome: 'executed' }));
     expect(await log.isResolved(heldId)).toBe(true);
     expect((await log.get(approvalId))?.resolves).toBe(heldId);
+  });
+});
+
+describe('hash-chained black box', () => {
+  let dir: string;
+  let path: string;
+  let file: SqliteAuditLog;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'guard-audit-'));
+    path = join(dir, 'audit.db');
+    file = createSqliteAuditLog(path);
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  // What someone with access to the database file could do behind the guard's back.
+  const tamper = (sql: string) => {
+    const db = new DatabaseSync(path);
+    db.exec(sql);
+    db.close();
+  };
+
+  async function sample() {
+    const first = await file.record(entry());
+    await file.update(first, { outcome: 'executed' });
+    const second = await file.record(entry({ outcome: 'blocked', moved: undefined, decision: { verdict: 'block', violations: [{ code: 'DAILY_LIMIT', message: 'over' }] } }));
+    return { first, second };
+  }
+
+  it('verifies an untouched log, counting every record and settlement', async () => {
+    await sample();
+    expect(file.verifyChain()).toEqual({ intact: true, records: 3, head: expect.stringMatching(/^[0-9a-f]{64}$/) });
+  });
+
+  it('verifies an empty log', () => {
+    expect(file.verifyChain()).toEqual({ intact: true, records: 0, head: null });
+  });
+
+  it('appends a settlement instead of rewriting the logged call', async () => {
+    const id = await file.record(entry());
+    const before = new DatabaseSync(path).prepare('SELECT * FROM audit_log WHERE id = ?').get(Number(id));
+    await file.update(id, { outcome: 'executed', detail: 'done' });
+    const db = new DatabaseSync(path);
+    expect(db.prepare('SELECT * FROM audit_log WHERE id = ?').get(Number(id))).toEqual(before);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM audit_log').get() as { n: number }).n).toBe(2);
+    expect(file.list(10)).toHaveLength(1);
+    expect(file.list(1)[0]).toMatchObject({ id, outcome: 'executed', detail: 'done', moved: { minor: 2500, currency: 'USD' } });
+  });
+
+  it('reports the first record whose content was changed', async () => {
+    const { first } = await sample();
+    tamper(`UPDATE audit_log SET args = '{"capture_id":"CAP-EVIL"}' WHERE id = ${first}`);
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: first });
+  });
+
+  it('reports a change to an amount', async () => {
+    const { first } = await sample();
+    tamper(`UPDATE audit_log SET moved_minor = 1 WHERE id = ${first}`);
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: first });
+  });
+
+  it('reports a deleted record at the record that followed it', async () => {
+    const { first, second } = await sample();
+    tamper(`DELETE FROM audit_log WHERE id = ${first}`);
+    const result = file.verifyChain();
+    expect(result.intact).toBe(false);
+    expect(Number(result.intact ? 0 : result.brokenAt)).toBeGreaterThan(Number(first));
+    expect(Number(result.intact ? 0 : result.brokenAt)).toBeLessThanOrEqual(Number(second));
+  });
+
+  it('reports a record whose hash was recomputed but whose link no longer matches', async () => {
+    const { second } = await sample();
+    tamper(`UPDATE audit_log SET prev_hash = '${'0'.repeat(64)}' WHERE id = ${second}`);
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: second });
+  });
+
+  it('keeps the chain across reopening the file', async () => {
+    await sample();
+    const reopened = createSqliteAuditLog(path);
+    await reopened.record(entry());
+    expect(reopened.verifyChain()).toMatchObject({ intact: true, records: 4 });
   });
 });
