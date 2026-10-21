@@ -1,5 +1,6 @@
-// AG Studio's data sources for the dashboard: a table for each row type in lib/dashboard-data.ts,
-// the relationships between them, a shared calendar and a few calculated measures.
+// AG Studio's data sources for the dashboard: a table for each row type in lib/dashboard-data.ts and
+// lib/guard/dashboard-rows.ts, the relationships between them, a shared calendar and a few
+// calculated measures.
 
 import type {
   AgDataSourcesDefinition,
@@ -55,13 +56,14 @@ const ratio = (id: string, name: string, description: string, numerator: string,
 
 // Whether the PayPal account has anything to report on. Without it, Studio would only show empty widgets.
 export const hasData = (data: DashboardData) =>
-  [data.invoices, data.transactions, data.products, data.plans, data.balances].some((rows) => rows.length > 0);
+  [data.invoices, data.transactions, data.products, data.plans, data.balances, data.guardDecisions].some((rows) => rows.length > 0);
 
 export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
   const dates = [
     ...data.invoices.map((r) => r.invoiceDate),
     ...data.invoicePayments.map((r) => r.date),
     ...data.transactions.map((r) => r.date?.slice(0, 10)),
+    ...data.guardDecisions.map((r) => r.day),
   ]
     .filter((d): d is string => !!d)
     .sort();
@@ -220,6 +222,42 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['withheld', 'Withheld Balance', 'currencyFormat'],
         ]),
       },
+      {
+        id: 'guardDecisions',
+        name: 'Guard Decisions',
+        description:
+          'Every tool call the AI support agent made through the payment guard, and every decision a person made on a held refund. ' +
+          'Verdict is allow, hold or block. Money protected is the requested amount of blocked refunds; it is empty when the agent asked ' +
+          'for a full refund without stating the amount. Refunded through guard is what may have left the account. Awaiting approval is 1 for held refunds no person has decided yet.',
+        data: data.guardDecisions,
+        fields: fields([
+          ['id', 'Guard Entry', 'textFormat'],
+          ['at', 'Decision Time', 'dateTimeFormat'],
+          ['day', 'Decision Date', 'dateFormat'],
+          ['tool', 'Tool', 'textFormat'],
+          ['verdict', 'Verdict', 'textFormat'],
+          ['outcome', 'Guard Outcome', 'textFormat'],
+          ['customer', 'Ticket Customer', 'textFormat'],
+          ['currency', 'Guard Currency', 'textFormat'],
+          ['requested', 'Requested Refund', 'currencyFormat'],
+          ['moved', 'Refunded Through Guard', 'currencyFormat'],
+          ['protected', 'Money Protected', 'currencyFormat'],
+          ['awaitingApproval', 'Awaiting Approval', 'integerFormat'],
+          ['decidedBy', 'Decided By', 'textFormat'],
+        ]),
+      },
+      {
+        id: 'guardViolations',
+        name: 'Guard Violations',
+        description: 'Each rule a guard decision broke, one row per rule; a decision can break several.',
+        data: data.guardViolations,
+        fields: fields([
+          ['id', 'Violation ID', 'textFormat', true],
+          ['decisionId', 'Guard Entry ID', 'textFormat', true],
+          ['code', 'Violation', 'textFormat'],
+          ['message', 'Violation Detail', 'textFormat'],
+        ]),
+      },
     ],
     relationships: [
       manyToOne('invoice-customer', 'invoices.customerId', 'customers.id'),
@@ -230,6 +268,8 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       onCalendar('invoicePayments', 'date'),
       onCalendar('transactions', 'date', 'day'),
       onCalendar('payouts', 'date', 'day'),
+      manyToOne('violation-decision', 'guardViolations.decisionId', 'guardDecisions.id'),
+      onCalendar('guardDecisions', 'day'),
     ],
     calendars: [
       {

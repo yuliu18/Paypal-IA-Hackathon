@@ -14,6 +14,7 @@ import {
   type Product,
   type Transaction,
 } from './paypal';
+import type { GuardDashboardRows } from './guard/dashboard-rows';
 
 // Flat rows for the Dashboard's AG Studio data sources. Relationships between them:
 //   invoices.customerId        -> customers.id
@@ -301,4 +302,7 @@ export async function getDashboardData(asOf = new Date()) {
   };
 }
 
-export type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+export type PayPalDashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+
+// What the dashboard shows: the PayPal snapshot plus the payment guard's decisions (app/dashboard/page.tsx).
+export type DashboardData = PayPalDashboardData & GuardDashboardRows;

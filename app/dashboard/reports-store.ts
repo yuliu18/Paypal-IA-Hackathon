@@ -28,6 +28,7 @@ const defaultPageTitles: Record<string, string> = {
   receivables: 'Receivables',
   cash: 'Cash & payouts',
   catalogue: 'Catalogue',
+  guard: 'Payment guard',
 };
 
 export const defaultReport = (): SavedReport => ({
