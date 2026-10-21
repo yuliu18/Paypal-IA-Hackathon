@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
-import { createPaymentGuard } from './guard';
+import { createPaymentGuard, decideHeldRefund } from './guard';
 import type { AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
@@ -41,6 +41,13 @@ const audit: AuditLog = {
   },
   async hasUnsettledRefund(captureId) {
     return entries.some((e) => e.tool === 'create_refund' && e.args.capture_id === captureId && e.moved && (e.outcome === 'pending' || e.outcome === 'error'));
+  },
+  async get(id) {
+    const entry = entries[Number(id)];
+    return entry && { ...entry, id };
+  },
+  async isResolved(id) {
+    return entries.some((e) => e.resolves === id);
   },
 };
 
@@ -444,6 +451,100 @@ describe('payment guard', () => {
     const agent = await connect();
     const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { value: 'lots' } } });
     expect(text(result)).toContain('INVALID_ARGUMENTS');
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('held refund approval', () => {
+  let capture: CaptureFacts;
+
+  async function decide(heldId: string, approve: boolean) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal().connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldRefund(
+      {
+        upstream,
+        captures: { getCapture: async () => capture },
+        audit,
+        limits: { approvalThreshold: usd(2000), perRefund: usd(10000), daily: usd(20000) },
+        now: () => new Date('2026-10-20T13:00:00Z'),
+        timeoutMs: 50,
+      },
+      heldId,
+      approve,
+    );
+  }
+
+  const heldArgs = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '25.00' } };
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over' }] };
+
+  beforeEach(() => {
+    capture = { ...facts };
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'create_refund', args: heldArgs, task, decision: hold, outcome: 'held' });
+  });
+
+  it('runs an approved refund through PayPal and records it against the held entry', async () => {
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('executed');
+    expect(upstreamCalls).toEqual([{ name: 'create_refund', args: heldArgs }]);
+    expect(entries[1]).toMatchObject({
+      tool: 'create_refund',
+      args: heldArgs,
+      task,
+      resolves: '0',
+      outcome: 'executed',
+      moved: usd(2500),
+      decision: { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON' }] },
+    });
+  });
+
+  it('refunds only once when the same hold is approved twice', async () => {
+    await decide('0', true);
+    const second = await decide('0', true);
+    expect(second.outcome).toBe('refused');
+    expect(second.message).toContain('already decided');
+    expect(upstreamCalls).toHaveLength(1);
+    expect(entries).toHaveLength(2);
+  });
+
+  it('refunds only once when two approvals of the same hold arrive together', async () => {
+    const results = await Promise.all([decide('0', true), decide('0', true)]);
+    expect(results.map((r) => r.outcome).sort()).toEqual(['executed', 'refused']);
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('records a rejection without reaching PayPal, and the hold cannot be approved afterwards', async () => {
+    const rejected = await decide('0', false);
+    expect(rejected.outcome).toBe('blocked');
+    expect(entries[1]).toMatchObject({ resolves: '0', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'REJECTED_BY_PERSON' }] } });
+    expect(entries[1].moved).toBeUndefined();
+    expect((await decide('0', true)).outcome).toBe('refused');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('checks the policy again on approval and blocks a refund that no longer fits', async () => {
+    capture = { ...facts, refunded: usd(5000), status: 'REFUNDED' };
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[1]).toMatchObject({ resolves: '0', outcome: 'blocked', decision: { verdict: 'block' } });
+    expect(entries[1].decision.violations.map((v) => v.code)).toContain('CAPTURE_NOT_REFUNDABLE');
+  });
+
+  it('enforces the daily limit at approval time, counting refunds made since the hold', async () => {
+    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'create_refund', args: { capture_id: 'CAP-9' }, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(19000) });
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(entries[2].decision.violations.map((v) => v.code)).toEqual(['DAILY_LIMIT']);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('refuses an id that is not a held refund', async () => {
+    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'create_refund', args: heldArgs, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(2500) });
+    expect((await decide('1', true)).outcome).toBe('refused');
+    expect((await decide('99', true)).outcome).toBe('refused');
     expect(upstreamCalls).toEqual([]);
   });
 });

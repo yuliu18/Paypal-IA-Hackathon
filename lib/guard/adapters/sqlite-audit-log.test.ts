@@ -83,4 +83,16 @@ describe('sqlite audit log', () => {
     await log.record(entry({ tool: 'get_order', args: { capture_id: 'CAP-1' } }));
     expect(await log.hasUnsettledRefund('CAP-1')).toBe(false);
   });
+
+  it('reads one entry by id, and tells whether a later entry resolves a held one', async () => {
+    const held = entry({ outcome: 'held', moved: undefined, decision: { verdict: 'hold', violations: [{ code: 'APPROVAL_REQUIRED', message: 'over' }] } });
+    const heldId = await log.record(held);
+    expect(await log.get(heldId)).toEqual({ ...held, id: heldId });
+    expect(await log.get('999')).toBeUndefined();
+    expect(await log.isResolved(heldId)).toBe(false);
+
+    const approvalId = await log.record(entry({ resolves: heldId, outcome: 'executed' }));
+    expect(await log.isResolved(heldId)).toBe(true);
+    expect((await log.get(approvalId))?.resolves).toBe(heldId);
+  });
 });

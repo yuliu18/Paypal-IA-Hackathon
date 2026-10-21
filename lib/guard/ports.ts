@@ -33,7 +33,11 @@ export type AuditEntry = {
   // `held` waits for a person and moved nothing.
   outcome: 'pending' | 'executed' | 'blocked' | 'held' | 'error';
   detail?: string;
+  // The held entry this one decides (a person's approval or rejection).
+  resolves?: string;
 };
+
+export type AuditRow = AuditEntry & { id: string };
 
 export interface AuditLog {
   // Returns the entry id. Writes are logged as `pending` before they run (write-ahead).
@@ -43,4 +47,7 @@ export interface AuditLog {
   // Whether a refund of this capture may have moved money but never settled (pending, or failed
   // with its amount still counting), so a retry could refund twice.
   hasUnsettledRefund(captureId: string): Promise<boolean>;
+  get(id: string): Promise<AuditRow | undefined>;
+  // Whether a later entry already decides this held entry.
+  isResolved(id: string): Promise<boolean>;
 }

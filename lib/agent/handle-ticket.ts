@@ -8,7 +8,7 @@ import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import type { Limits } from '@/lib/guard/domain/policy';
-import { createPaymentGuard } from '@/lib/guard/guard';
+import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
@@ -44,15 +44,19 @@ function llmConfig() {
   return { baseUrl, apiKey, agentModel, judgeModel: judgeModel || agentModel, headers };
 }
 
-export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'careful'): Promise<{ reply: string; steps: AgentStep[] }> {
-  const llm = llmConfig();
-  const paypal = new PayPalAgentToolkit({
+async function payPalToolkit() {
+  return new PayPalAgentToolkit({
     accessToken: await accessToken(),
     configuration: {
       actions: { orders: { get: true }, payments: { createRefund: true } },
       context: { sandbox: true },
     },
   });
+}
+
+export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'careful'): Promise<{ reply: string; steps: AgentStep[] }> {
+  const llm = llmConfig();
+  const paypal = await payPalToolkit();
 
   return withClient(paypal, 'payment-guard', (upstream) => {
     const guard = createPaymentGuard({
@@ -72,4 +76,12 @@ export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'car
       }),
     );
   });
+}
+
+// A person's decision on a refund the guard held. Approval re-checks the policy before PayPal runs it.
+export async function decideHeld(heldId: string, approve: boolean): Promise<HeldRefundDecision> {
+  const paypal = await payPalToolkit();
+  return withClient(paypal, 'payment-guard-approval', (upstream) =>
+    decideHeldRefund({ upstream, captures: payPalCaptureLookup, audit: auditLog(), limits: LIMITS }, heldId, approve),
+  );
 }

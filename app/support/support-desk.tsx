@@ -9,8 +9,12 @@ export type Scenario = { label: string; agent: AgentMode; customerEmail: string;
 
 type Outcome = { reply: string; steps: AgentStep[] } | { error: string };
 
+// Held refunds (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
+const stepStyle = (step: AgentStep) =>
+  step.isError ? 'border-pp-danger text-pp-danger' : step.result.startsWith('Refund held for human approval') ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
+
 // Sends one ticket to the support agent (app/api/support/tickets) and shows each tool call it
-// made through the payment guard, blocked ones in red.
+// made through the payment guard, blocked ones in red and held ones in amber.
 export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
@@ -115,7 +119,7 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
             {outcome.steps.map((step, i) => (
               <li
                 key={i}
-                className={`rounded border px-3 py-2 text-sm ${step.isError ? 'border-pp-danger text-pp-danger' : 'border-pp-border'}`}
+                className={`rounded border px-3 py-2 text-sm ${stepStyle(step)}`}
               >
                 <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{JSON.stringify(step.args)}</code>
                 <p className="mt-1 line-clamp-3 break-all">{step.result}</p>
