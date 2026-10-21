@@ -162,10 +162,14 @@ describe('payment guard', () => {
     expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order', 'get_refund', 'list_transactions']);
   });
 
-  it('returns an order of the ticket customer and logs the read', async () => {
+  it('returns an order of the ticket customer without its personal data, and logs the read', async () => {
     const agent = await connect();
     const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
-    expect(text(result)).toBe(ORDERS['ORD-1']);
+    expect(JSON.parse(text(result))).toEqual({
+      id: 'ORD-1',
+      purchase_units: [{ payments: { captures: [{ id: 'CAP-ORD-1' }] } }],
+      withheld_by_guard: ['purchase_units[0].custom_id'],
+    });
     expect(upstreamCalls).toEqual([{ name: 'get_order', args: { id: 'ORD-1' } }]);
     expect(entries.map((e) => e.outcome)).toEqual(['executed']);
     expect(judgeCalls).toBe(0);
@@ -345,7 +349,7 @@ describe('payment guard', () => {
     auditFails = true;
     const agent = await connect();
     const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-1' } });
-    expect(text(result)).toBe(ORDERS['ORD-1']);
+    expect(JSON.parse(text(result)).id).toBe('ORD-1');
   });
 
   it('logs a read once, after it ran, with no amount', async () => {
