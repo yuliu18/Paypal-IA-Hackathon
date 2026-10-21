@@ -175,6 +175,12 @@ describe('hash-chained black box', () => {
     expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: second });
   });
 
+  it('stays intact when a stored text holds a malformed character, which SQLite rewrites on insert', async () => {
+    const id = await file.record(entry({ detail: 'socket \ud800 closed' }));
+    await file.update(id, { outcome: 'error', detail: 'bad \udfff' });
+    expect(file.verifyChain()).toMatchObject({ intact: true, records: 2 });
+  });
+
   it('keeps the chain across reopening the file', async () => {
     await sample();
     const reopened = createSqliteAuditLog(path);

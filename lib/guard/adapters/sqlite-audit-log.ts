@@ -152,7 +152,11 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
   const everyRow = db.prepare(`SELECT * FROM audit_log ORDER BY id`);
 
   // Synchronous from reading the last hash to the insert, so no other write can slip in between.
-  function append(row: Omit<LogRow, 'id' | 'prev_hash' | 'hash'>): string {
+  function append(raw: Omit<LogRow, 'id' | 'prev_hash' | 'hash'>): string {
+    // SQLite stores a lone surrogate as U+FFFD; hash what it will read back, not what was passed.
+    const row = Object.fromEntries(
+      Object.entries(raw).map(([key, value]) => [key, typeof value === 'string' ? value.toWellFormed() : value]),
+    ) as typeof raw;
     const prev_hash = (lastHash.get() as { hash: string } | undefined)?.hash ?? GENESIS;
     const hash = hashOf({ ...row, prev_hash });
     const { lastInsertRowid } = insert.run(
