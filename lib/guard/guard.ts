@@ -53,14 +53,14 @@ function blockedResult(decision: Decision): CallToolResult {
   return { isError: true, content: [{ type: 'text', text: `Blocked by payment guard. ${reasons}` }] };
 }
 
-// get_order answers with the order JSON; every purchase unit's custom_id (the customer the shop
-// charged) must be the ticket customer. An answer that can't be read is withheld too.
 // Not an error: the agent should tell the customer the refund is under review, not retry it.
 function heldResult(decision: Decision): CallToolResult {
   const reasons = decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ');
   return { content: [{ type: 'text', text: `Refund held for human approval; it has not been executed. Tell the customer a person will review it. ${reasons}` }] };
 }
 
+// get_order answers with the order JSON; every purchase unit's custom_id (the customer the shop
+// charged) must be the ticket customer. An answer that can't be read is withheld too.
 function orderBelongsTo(result: CallToolResult, mandate: AgentTask['mandate']): boolean {
   const part = result.content[0];
   try {
