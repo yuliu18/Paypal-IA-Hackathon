@@ -102,7 +102,7 @@ An AI agent with refund tools can be talked into refunding the wrong order, the 
 ### Try it
 
 1. Fill in the LLM variables in `.env.local` (`LLM_BASE_URL`, `LLM_API_KEY`, `AGENT_MODEL`, optionally `JUDGE_MODEL`); any OpenAI-compatible endpoint works.
-2. `npm run seed` charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Run it again before each demo: a refunded order can't be refunded twice.
+2. `npm run seed`, or **Create sample payments** / **New sample payments** on `/support`, charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Do it again before each demo: a refunded order can't be refunded twice. On a deployed app use the button: `data/` isn't in git, so a local seed never reaches the host.
 3. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
 4. Open `/guard` to see every decision, approve or reject held refunds, and check the black box.
 

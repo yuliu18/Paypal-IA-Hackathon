@@ -1,21 +1,13 @@
 import type { Metadata } from 'next';
-import { readFile } from 'node:fs/promises';
 import { connection } from 'next/server';
+import { readSeed } from '@/lib/demo-seed';
 import { SupportDesk, type Scenario } from './support-desk';
 
 export const metadata: Metadata = { title: 'Support agent demo' };
 
-type SeedCharge = { customerEmail: string; description: string; orderId: string };
-
-// Sample tickets built from the payments `npm run seed` created, so their order ids exist in the sandbox.
+// Sample tickets built from the sample payments (lib/demo-seed.ts), so their order ids exist in the sandbox.
 async function scenarios(): Promise<Scenario[]> {
-  let charges: SeedCharge[];
-  try {
-    charges = (JSON.parse(await readFile('data/seed.json', 'utf8')) as { charges: SeedCharge[] }).charges;
-  } catch {
-    return [];
-  }
-  const [ana, ben] = charges;
+  const [ana, ben] = await readSeed();
   if (!ana || !ben) return [];
   return [
     {

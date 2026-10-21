@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
+import { SeedButton } from './seed-button';
 
 type AgentMode = 'careful' | 'vulnerable';
 export type Scenario = { label: string; agent: AgentMode; customerEmail: string; message: string };
@@ -64,7 +65,7 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
       </p>
 
       {scenarios.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {scenarios.map((scenario) => (
             <button
               key={scenario.label}
@@ -75,9 +76,13 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
               {scenario.label}
             </button>
           ))}
+          <SeedButton label="New sample payments" />
         </div>
       ) : (
-        <p className="mt-4 text-sm text-pp-warning">No sample tickets: run `npm run seed` to create sandbox payments.</p>
+        <div className="mt-4 flex flex-col gap-2">
+          <p className="text-sm text-pp-warning">No sample tickets yet: create the sandbox payments they refer to.</p>
+          <SeedButton label="Create sample payments" />
+        </div>
       )}
 
       <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
