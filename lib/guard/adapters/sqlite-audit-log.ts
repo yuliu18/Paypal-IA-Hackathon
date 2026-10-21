@@ -209,9 +209,9 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
   carryOverLegacyLog();
 
   // A log from before the chain (table `audit`, one row per call with its final outcome) is copied
-  // into the empty chain once, keeping its ids so held entries and their decisions still pair up,
-  // and so its pending refunds and today's total keep counting toward the limits. The old table is
-  // left as it was.
+  // into the empty chain once, so its pending refunds and today's total keep counting toward the
+  // limits. Rows are renumbered 1..n, since the chain treats a gap in ids as a removed row, and a
+  // decision's `resolves` follows its held entry to the new id. The old table is left as it was.
   function carryOverLegacyLog() {
     const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit'`).get();
     if (!legacy) return;
@@ -221,6 +221,7 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       const rows = db
         .prepare(`SELECT *${hasResolves ? '' : ', NULL AS resolves'} FROM audit ORDER BY id`)
         .all() as unknown as (Omit<StateRow, 'resolves'> & { resolves: number | null })[];
+      const renumbered = new Map(rows.map((row, i) => [row.id, i + 1]));
       for (const row of rows) {
         append(
           {
@@ -236,9 +237,9 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
             moved_set: 1,
             outcome: row.outcome,
             detail: row.detail,
-            resolves: row.resolves,
+            resolves: row.resolves === null ? null : (renumbered.get(row.resolves) ?? null),
           },
-          row.id,
+          renumbered.get(row.id)!,
         );
       }
     });
@@ -255,6 +256,8 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
     for (const row of rowsAfter.iterate(last) as Iterable<LogRow>) {
       if (row.prev_hash !== prev) return { intact: false, brokenAt: String(row.id), reason: 'does not link to the row before it (a row was removed or altered)' };
       if (hashOf(row) !== row.hash) return { intact: false, brokenAt: String(row.id), reason: 'content does not match its hash (the row was altered)' };
+      // Ids are handed out one by one, so a gap is a row deleted from the end before the next append.
+      if (row.id !== last + 1) return { intact: false, brokenAt: String(last + 1), reason: 'is missing: a row was removed' };
       prev = row.hash;
       records++;
       last = row.id;

@@ -195,6 +195,20 @@ describe('hash-chained black box', () => {
     expect(file.verifyChain()).toEqual({ intact: false, brokenAt: second, reason: 'is missing: the newest rows were removed' });
   });
 
+  it('still reports the removed newest rows after a later row is appended', async () => {
+    const { second } = await sample();
+    tamper(`DELETE FROM audit_log WHERE id = ${second}`);
+    await file.record(entry());
+    expect(file.verifyChain()).toEqual({ intact: false, brokenAt: second, reason: 'is missing: a row was removed' });
+  });
+
+  it('still reports an emptied log after a later row is appended', async () => {
+    await sample();
+    tamper(`DELETE FROM audit_log`);
+    await file.record(entry());
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: '1' });
+  });
+
   it('reports a log emptied after rows were written', async () => {
     await sample();
     tamper(`DELETE FROM audit_log`);
@@ -257,15 +271,15 @@ describe('hash-chained black box', () => {
       `);
     };
 
-    it('carries its rows into the chain with their ids, so limits and decisions keep counting them', async () => {
+    it('carries its rows into the chain, renumbered without gaps, so limits and decisions keep counting them', async () => {
       tamper('DROP TABLE audit_log; DROP VIEW audit_state;');
       legacy(true);
       const upgraded = createSqliteAuditLog(path);
-      expect(upgraded.list(10).map((e) => [e.id, e.outcome])).toEqual([['9', 'blocked'], ['7', 'held'], ['3', 'pending']]);
+      expect(upgraded.list(10).map((e) => [e.id, e.outcome, e.resolves])).toEqual([['3', 'blocked', '2'], ['2', 'held', undefined], ['1', 'pending', undefined]]);
       expect(await upgraded.hasUnsettledRefund('CAP-1')).toBe(true);
       expect(await upgraded.movedSince(new Date('2026-10-20T00:00:00.000Z'), 'USD')).toEqual({ minor: 2500, currency: 'USD' });
-      expect(await upgraded.isResolved('7')).toBe(true);
-      expect(await upgraded.record(entry())).toBe('10');
+      expect(await upgraded.isResolved('2')).toBe(true);
+      expect(await upgraded.record(entry())).toBe('4');
       expect(upgraded.verifyChain()).toMatchObject({ intact: true, records: 4 });
     });
 
