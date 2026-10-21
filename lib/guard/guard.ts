@@ -195,6 +195,10 @@ export function decideHeldRefund(
     }
 
     const { decision, moved } = await checkRefund(full, held.task, held.args, true);
+    // PayPal unreachable says nothing about the refund itself: leave the hold open to try again.
+    if (decision.violations.some((v) => v.code === 'CAPTURE_LOOKUP_FAILED')) {
+      return { outcome: 'error', message: 'PayPal could not be reached to check the capture; the refund is still held, try again' };
+    }
     if (decision.verdict !== 'allow') {
       await full.audit.record({ ...base, decision, outcome: 'blocked' });
       return { outcome: 'blocked', message: decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ') };

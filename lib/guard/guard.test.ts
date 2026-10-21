@@ -541,6 +541,23 @@ describe('held refund approval', () => {
     expect(upstreamCalls).toEqual([]);
   });
 
+  it('keeps the hold open when PayPal cannot be reached to re-check it, so it can be approved later', async () => {
+    const unreachable = await decideHeldRefund(
+      {
+        upstream: undefined as unknown as Client,
+        captures: { getCapture: async () => { throw new Error('connect timeout'); } },
+        audit,
+        limits: { approvalThreshold: usd(2000), perRefund: usd(10000), daily: usd(20000) },
+        timeoutMs: 50,
+      },
+      '0',
+      true,
+    );
+    expect(unreachable.outcome).toBe('error');
+    expect(entries).toHaveLength(1);
+    expect((await decide('0', true)).outcome).toBe('executed');
+  });
+
   it('refuses an id that is not a held refund', async () => {
     entries.push({ at: '2026-10-20T12:30:00Z', tool: 'create_refund', args: heldArgs, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(2500) });
     expect((await decide('1', true)).outcome).toBe('refused');
