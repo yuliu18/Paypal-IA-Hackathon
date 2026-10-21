@@ -1,7 +1,7 @@
 // The payment guard: an MCP server that sits between an AI agent and PayPal's MCP toolkit.
 // It exposes the same tools, passes allowlisted reads through, evaluates refunds against the
-// policy and the intent judge, and blocks everything else by default. Blocked calls never
-// reach PayPal.
+// policy and the intent judge, and blocks everything else by default. Blocked and held calls
+// never reach PayPal; a held refund waits for a person to approve it.
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -55,6 +55,12 @@ function blockedResult(decision: Decision): CallToolResult {
 
 // get_order answers with the order JSON; every purchase unit's custom_id (the customer the shop
 // charged) must be the ticket customer. An answer that can't be read is withheld too.
+// Not an error: the agent should tell the customer the refund is under review, not retry it.
+function heldResult(decision: Decision): CallToolResult {
+  const reasons = decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ');
+  return { content: [{ type: 'text', text: `Refund held for human approval; it has not been executed. Tell the customer a person will review it. ${reasons}` }] };
+}
+
 function orderBelongsTo(result: CallToolResult, mandate: AgentTask['mandate']): boolean {
   const part = result.content[0];
   try {
@@ -117,7 +123,7 @@ export function createPaymentGuard({
     const refundedToday = await audit.movedSince(startOfDay, moved.currency);
 
     const policy = evaluateRefund({ request, capture, mandate: task.mandate, limits, refundedToday });
-    // Only a policy-clean call is worth an LLM round trip; the judge can't relax a block anyway.
+    // Only a policy-clean (or held) call is worth an LLM round trip; the judge can't relax a block anyway.
     if (policy.verdict === 'block') return { decision: policy };
     return { decision: mergeDecisions(policy, await judge.judge({ task, call: { tool: 'create_refund', args } })), moved };
   }
@@ -141,6 +147,16 @@ export function createPaymentGuard({
       // The call is refused either way; a failed log write must not turn a block into an error.
       await audit.record({ at, tool: name, args, task, decision, outcome: 'blocked' }).catch(() => undefined);
       return blockedResult(decision);
+    }
+    if (decision.verdict === 'hold') {
+      // Nothing runs and nothing moves, so the amount stays out of the limits until a person approves.
+      try {
+        await audit.record({ at, tool: name, args, task, decision, outcome: 'held' });
+      } catch (error) {
+        // A hold nobody can see would never be approved: refuse it instead.
+        return blockedResult(block('AUDIT_UNAVAILABLE', message(error)));
+      }
+      return heldResult(decision);
     }
 
     // Reads move no money, so they don't depend on the log: run them and log afterwards.

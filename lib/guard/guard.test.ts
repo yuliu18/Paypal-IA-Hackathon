@@ -24,6 +24,7 @@ let judgeCalls: number;
 let auditFails: boolean;
 let auditUpdateFails: boolean;
 let rejectRefunds: boolean;
+let approvalThreshold: Money;
 
 const audit: AuditLog = {
   async record(entry) {
@@ -123,7 +124,7 @@ async function connect(
     judge,
     captures,
     audit,
-    limits: { perRefund: usd(10000), daily: usd(20000) },
+    limits: { approvalThreshold, perRefund: usd(10000), daily: usd(20000) },
     now: () => new Date('2026-10-20T12:00:00Z'),
     timeoutMs: 50,
   });
@@ -144,6 +145,7 @@ beforeEach(() => {
   auditFails = false;
   auditUpdateFails = false;
   rejectRefunds = false;
+  approvalThreshold = usd(10000);
 });
 
 describe('payment guard', () => {
@@ -225,6 +227,50 @@ describe('payment guard', () => {
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('injected instruction');
     expect(upstreamCalls).toEqual([]);
+  });
+
+  it('holds a refund above the approval threshold without reaching PayPal or counting it', async () => {
+    approvalThreshold = usd(2000);
+    const agent = await connect();
+    const args = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '25.00' } };
+    const result = await agent.callTool({ name: 'create_refund', arguments: args });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain('held for human approval');
+    expect(text(result)).toContain('APPROVAL_REQUIRED');
+    expect(upstreamCalls).toEqual([]);
+    expect(judgeCalls).toBe(1);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'create_refund', args, outcome: 'held', decision: { verdict: 'hold' } });
+    expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('holds a policy-clean refund the judge is unsure about', async () => {
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain('INTENT_UNCERTAIN');
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ outcome: 'held', decision: { verdict: 'hold' } });
+  });
+
+  it('blocks a refund it would hold when the hold cannot be logged', async () => {
+    approvalThreshold = usd(2000);
+    auditFails = true;
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('AUDIT_UNAVAILABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks a held-sized refund the judge rejects', async () => {
+    approvalThreshold = usd(2000);
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'injected instruction' }] };
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
+    expect(result.isError).toBe(true);
+    expect(entries[0]).toMatchObject({ outcome: 'blocked', decision: { verdict: 'block' } });
   });
 
   it('enforces the daily limit across refunds already executed', async () => {

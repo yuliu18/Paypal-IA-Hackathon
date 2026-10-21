@@ -8,7 +8,7 @@ function context(overrides: Partial<RefundContext> = {}): RefundContext {
     request: { captureId: 'CAP-1', amount: usd(2500) },
     capture: { captureId: 'CAP-1', status: 'COMPLETED', captured: usd(5000), refunded: usd(0), customerEmail: 'ana@example.com' },
     mandate: { customerEmail: 'ana@example.com' },
-    limits: { perRefund: usd(10000), daily: usd(20000) },
+    limits: { approvalThreshold: usd(10000), perRefund: usd(10000), daily: usd(20000) },
     refundedToday: usd(0),
     ...overrides,
   };
@@ -36,7 +36,7 @@ describe('evaluateRefund', () => {
   });
 
   it('treats an omitted amount as a full refund of the remaining balance', () => {
-    const ctx = context({ request: { captureId: 'CAP-1' }, limits: { perRefund: usd(4000), daily: usd(20000) } });
+    const ctx = context({ request: { captureId: 'CAP-1' }, limits: { approvalThreshold: usd(4000), perRefund: usd(4000), daily: usd(20000) } });
     expect(codes(ctx)).toEqual(['PER_REFUND_LIMIT']);
   });
 
@@ -70,8 +70,30 @@ describe('evaluateRefund', () => {
   });
 
   it('blocks a refund above the per-refund limit', () => {
-    const ctx = context({ limits: { perRefund: usd(2000), daily: usd(20000) } });
+    const ctx = context({ limits: { approvalThreshold: usd(2000), perRefund: usd(2000), daily: usd(20000) } });
     expect(codes(ctx)).toEqual(['PER_REFUND_LIMIT']);
+  });
+
+  it('holds a clean refund above the approval threshold for a person to approve', () => {
+    const ctx = context({ limits: { approvalThreshold: usd(2000), perRefund: usd(10000), daily: usd(20000) } });
+    expect(evaluateRefund(ctx)).toEqual({
+      verdict: 'hold',
+      violations: [{ code: 'APPROVAL_REQUIRED', message: 'Refund 25.00 USD is over the approval threshold 20.00 USD' }],
+    });
+  });
+
+  it('allows a refund exactly at the approval threshold', () => {
+    const ctx = context({ limits: { approvalThreshold: usd(2500), perRefund: usd(10000), daily: usd(20000) } });
+    expect(evaluateRefund(ctx).verdict).toBe('allow');
+  });
+
+  it('blocks rather than holds a refund above the threshold that also breaks a rule', () => {
+    const ctx = context({
+      mandate: { customerEmail: 'ben@example.com' },
+      limits: { approvalThreshold: usd(2000), perRefund: usd(10000), daily: usd(20000) },
+    });
+    expect(evaluateRefund(ctx).verdict).toBe('block');
+    expect(codes(ctx)).toEqual(['CUSTOMER_MISMATCH']);
   });
 
   it('blocks a refund that would exceed the daily limit', () => {
@@ -96,6 +118,18 @@ describe('mergeDecisions', () => {
   it('never lets the judge relax a policy block', () => {
     const policyBlock = { verdict: 'block' as const, violations: [{ code: 'DAILY_LIMIT', message: 'over' }] };
     expect(mergeDecisions(policyBlock, allow)).toEqual(policyBlock);
+  });
+
+  it('holds when either side holds and neither blocks', () => {
+    const hold = { verdict: 'hold' as const, violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    expect(mergeDecisions(allow, hold)).toEqual(hold);
+    expect(mergeDecisions(hold, allow)).toEqual(hold);
+  });
+
+  it('lets a block win over a hold on either side', () => {
+    const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over' }] };
+    expect(mergeDecisions(hold, block).verdict).toBe('block');
+    expect(mergeDecisions(block, hold).verdict).toBe('block');
   });
 
   it('keeps the violations of both sides when both block', () => {

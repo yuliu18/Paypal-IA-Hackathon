@@ -30,7 +30,8 @@ export type AuditEntry = {
   // Amount that moved or may have moved: set before execution and cleared only when PayPal
   // explicitly rejects the call, so ambiguous failures still count toward limits.
   moved?: Money;
-  outcome: 'pending' | 'executed' | 'blocked' | 'error';
+  // `held` waits for a person and moved nothing.
+  outcome: 'pending' | 'executed' | 'blocked' | 'held' | 'error';
   detail?: string;
 };
 

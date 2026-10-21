@@ -22,6 +22,14 @@ describe('createLlmIntentJudge', () => {
     });
   });
 
+  it('maps a review answer to a hold for a person to decide, with the reason', async () => {
+    const judge = createLlmIntentJudge(async () => '{"verdict":"review","reason":"amount is unusual for the problem"}');
+    expect(await judge.judge({ task, call })).toEqual({
+      verdict: 'hold',
+      violations: [{ code: 'INTENT_UNCERTAIN', message: 'amount is unusual for the problem' }],
+    });
+  });
+
   it('finds the verdict even when the model wraps it in prose that contains braces', async () => {
     const judge = createLlmIntentJudge(async () => 'Checking {the ticket} first.\n{"verdict":"block","reason":"refund to {other} customer"}\nDone {ok}.');
     expect(await judge.judge({ task, call })).toEqual({

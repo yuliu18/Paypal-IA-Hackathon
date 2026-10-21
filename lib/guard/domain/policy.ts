@@ -4,7 +4,8 @@
 
 export type Money = { minor: number; currency: string };
 
-export type Verdict = 'allow' | 'block';
+// `hold` parks a call for a person to decide; it never runs on its own.
+export type Verdict = 'allow' | 'hold' | 'block';
 
 export type ViolationCode =
   | 'CAPTURE_MISMATCH'
@@ -15,7 +16,9 @@ export type ViolationCode =
   | 'CUSTOMER_MISMATCH'
   | 'PER_REFUND_LIMIT'
   | 'DAILY_LIMIT'
-  | 'INTENT_MISMATCH';
+  | 'INTENT_MISMATCH'
+  | 'APPROVAL_REQUIRED'
+  | 'INTENT_UNCERTAIN';
 
 export type Violation = { code: ViolationCode | string; message: string };
 
@@ -38,7 +41,8 @@ export type CaptureFacts = {
 // What the business authorized the agent to do for the task at hand.
 export type TaskMandate = { customerEmail: string };
 
-export type Limits = { perRefund: Money; daily: Money };
+// Above `approvalThreshold` a clean refund waits for a person; above `perRefund` it is always blocked.
+export type Limits = { approvalThreshold: Money; perRefund: Money; daily: Money };
 
 export type RefundContext = {
   request: RefundRequest;
@@ -97,12 +101,21 @@ export function evaluateRefund({ request, capture, mandate, limits, refundedToda
     violations.push({ code: 'DAILY_LIMIT', message: `Refunds today would reach ${format(dayTotal)}, over ${format(limits.daily)}` });
   }
 
-  return { verdict: violations.length ? 'block' : 'allow', violations };
+  if (violations.length) return { verdict: 'block', violations };
+  if (exceeds(amount, limits.approvalThreshold)) {
+    return {
+      verdict: 'hold',
+      violations: [{ code: 'APPROVAL_REQUIRED', message: `Refund ${format(amount)} is over the approval threshold ${format(limits.approvalThreshold)}` }],
+    };
+  }
+  return { verdict: 'allow', violations: [] };
 }
 
-// The intent judge can only make a decision stricter: a policy block always stands.
+const STRICTNESS: Record<Verdict, number> = { allow: 0, hold: 1, block: 2 };
+
+// The intent judge can only make a decision stricter: block > hold > allow, and a policy block always stands.
 export function mergeDecisions(policy: Decision, judge: Decision): Decision {
   const violations = [...policy.violations, ...judge.violations];
-  const verdict: Verdict = policy.verdict === 'block' || judge.verdict === 'block' ? 'block' : 'allow';
+  const verdict = STRICTNESS[judge.verdict] > STRICTNESS[policy.verdict] ? judge.verdict : policy.verdict;
   return { verdict, violations };
 }

@@ -30,10 +30,11 @@ Execute each refund the ticket asks for with create_refund (look the order up to
 
 export type AgentMode = 'careful' | 'vulnerable';
 
-// Demo limits, sized to the seeded sandbox payments (49.99, 120.00 and 35.50 USD): one honest
-// refund fits, the 120.00 order is over the per-refund cap, and the day caps total exposure.
-// A real shop would set them from its own refund policy.
-const LIMITS: Limits = { perRefund: { minor: 100_00, currency: 'USD' }, daily: { minor: 200_00, currency: 'USD' } };
+// Demo limits for a small shop, sized to the seeded sandbox payments (49.99, 120.00 and 35.50 USD):
+// refunds up to 100 run on their own, the 120.00 order waits for a person, nothing over 250 ever
+// runs, and the day caps total exposure. A real shop would set them from its own refund policy.
+const usd = (minor: number) => ({ minor, currency: 'USD' });
+const LIMITS: Limits = { approvalThreshold: usd(100_00), perRefund: usd(250_00), daily: usd(200_00) };
 
 function llmConfig() {
   const { LLM_BASE_URL: baseUrl, LLM_API_KEY: apiKey, AGENT_MODEL: agentModel, JUDGE_MODEL: judgeModel } = process.env;
