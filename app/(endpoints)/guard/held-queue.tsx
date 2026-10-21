@@ -15,8 +15,9 @@ const OUTCOME_STYLE: Record<string, string> = {
   refused: 'text-pp-muted',
 };
 
-function HeldItem({ refund }: { refund: HeldRefund }) {
-  const [state, action, pending] = useActionState(decideHeldAction, null);
+// The decision state lives in the queue, not in each item: a decided refund leaves the list when
+// the page refreshes, and its result must stay on screen after it does.
+function HeldItem({ refund, action, pending }: { refund: HeldRefund; action: (form: FormData) => void; pending: boolean }) {
   return (
     <li className="rounded border border-pp-border bg-pp-surface px-4 py-3">
       <form action={action} className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
@@ -47,21 +48,22 @@ function HeldItem({ refund }: { refund: HeldRefund }) {
           </button>
         </span>
       </form>
-      {state && <p className={`mt-2 text-sm ${OUTCOME_STYLE[state.outcome]}`}>{state.message}</p>}
     </li>
   );
 }
 
 export function HeldQueue({ refunds }: { refunds: HeldRefund[] }) {
+  const [state, action, pending] = useActionState(decideHeldAction, null);
   return (
     <section className="mt-5">
       <h2 className="text-lg font-semibold text-pp-navy">Waiting for approval ({refunds.length})</h2>
+      {state && <p className={`mt-1 text-sm ${OUTCOME_STYLE[state.outcome]}`}>{state.message}</p>}
       {refunds.length === 0 ? (
         <p className="mt-1 text-sm text-pp-muted">No refunds are held right now.</p>
       ) : (
         <ul className="mt-2 flex flex-col gap-2">
           {refunds.map((refund) => (
-            <HeldItem key={refund.id} refund={refund} />
+            <HeldItem key={refund.id} refund={refund} action={action} pending={pending} />
           ))}
         </ul>
       )}

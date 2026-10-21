@@ -488,6 +488,7 @@ describe('held refund approval', () => {
   it('runs an approved refund through PayPal and records it against the held entry', async () => {
     const result = await decide('0', true);
     expect(result.outcome).toBe('executed');
+    expect(result.message).toBe('Refund of 25.00 USD executed in PayPal');
     expect(upstreamCalls).toEqual([{ name: 'create_refund', args: heldArgs }]);
     expect(entries[1]).toMatchObject({
       tool: 'create_refund',

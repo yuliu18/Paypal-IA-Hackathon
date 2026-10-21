@@ -205,7 +205,8 @@ export function decideHeldRefund(
     }
     const approved: Decision = { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON', message: 'A person approved the held refund' }] };
     const result = await executeWrite(full, { ...base, decision: approved, moved });
-    return { outcome: result.isError ? 'error' : 'executed', message: textOf(result) };
+    if (result.isError) return { outcome: 'error', message: textOf(result) };
+    return { outcome: 'executed', message: `Refund of ${(moved!.minor / 100).toFixed(2)} ${moved!.currency} executed in PayPal` };
   });
 }
 
