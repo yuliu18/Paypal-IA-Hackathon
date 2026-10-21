@@ -172,7 +172,8 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       db.exec('COMMIT');
       return result;
     } catch (error) {
-      db.exec('ROLLBACK');
+      // SQLite may have rolled back already (some I/O and busy errors do); keep the original error.
+      if (db.isTransaction) db.exec('ROLLBACK');
       throw error;
     }
   }

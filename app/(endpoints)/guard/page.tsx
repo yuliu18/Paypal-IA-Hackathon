@@ -26,7 +26,8 @@ function ChainStatus({ check }: { check: ChainCheck }) {
       {check.head && (
         <>
           {' '}· head <code title={check.head}>{check.head.slice(0, 16)}…</code>. A log rewritten from scratch would also
-          chain; keep a copy of this head elsewhere to catch that.
+          chain; keep a copy of this head elsewhere to catch that. New rows are checked on every visit, older ones in full at
+          least once a minute.
         </>
       )}
     </p>
