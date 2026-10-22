@@ -4,8 +4,9 @@
 
 // Digits in groups split by up to 3 spaces (any kind, line breaks included), dots or dashes; a card
 // is any run of whole groups with 13-19 digits that passes Luhn, so "4111 1111 1111 1111 12/30" is
-// found but a card is never cut out of a longer unseparated number.
-const DIGIT_RUN = /(?<!\d)\d(?:[\s.-]{0,3}\d)*(?!\d)/g;
+// found but a card is never cut out of a longer unseparated number. Digits glued to letters belong
+// to an id (PayPal's are letters and digits) and are left alone.
+const DIGIT_RUN = /(?<![\p{L}\p{N}])\d(?:[\s.-]{0,3}\d)*(?![\p{L}\p{N}])/gu;
 // Letters of any script; an apostrophe only inside the name, so a quoted address isn't swallowed.
 const EMAIL = /[\p{L}\p{N}._%+-][\p{L}\p{N}._%+'-]*@[\p{L}\p{N}.-]+\.\p{L}{2,}/gu;
 
@@ -55,11 +56,13 @@ export function privateTicket<T extends { message: string }>(ticket: T): { ticke
   return { ticket: { ...ticket, message: text }, removed };
 }
 
-export function privateReply(reply: string, customerEmail: string): { reply: string; removed: number } {
+// `shopEmails`: the shop's own contact addresses, which a reply may give out.
+export function privateReply(reply: string, customerEmail: string, shopEmails: string[] = []): { reply: string; removed: number } {
   const cards = maskCards(reply);
   let removed = cards.removed;
+  const allowed = new Set([customerEmail, ...shopEmails].map((email) => email.toLowerCase()));
   const text = cards.text.replace(EMAIL, (email) => {
-    if (email.toLowerCase() === customerEmail.toLowerCase()) return email;
+    if (allowed.has(email.toLowerCase())) return email;
     removed += 1;
     return '[email removed]';
   });

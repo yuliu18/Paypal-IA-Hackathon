@@ -16,7 +16,6 @@ describe('privateTicket', () => {
       ['card 4111 1111 1111 1111 123', 'card [card •••• 1111] 123'],
       ['paid with 4111111111111111 2 times', 'paid with [card •••• 1111] 2 times'],
       ['Order 12 4111 1111 1111 1111', 'Order 12 [card •••• 1111]'],
-      ['card4111111111111111', 'card[card •••• 1111]'],
     ];
     for (const [message, masked] of cases) expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(masked);
     expect(privateReply('Your card 4111 1111 1111 1111 12/30 is noted', 'ana@example.com').reply).toBe('Your card [card •••• 1111] 12/30 is noted');
@@ -26,6 +25,12 @@ describe('privateTicket', () => {
     for (const message of ['4111  1111  1111  1111', '4111 - 1111 - 1111 - 1111', '4111.1111.1111.1111', '4111\n1111\n1111\n1111', '4111\u00a01111\u00a01111\u00a01111']) {
       expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe('[card •••• 1111]');
     }
+  });
+
+  it('leaves a PayPal id alone even when its digits would pass as a card number', () => {
+    const message = 'Order 5O4111111111111111 and capture 4111111111111111X';
+    expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(message);
+    expect(privateReply(message, 'ana@example.com').reply).toBe(message);
   });
 
   it('does not cut a card number out of a longer unseparated number', () => {
@@ -51,6 +56,13 @@ describe('privateReply', () => {
   it('masks whole emails with accents or apostrophes, and keeps such a customer address', () => {
     expect(privateReply('Write to bén@exämple.com', 'ana@example.com')).toEqual({ reply: 'Write to [email removed]', removed: 1 });
     expect(privateReply("Hi o'brien@example.com", "o'brien@example.com")).toEqual({ reply: "Hi o'brien@example.com", removed: 0 });
+  });
+
+  it("keeps the shop's own contact addresses", () => {
+    expect(privateReply('Write to Support@shop.example.com or ben@example.com', 'ana@example.com', ['support@shop.example.com'])).toEqual({
+      reply: 'Write to Support@shop.example.com or [email removed]',
+      removed: 1,
+    });
   });
 
   it('returns a reply with nothing personal unchanged', () => {

@@ -75,6 +75,7 @@ function fakePayPal() {
   };
   server.registerTool('get_order', { description: 'get', inputSchema: { id: z.string() } }, async (args) => {
     upstreamCalls.push({ name: 'get_order', args });
+    if (args.id === 'ORD-PII-ERROR') return { isError: true, content: [{ type: 'text' as const, text: 'RESOURCE_NOT_FOUND for payer ben@example.com, card 4111111111111111' }] };
     return { content: [{ type: 'text' as const, text: ORDERS[args.id] ?? 'not found' }] };
   });
   server.registerTool('get_refund', { description: 'get refund', inputSchema: { id: z.string() } }, ok('get_refund'));
@@ -414,6 +415,13 @@ describe('payment guard', () => {
     const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
     expect(text(result)).toContain('CAPTURE_LOOKUP_FAILED');
     expect(upstreamCalls).toEqual([]);
+  });
+
+  it("masks personal data in PayPal's error answers before the agent sees them", async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-PII-ERROR' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('RESOURCE_NOT_FOUND for payer b***@example.com, card [card •••• 1111]');
   });
 
   it('returns a structured error and logs a read whose PayPal call fails', async () => {
