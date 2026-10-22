@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import type { Money } from '@/lib/guard/domain/policy';
-import { loadCatalog } from '@/lib/settings/catalog';
+import { loadCatalog, withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings } from '@/lib/settings/settings';
 
 export const metadata: Metadata = { title: 'Overview' };
@@ -32,7 +32,8 @@ const STEPS = [
 // Shows no keys, only which provider and limits are in force.
 export default async function Overview() {
   await connection();
-  const [{ business, limits, ai, paypal }, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
+  const [{ business, limits, ai: chosen, paypal }, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
+  const ai = await withDefaultModels(chosen, async () => catalog);
   const provider = catalog.providers.find((p) => p.id === ai.provider)?.label ?? 'Custom provider';
 
   return (
@@ -49,6 +50,7 @@ export default async function Overview() {
           <p className="font-semibold text-pp-navy">{provider}</p>
           <p className="mt-1 text-pp-muted">
             Agent <code>{ai.agentModel || 'not set'}</code>
+            {ai.defaulted && ' (provider default)'}
             <br />
             Judge <code>{ai.judgeModel || 'not set'}</code>
           </p>

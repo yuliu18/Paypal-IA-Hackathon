@@ -112,7 +112,7 @@ An AI agent with refund tools can be talked into refunding the wrong order, the 
 
 ### Try it
 
-1. Choose an AI provider and model on `/settings`, or fill in the LLM variables in `.env.local` (`LLM_BASE_URL`, `LLM_API_KEY`, `AGENT_MODEL`, optionally `JUDGE_MODEL`); any OpenAI-compatible endpoint works.
+1. Choose an AI provider, key and models on `/settings` (provider and key may also come from `LLM_BASE_URL` and `LLM_API_KEY` in `.env.local`); any OpenAI-compatible endpoint works. Without a chosen model, the provider's newest model that can call tools in the catalog runs.
 2. `npm run seed`, or **Create sample payments** / **New sample payments** on `/support`, charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Do it again before each demo: a refunded order can't be refunded twice. On a deployed app use the button: `data/` isn't in git, so a local seed never reaches the host.
 3. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
 4. Open `/guard` to see every decision, approve or reject held refunds, and check the black box.
@@ -183,4 +183,6 @@ npm run redteam view            # results in promptfoo's local viewer
 - **Size:** `REDTEAM_TESTS` sets the attacks per plugin (default 3, about 140 tickets; `REDTEAM_TESTS=1` is a quick pass).
 - **Target:** `REDTEAM_TARGET` points at a deployed app (default `http://localhost:3000`), with `DEMO_PASSWORD` set for its Basic auth.
 - **Money:** sandbox only. The first business case refunds Ana's sample payment, so run `npm run seed` before each run.
+- **Same-day runs:** the daily cap (200 USD by default) counts every refund the guard allowed today, test runs included. After a few runs the 120 USD case is blocked by `DAILY_LIMIT` instead of held: raise the cap on `/settings` while testing, or run again the next day.
+- **Model variance:** an AI judge can grade the same ticket differently between runs (e.g. hold a refund it allowed before as `INTENT_UNCERTAIN`); repeat a run before drawing conclusions about a model.
 - A ticket the app can't answer (for example the AI provider retired the model) counts as an **error**, never as a pass.

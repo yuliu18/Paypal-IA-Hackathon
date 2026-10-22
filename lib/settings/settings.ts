@@ -1,7 +1,8 @@
 // The shop's own configuration, edited on /settings: who the business is, its refund policy and
 // limits, which AI provider and models run the agent and the judge, and its PayPal credentials.
-// Saved in data/settings.json with the keys encrypted (./secret-box). Every value falls back to
-// the environment, then to the demo defaults, so an unconfigured server behaves as before.
+// Saved in data/settings.json with the keys encrypted (./secret-box). The AI provider, its key and
+// PayPal fall back to the environment, everything else to the demo defaults; the models are chosen
+// here only.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
 
 import { link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
@@ -181,7 +182,8 @@ function resolve(stored: Stored, env: Env) {
   const money = (minor: number) => ({ minor, currency: limits.currency });
 
   const baseUrl = stored.ai?.baseUrl ?? normalizeBaseUrl(env.LLM_BASE_URL ?? '');
-  const agentModel = stored.ai?.agentModel ?? env.AGENT_MODEL ?? '';
+  // Models come from /settings only; empty means the provider's default (catalog.withDefaultModels).
+  const agentModel = stored.ai?.agentModel ?? '';
   const aiKey = savedKey(stored.ai?.apiKey, env) ?? envKey(env.LLM_API_KEY, baseUrl === normalizeBaseUrl(env.LLM_BASE_URL ?? ''));
 
   const clientId = stored.paypal?.clientId || env.PAYPAL_CLIENT_ID || '';
@@ -199,7 +201,7 @@ function resolve(stored: Stored, env: Env) {
       baseUrl,
       apiKey: aiKey.value,
       agentModel,
-      judgeModel: (stored.ai ? stored.ai.judgeModel : env.JUDGE_MODEL) || agentModel,
+      judgeModel: stored.ai?.judgeModel || agentModel,
     },
     paypal: { clientId, secret: payPalSecret.value },
   };
@@ -231,7 +233,7 @@ export async function settingsView({ env = process.env, file = env.SETTINGS_FILE
       provider: settings.ai.provider,
       baseUrl: settings.ai.baseUrl,
       agentModel: settings.ai.agentModel,
-      judgeModel: stored.ai ? stored.ai.judgeModel : (env.JUDGE_MODEL ?? ''),
+      judgeModel: stored.ai?.judgeModel ?? '',
       apiKey: '',
       paypalClientId: settings.paypal.clientId,
       paypalSecret: '',
@@ -285,7 +287,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   const baseUrl = normalizeBaseUrl(form.baseUrl);
   if (!/^https?:\/\/[^\s/]+/i.test(baseUrl) || !URL.canParse(baseUrl)) errors.baseUrl = 'Enter an http(s) URL.';
   const agentModel = form.agentModel.trim();
-  if (!MODEL.test(agentModel)) errors.agentModel = 'Choose the agent model.';
+  if (agentModel && !MODEL.test(agentModel)) errors.agentModel = 'Model ids have no spaces.';
   const judgeModel = form.judgeModel.trim();
   if (judgeModel && !MODEL.test(judgeModel)) errors.judgeModel = 'Model ids have no spaces.';
   const paypalClientId = form.paypalClientId.trim();

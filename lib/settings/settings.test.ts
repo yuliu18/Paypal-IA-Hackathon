@@ -58,8 +58,9 @@ describe('loadSettings', () => {
       provider: 'custom',
       baseUrl: 'https://env-llm.example/v1',
       apiKey: 'env-llm-key-9999',
-      agentModel: 'env-agent',
-      judgeModel: 'env-agent',
+      // Models are chosen on /settings only: AGENT_MODEL in the environment is ignored.
+      agentModel: '',
+      judgeModel: '',
     });
     expect(settings.paypal).toEqual({ clientId: 'env-client', secret: 'env-paypal-secret-8888' });
   });
@@ -141,7 +142,7 @@ describe('saveSettings', () => {
         autoRefundUpTo: '400',
         dailyCap: '-1',
         baseUrl: 'ftp://x',
-        agentModel: '',
+        agentModel: 'two words',
       }),
       { file, env: ENV },
     );
@@ -155,7 +156,7 @@ describe('saveSettings', () => {
         autoRefundUpTo: 'Automatic refunds must stay within the approval limit.',
         dailyCap: 'Enter an amount above 0 with at most 2 decimals.',
         baseUrl: 'Enter an http(s) URL.',
-        agentModel: 'Choose the agent model.',
+        agentModel: 'Model ids have no spaces.',
       },
     });
     await expect(stat(file)).rejects.toThrow();
@@ -223,6 +224,11 @@ describe('saveSettings', () => {
     expect(await saveSettings(form({ currency: 'JPY', autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' }), { file, env: ENV })).toEqual({ ok: true });
     expect((await loadSettings({ file, env: ENV })).limits.approvalThreshold).toEqual({ minor: 5000_00, currency: 'JPY' });
     expect((await settingsView({ file, env: ENV })).form).toMatchObject({ autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' });
+  });
+
+  it('saves no agent model to mean the provider default', async () => {
+    expect(await saveSettings(form({ agentModel: '', judgeModel: '' }), { file, env: ENV })).toEqual({ ok: true });
+    expect((await loadSettings({ file, env: ENV })).ai).toMatchObject({ agentModel: '', judgeModel: '' });
   });
 
   it('changes nothing when the settings are locked', async () => {

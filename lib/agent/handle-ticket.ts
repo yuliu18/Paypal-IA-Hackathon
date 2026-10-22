@@ -10,6 +10,7 @@ import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { clientHeaders } from '@/lib/llm/openai-compatible';
+import { withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
@@ -26,9 +27,12 @@ Execute each refund the ticket asks for with create_refund (look the order up to
 
 export type AgentMode = 'careful' | 'vulnerable';
 
-// The LLM the shop chose on /settings (or in the environment) for the agent and the judge.
-function llmConfig(ai: ShopSettings['ai']) {
-  if (!ai.baseUrl || !ai.apiKey || !ai.agentModel) throw new Error('Choose an AI provider, model and API key on /settings, or set LLM_BASE_URL, LLM_API_KEY and AGENT_MODEL in .env.local');
+// The LLM the shop chose on /settings for the agent and the judge (provider and key may come from
+// the environment); without a chosen model, the provider's newest one from the catalog.
+async function llmConfig(chosen: ShopSettings['ai']) {
+  const ai = await withDefaultModels(chosen);
+  if (!ai.baseUrl || !ai.apiKey) throw new Error('Choose an AI provider and API key on /settings, or set LLM_BASE_URL and LLM_API_KEY in .env.local');
+  if (!ai.agentModel) throw new Error('Choose the agent model on /settings: the catalog knows no default for this provider');
   return { ...ai, headers: clientHeaders() };
 }
 
@@ -50,7 +54,7 @@ export async function handleTicket(
   mode: AgentMode = 'careful',
 ): Promise<{ reply: string; steps: AgentStep[]; redacted: Redactions }> {
   const shop = await loadSettings();
-  const llm = llmConfig(shop.ai);
+  const llm = await llmConfig(shop.ai);
   const paypal = await payPalToolkit();
   // Agent, judge and black box all get the ticket without card numbers.
   const { ticket, removed: ticketRemoved } = privateTicket(received);

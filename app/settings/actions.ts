@@ -1,7 +1,7 @@
 'use server';
 
 import { refresh } from 'next/cache';
-import { loadCatalog, type CatalogModel } from '@/lib/settings/catalog';
+import { loadCatalog, withDefaultModels, type CatalogModel } from '@/lib/settings/catalog';
 import { listModels, testPayPal, type ConnectionCheck, type ModelList } from '@/lib/settings/connection';
 import { saveSettings, testCredentials, type SaveResult, type SettingsForm } from '@/lib/settings/settings';
 
@@ -44,7 +44,9 @@ export async function saveSettingsAction(_previous: SaveState, form: FormData): 
 export async function testAiAction(form: FormData): Promise<ModelList> {
   if (locked()) return { ok: false, error: LOCKED };
   const settings = settingsForm(form);
-  return listModels({ ...(await testCredentials(settings)).ai, model: settings.agentModel });
+  const { ai } = await testCredentials(settings);
+  const { agentModel } = await withDefaultModels({ ...ai, provider: settings.provider, agentModel: settings.agentModel, judgeModel: '' });
+  return listModels({ ...ai, model: agentModel });
 }
 
 export async function testPayPalAction(form: FormData): Promise<ConnectionCheck> {

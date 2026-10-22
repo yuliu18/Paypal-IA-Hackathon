@@ -198,7 +198,14 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
               </label>
             )}
             <Field label="Agent model" error={errors.agentModel} hint="Answers the tickets and calls PayPal tools. Only models that can call tools are listed.">
-              <Picker name="agentModel" value={agentModel} onChange={setAgentModel} options={modelOptions} allowCustom placeholder="Choose or type a model id" disabled={view.locked} />
+              <Picker
+                name="agentModel"
+                value={agentModel}
+                onChange={setAgentModel}
+                options={[{ value: '', label: catalogModels[0] ? `Provider default (${catalogModels[0].name})` : 'Provider default' }, ...modelOptions]}
+                allowCustom
+                disabled={view.locked}
+              />
             </Field>
             <Field label="Judge model" error={errors.judgeModel} hint="Checks each refund against the policy.">
               <Picker

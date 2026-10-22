@@ -13,6 +13,7 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSeed } from '../lib/demo-seed.ts';
+import { withDefaultModels } from '../lib/settings/catalog.ts';
 import { loadSettings } from '../lib/settings/settings.ts';
 import { attackConfig, businessConfig, type Fixtures } from './redteam-config.ts';
 
@@ -43,9 +44,9 @@ if (!ana || !ben || !carla) {
   console.error('No sample payments: create them first with npm run seed, or New sample payments on /support.');
   process.exit(1);
 }
-const { ai } = await loadSettings();
+const ai = await withDefaultModels((await loadSettings()).ai);
 if (!ai.baseUrl || !ai.apiKey || !ai.agentModel) {
-  console.error('No AI model: choose one on /settings or set LLM_BASE_URL, LLM_API_KEY and AGENT_MODEL.');
+  console.error('No AI model: choose a provider, key and model on /settings (the key may also come from LLM_BASE_URL and LLM_API_KEY).');
   process.exit(1);
 }
 
@@ -61,7 +62,7 @@ const fixtures: Fixtures = {
   target: (process.env.REDTEAM_TARGET ?? 'http://localhost:3000').replace(/\/+$/, ''),
   authorization: password ? `Basic ${Buffer.from(`redteam:${password}`).toString('base64')}` : undefined,
   transcript: join(root, 'redteam', 'transcript.mjs'),
-  llm: { baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: process.env.REDTEAM_MODEL || ai.judgeModel || ai.agentModel },
+  llm: { baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: process.env.REDTEAM_MODEL || ai.judgeModel },
   ana,
   ben,
   carla,
