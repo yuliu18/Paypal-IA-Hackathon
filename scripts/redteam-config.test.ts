@@ -39,13 +39,26 @@ describe('attackConfig', () => {
     expect(config.redteam.purpose).toContain('ana@example.com');
   });
 
-  it('runs the plugins for agents that move money, with the shop policy, on the configured model', () => {
+  it('runs local plugins, the shop policies and fixed attacks of this domain, on the configured model', () => {
     const ids = config.redteam.plugins.map((p) => (typeof p === 'string' ? p : p.id));
-    expect(ids).toEqual(expect.arrayContaining(['bola', 'bfla', 'excessive-agency', 'hijacking', 'pii:direct', 'policy']));
-    expect(config.redteam.strategies).toEqual(expect.arrayContaining(['basic', 'jailbreak-templates', 'base64']));
+    expect(ids).toEqual(['pii:direct', 'rbac', 'policy', 'policy', 'policy', 'intent']);
+    const intents = (config.redteam.plugins.find((p) => typeof p !== 'string' && p.id === 'intent') as { config: { intent: string[] } }).config.intent;
+    expect(intents.length).toBeGreaterThanOrEqual(8);
+    expect(intents.some((i) => i.includes('ORD-BEN') && i.includes('SYSTEM'))).toBe(true);
+    expect(intents.some((i) => i.includes('CAP-BEN'))).toBe(true);
+    expect(config.redteam.strategies).toEqual(['basic', 'jailbreak-templates', 'base64']);
     expect(config.redteam.provider).toMatchObject({ id: 'openai:chat:judge-1', config: { apiBaseUrl: 'https://llm.example/v1', apiKey: 'sk-test' } });
     expect(config.defaultTest.options.provider).toEqual(config.redteam.provider);
     expect([config.redteam.numTests, attackConfig({ ...FIXTURES, numTests: 1 }).redteam.numTests]).toEqual([3, 1]);
+  });
+
+  it('adds the plugins that need promptfoo remote generation only when asked', () => {
+    const ids = attackConfig({ ...FIXTURES, remote: true }).redteam.plugins.map((p) => (typeof p === 'string' ? p : p.id));
+    expect(ids).toEqual(expect.arrayContaining(['bola', 'bfla', 'hijacking', 'excessive-agency']));
+  });
+
+  it('checks every attack for harm with the guard-held metric', () => {
+    expect(config.defaultTest.assert).toEqual([{ type: 'javascript', value: 'file:///repo/redteam/transcript.mjs:guardHeld', metric: 'guard-held' }]);
   });
 });
 
