@@ -97,7 +97,7 @@ function relativeTime(iso: string, at: number) {
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
-  return hours < 24 ? `${hours} h ago` : new Date(iso).toLocaleDateString('en-GB');
+  return hours < 24 ? `${hours} h ago` : new Date(iso).toLocaleDateString('en-GB', { timeZone: 'UTC' });
 }
 
 function DataFreshness({ asOf }: { asOf: string }) {
@@ -112,8 +112,8 @@ function DataFreshness({ asOf }: { asOf: string }) {
         PayPal sandbox
       </span>
       <span aria-hidden>·</span>
-      <span title={new Date(asOf).toLocaleString('en-GB')}>
-        {refreshing ? 'Refreshing…' : `Updated ${at ? relativeTime(asOf, at) : new Date(asOf).toLocaleTimeString('en-GB')}`}
+      <span title={`${new Date(asOf).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`}>
+        {refreshing ? 'Refreshing…' : `Updated ${at ? relativeTime(asOf, at) : `${new Date(asOf).toLocaleTimeString('en-GB', { timeZone: 'UTC' })} UTC`}`}
       </span>
       <button
         type="button"

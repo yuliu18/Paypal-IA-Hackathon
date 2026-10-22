@@ -8,6 +8,9 @@ import { decideHeldAction } from './actions';
 
 export type HeldRefund = { id: string; at: string; customer: string; amount: string; captureId: string; codes: string[]; reasons: string };
 
+// A fixed locale and time zone, so the server's HTML and the browser's render show the same text.
+const atUtc = (iso: string) => `${new Date(iso).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`;
+
 // Short labels for why the guard held a refund (lib/guard: policy.ts and the intent judge).
 const WHY: Record<string, string> = {
   APPROVAL_REQUIRED: 'Over the approval limit',
@@ -34,7 +37,7 @@ function HeldItem({ refund, action, pending }: { refund: HeldRefund; action: (fo
             <span className="text-lg font-semibold text-pp-navy">{refund.amount}</span>
             <span>{refund.customer}</span>
             <code className="text-xs text-pp-muted">{refund.captureId}</code>
-            <span className="text-xs text-pp-muted">{new Date(refund.at).toLocaleString()}</span>
+            <span className="text-xs text-pp-muted">{atUtc(refund.at)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {[...new Set(refund.codes)].map((code) => (
