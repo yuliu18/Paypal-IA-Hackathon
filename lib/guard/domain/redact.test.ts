@@ -10,6 +10,23 @@ describe('privateTicket', () => {
     });
   });
 
+  it('finds a card number with more digits next to it: expiry, CVV, counts or ids', () => {
+    const cases: [string, string][] = [
+      ['My card 4111 1111 1111 1111 12/30 was charged twice', 'My card [card •••• 1111] 12/30 was charged twice'],
+      ['card 4111 1111 1111 1111 123', 'card [card •••• 1111] 123'],
+      ['paid with 4111111111111111 2 times', 'paid with [card •••• 1111] 2 times'],
+      ['Order 12 4111 1111 1111 1111', 'Order 12 [card •••• 1111]'],
+      ['card4111111111111111', 'card[card •••• 1111]'],
+    ];
+    for (const [message, masked] of cases) expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(masked);
+    expect(privateReply('Your card 4111 1111 1111 1111 12/30 is noted', 'ana@example.com').reply).toBe('Your card [card •••• 1111] 12/30 is noted');
+  });
+
+  it('does not cut a card number out of a longer unseparated number', () => {
+    const message = 'Tracking 4111111111111111000017';
+    expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(message);
+  });
+
   it('leaves numbers that are not card numbers alone: order ids, amounts, phone numbers', () => {
     const message = 'Order 12345678, 120.00 USD, call me on +34 612 345 678, tracking 1234567812345678.';
     expect(privateTicket({ customerEmail: 'ana@example.com', message })).toEqual({ ticket: { customerEmail: 'ana@example.com', message }, removed: 0 });

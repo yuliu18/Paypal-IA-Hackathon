@@ -35,7 +35,7 @@ function keep(value: unknown, shape: Shape, path: string, withheld: string[]): u
   const kept: Record<string, unknown> = {};
   for (const [field, child] of Object.entries(value)) {
     const childPath = path ? `${path}.${field}` : field;
-    const result = field in shape ? keep(child, shape[field], childPath, withheld) : undefined;
+    const result = Object.hasOwn(shape, field) ? keep(child, shape[field], childPath, withheld) : undefined;
     if (result === undefined) withheld.push(childPath);
     else kept[field] = result;
   }

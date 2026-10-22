@@ -2,7 +2,10 @@
 // agent, the intent judge or the black box, and a reply to a customer never carries a card number
 // or anyone else's email. Card numbers are recognised by their Luhn check digit.
 
-const CARD_CANDIDATE = /\b\d(?:[ -]?\d){12,18}\b/g;
+// Digits in groups split by single spaces or dashes; a card is any run of whole groups with 13-19
+// digits that passes Luhn, so "4111 1111 1111 1111 12/30" is found but a card is never cut out of
+// a longer unseparated number.
+const DIGIT_RUN = /(?<!\d)\d(?:[ -]?\d)*(?!\d)/g;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 function passesLuhn(digits: string): boolean {
@@ -15,13 +18,33 @@ function passesLuhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+// The longest card number starting at group `first`, as the index of its last group.
+function cardEndingAt(groups: RegExpExecArray[], first: number): { last: number; digits: string } | undefined {
+  let digits = '';
+  let found: { last: number; digits: string } | undefined;
+  for (let last = first; last < groups.length && digits.length + groups[last][0].length <= 19; last++) {
+    digits += groups[last][0];
+    if (digits.length >= 13 && passesLuhn(digits)) found = { last, digits };
+  }
+  return found;
+}
+
 function maskCards(text: string): { text: string; removed: number } {
   let removed = 0;
-  const masked = text.replace(CARD_CANDIDATE, (match) => {
-    const digits = match.replace(/\D/g, '');
-    if (!passesLuhn(digits)) return match;
-    removed += 1;
-    return `[card •••• ${digits.slice(-4)}]`;
+  const masked = text.replace(DIGIT_RUN, (run) => {
+    const groups = [...run.matchAll(/\d+/g)];
+    let out = '';
+    let copied = 0;
+    for (let first = 0; first < groups.length; first++) {
+      const card = cardEndingAt(groups, first);
+      if (!card) continue;
+      const end = groups[card.last].index + groups[card.last][0].length;
+      out += `${run.slice(copied, groups[first].index)}[card •••• ${card.digits.slice(-4)}]`;
+      copied = end;
+      removed += 1;
+      first = card.last;
+    }
+    return out + run.slice(copied);
   });
   return { text: masked, removed };
 }

@@ -81,6 +81,11 @@ describe('minimizeOrder', () => {
     for (const secret of ['1111', '2030-12', 'Sandbox Buyer', '@', 'Ana Lopez', 'Calle Mayor', 'ZR6AR9JXYUB68']) expect(text).not.toContain(secret);
   });
 
+  it('withholds keys that only exist on JavaScript objects instead of failing', () => {
+    const odd = JSON.parse('{"id":"O-1","constructor":{"name":{"x":1}},"toString":{"length":{"x":1}}}');
+    expect(minimizeOrder(odd)).toEqual({ order: { id: 'O-1' }, withheld: ['constructor', 'toString'] });
+  });
+
   it('drops a kept field whose value has the wrong shape instead of passing it through', () => {
     const odd = { id: 'O-1', status: { email: 'ana@example.com' }, purchase_units: 'ana@example.com' };
     expect(minimizeOrder(odd)).toEqual({ order: { id: 'O-1' }, withheld: ['status', 'purchase_units'] });
