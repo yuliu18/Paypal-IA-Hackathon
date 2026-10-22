@@ -1,6 +1,9 @@
 // One request to an OpenAI-compatible `/chat/completions` endpoint, shared by the guard's intent
 // judge and the support agent so headers, timeouts and error handling stay the same in both.
 
+// OpenCode Go rejects requests without a client user agent and a session id; other providers ignore them.
+export const clientHeaders = (): Record<string, string> => ({ 'User-Agent': 'payment-guard/0.1', 'x-opencode-session': crypto.randomUUID() });
+
 export type OpenAiCompatibleConfig = {
   baseUrl: string;
   apiKey: string;

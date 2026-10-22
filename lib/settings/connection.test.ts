@@ -63,6 +63,27 @@ describe('listModels', () => {
   });
 });
 
+describe('listModels without a model list', () => {
+  it("checks the key with a one-token chat when the provider has no /models, as OpenCode Go", async () => {
+    const { calls, fetchImpl } = fakeFetch(({ url }) =>
+      url.endsWith('/models') ? new Response('Not Found', { status: 404 }) : Response.json({ choices: [{ message: { content: 'ok' } }] }),
+    );
+    expect(await listModels({ baseUrl: 'https://opencode.ai/inference/go/openai/v1', apiKey: 'k', model: 'mini' }, fetchImpl)).toEqual({ ok: true, models: [] });
+    expect(calls[1].url).toBe('https://opencode.ai/inference/go/openai/v1/chat/completions');
+    expect(JSON.parse(calls[1].body!)).toMatchObject({ model: 'mini', max_tokens: 1 });
+    expect(calls[1].headers.get('x-opencode-session')).toBeTruthy();
+  });
+
+  it('reports the chat error, or asks for a model when none is chosen', async () => {
+    const { fetchImpl } = fakeFetch(({ url }) => (url.endsWith('/models') ? new Response('', { status: 404 }) : new Response('bad key sk-k1', { status: 401 })));
+    expect(await listModels({ baseUrl: 'https://x.example/v1', apiKey: 'sk-k1', model: 'm' }, fetchImpl)).toEqual({ ok: false, error: 'The provider answered 401: bad key ••••' });
+    expect(await listModels({ baseUrl: 'https://x.example/v1', apiKey: 'sk-k1', model: '' }, fetchImpl)).toEqual({
+      ok: false,
+      error: 'This provider does not list its models: type the agent model id, then test again.',
+    });
+  });
+});
+
 describe('testPayPal', () => {
   it('asks PayPal sandbox for a token with the client ID and secret', async () => {
     const { calls, fetchImpl } = fakeFetch(() => Response.json({ access_token: 't', expires_in: 3600 }));

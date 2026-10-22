@@ -2,7 +2,6 @@
 // payment guard sits in front of it, and the support agent only ever talks to the guard.
 // Server-side only: it reads the shop's policy, limits and PayPal and LLM credentials from its settings.
 
-import { randomUUID } from 'node:crypto';
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
 import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
@@ -10,6 +9,7 @@ import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup'
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
+import { clientHeaders } from '@/lib/llm/openai-compatible';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
@@ -29,9 +29,7 @@ export type AgentMode = 'careful' | 'vulnerable';
 // The LLM the shop chose on /settings (or in the environment) for the agent and the judge.
 function llmConfig(ai: ShopSettings['ai']) {
   if (!ai.baseUrl || !ai.apiKey || !ai.agentModel) throw new Error('Choose an AI provider, model and API key on /settings, or set LLM_BASE_URL, LLM_API_KEY and AGENT_MODEL in .env.local');
-  // OpenCode Go rejects requests without a client user agent and a session id; other providers ignore them.
-  const headers = { 'User-Agent': 'payment-guard/0.1', 'x-opencode-session': randomUUID() };
-  return { ...ai, headers };
+  return { ...ai, headers: clientHeaders() };
 }
 
 async function payPalToolkit() {

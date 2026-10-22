@@ -184,7 +184,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   const contactEmails = splitEmails(form.contactEmails);
   const badEmail = contactEmails.find((email) => !EMAIL.test(email));
   if (badEmail) errors.contactEmails = `Not an email: ${badEmail}`;
-  const refundPolicy = form.refundPolicy.trim();
+  const refundPolicy = form.refundPolicy.replace(/\r\n?/g, '\n').trim();
   if (refundPolicy.length < 20 || refundPolicy.length > 4000) errors.refundPolicy = 'Describe the refund policy in at least 20 characters.';
 
   const currency = form.currency.trim();

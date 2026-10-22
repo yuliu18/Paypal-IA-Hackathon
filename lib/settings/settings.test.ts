@@ -117,6 +117,11 @@ describe('saveSettings', () => {
     expect((await stat(file)).mode & 0o777).toBe(0o600);
   });
 
+  it('stores the refund policy with plain line breaks, as browsers send \\r\\n', async () => {
+    await saveSettings(form({ refundPolicy: 'Refund damaged orders.\r\nNever refund other customers.' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).business.refundPolicy).toBe('Refund damaged orders.\nNever refund other customers.');
+  });
+
   it('keeps a saved key when the key field is left blank, and removes it when asked', async () => {
     await saveSettings(form(), { file, env: ENV });
     await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env: ENV });
