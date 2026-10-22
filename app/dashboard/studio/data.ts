@@ -243,6 +243,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['moved', 'Refunded Through Guard', 'currencyFormat'],
           ['protected', 'Money Protected', 'currencyFormat'],
           ['awaitingApproval', 'Awaiting Approval', 'integerFormat'],
+          ['withheld', 'Personal Data Withheld', 'integerFormat'],
           ['decidedBy', 'Decided By', 'textFormat'],
         ]),
       },

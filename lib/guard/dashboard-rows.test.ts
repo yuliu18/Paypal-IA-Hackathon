@@ -26,15 +26,21 @@ describe('guardDashboardRows', () => {
         tool: 'create_refund',
         verdict: 'allow',
         outcome: 'executed',
-        customer: 'ana@example.com',
+        customer: 'a***@example.com',
         currency: 'USD',
         requested: 25,
         moved: 25,
         protected: 0,
         awaitingApproval: 0,
+        withheld: 0,
         decidedBy: 'guard',
       },
     ]);
+  });
+
+  it('counts the personal data fields a read withheld from the agent', () => {
+    const lookup = row({ id: '9', tool: 'get_order', args: { id: 'O-1' }, moved: undefined, detail: 'Withheld from the agent: payment_source, payer, purchase_units[0].custom_id' });
+    expect(guardDashboardRows([lookup]).guardDecisions[0].withheld).toBe(3);
   });
 
   it('counts a blocked refund as money protected and moves nothing', () => {
@@ -81,7 +87,7 @@ describe('guardDashboardRows', () => {
       decision: {
         verdict: 'block',
         violations: [
-          { code: 'CUSTOMER_MISMATCH', message: 'other payer' },
+          { code: 'CUSTOMER_MISMATCH', message: 'Order is not one of the ticket customer ana@example.com' },
           { code: 'DAILY_LIMIT', message: 'over' },
         ],
       },
@@ -89,7 +95,7 @@ describe('guardDashboardRows', () => {
       moved: undefined,
     });
     expect(guardDashboardRows([row({ id: '1' }), blocked]).guardViolations).toEqual([
-      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'other payer' },
+      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'Order is not one of the ticket customer a***@example.com' },
       { id: '7-1', decisionId: '7', code: 'DAILY_LIMIT', message: 'over' },
     ]);
   });

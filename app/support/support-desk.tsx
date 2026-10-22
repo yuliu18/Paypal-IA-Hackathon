@@ -3,12 +3,25 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
+import { maskPersonalData } from '@/lib/guard/domain/redact';
 import { SeedButton } from './seed-button';
 
 type AgentMode = 'careful' | 'vulnerable';
 export type Scenario = { label: string; agent: AgentMode; customerEmail: string; message: string };
 
-type Outcome = { reply: string; steps: AgentStep[] } | { error: string };
+type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
+
+// The fields the guard kept from the agent in a get_order answer (lib/guard/domain/privacy.ts).
+function withheldFields(step: AgentStep): number {
+  try {
+    const withheld = (JSON.parse(step.result) as { withheld_by_guard?: unknown }).withheld_by_guard;
+    return Array.isArray(withheld) ? withheld.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // Held refunds (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
 const stepStyle = (step: AgentStep) =>
@@ -126,14 +139,26 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
                 key={i}
                 className={`rounded border px-3 py-2 text-sm ${stepStyle(step)}`}
               >
-                <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{JSON.stringify(step.args)}</code>
-                <p className="mt-1 line-clamp-3 break-all">{step.result}</p>
+                {/* Masked like the guard log: a tool call can quote the customer's or another person's email. */}
+                <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{maskPersonalData(JSON.stringify(step.args))}</code>
+                <p className="mt-1 line-clamp-3 break-all">{maskPersonalData(step.result)}</p>
+                {withheldFields(step) > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-pp-blue">
+                    Privacy: {plural(withheldFields(step), 'personal data field')} hidden from the agent (card, names, emails, addresses)
+                  </p>
+                )}
               </li>
             ))}
             {outcome.steps.length === 0 && <li className="text-sm text-pp-muted">No tool calls.</li>}
           </ol>
           <h2 className="mt-6 text-sm font-semibold uppercase tracking-wider text-pp-muted">Reply to the customer</h2>
           <p className="mt-2 whitespace-pre-wrap rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm">{outcome.reply}</p>
+          {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
+            <p className="mt-2 text-xs font-semibold text-pp-blue">
+              Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the ticket before the AI saw it,{' '}
+              {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+            </p>
+          )}
         </section>
       )}
     </main>

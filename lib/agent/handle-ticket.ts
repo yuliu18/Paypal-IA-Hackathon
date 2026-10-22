@@ -8,6 +8,7 @@ import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import type { Limits } from '@/lib/guard/domain/policy';
+import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { withClient } from './in-memory-mcp';
@@ -54,11 +55,19 @@ async function payPalToolkit() {
   });
 }
 
-export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'careful'): Promise<{ reply: string; steps: AgentStep[] }> {
+// How many card numbers or other people's emails were masked on the way in and out.
+export type Redactions = { ticket: number; reply: number };
+
+export async function handleTicket(
+  received: SupportTicket,
+  mode: AgentMode = 'careful',
+): Promise<{ reply: string; steps: AgentStep[]; redacted: Redactions }> {
   const llm = llmConfig();
   const paypal = await payPalToolkit();
+  // Agent, judge and black box all get the ticket without card numbers.
+  const { ticket, removed: ticketRemoved } = privateTicket(received);
 
-  return withClient(paypal, 'payment-guard', (upstream) => {
+  const { reply, steps } = await withClient(paypal, 'payment-guard', (upstream) => {
     const guard = createPaymentGuard({
       upstream,
       task: { mandate: { customerEmail: ticket.customerEmail }, instructions: SHOP_INSTRUCTIONS, untrustedInput: ticket.message },
@@ -76,6 +85,9 @@ export async function handleTicket(ticket: SupportTicket, mode: AgentMode = 'car
       }),
     );
   });
+  // Whatever the agent was tricked into writing, the customer gets no one else's data.
+  const answer = privateReply(reply, ticket.customerEmail);
+  return { reply: answer.reply, steps, redacted: { ticket: ticketRemoved, reply: answer.removed } };
 }
 
 // A person's decision on a refund the guard held. Approval re-checks the policy before PayPal runs it.

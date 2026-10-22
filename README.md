@@ -15,7 +15,7 @@ A Next.js app that reads PayPal sandbox data over the [PayPal REST API](https://
 
 - **Endpoint pages**: one [AG Grid](https://www.ag-grid.com/react-data-grid/) per PayPal endpoint the demo calls, showing what each returns.
 - **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over all of that data, joined together, which you can edit and save in the browser.
-- **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
+- **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, keeps the customer's personal data from the agent, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
 
 ## Run locally
 
@@ -135,4 +135,17 @@ What it can't see: someone with write access who rewrites the whole chain with f
 
 Several processes can write to the same file: each append locks the database before reading the last hash, so the chain can't fork. A log written before the chain existed (table `audit`) is copied into the chain once, renumbered from 1, the first time the new version opens it; the old table is left as it was.
 
-The **Payment guard** page of the dashboard report shows the same log as charts: money protected (the requested amount of blocked refunds; a full refund with no stated amount isn't counted), money refunded through the guard, refunds awaiting approval, decisions by verdict, rules broken, and decisions per day.
+The **Payment guard** page of the dashboard report shows the same log as charts: money protected (the requested amount of blocked refunds; a full refund with no stated amount isn't counted), money refunded through the guard, refunds awaiting approval, personal data fields withheld from the agent, decisions by verdict, rules broken, and decisions per day.
+
+### Privacy
+
+The agent, and the LLM provider behind it, only see the personal data a refund needs:
+
+| Where | What happens |
+|---|---|
+| PayPal answers | A successful `get_order` is cut to an allowlist ([`lib/guard/domain/privacy.ts`](lib/guard/domain/privacy.ts)): order, purchase unit, capture and refund ids, status, amounts, dates and the item description (with any email or card number in it masked). PayPal error messages pass through as they are. Card details, payer and payee, names, addresses, the shop's `custom_id`, notes and links are withheld; the answer lists their paths in `withheld_by_guard`, and the black box records them. |
+| Incoming ticket | Card numbers (recognised by their Luhn check digit, however their groups are separated) become `[card •••• 1111]` before the agent, the intent judge or the black box see the ticket ([`lib/guard/domain/redact.ts`](lib/guard/domain/redact.ts)). |
+| Reply to the customer | Card numbers and every email other than the ticket customer's are masked, whatever the agent was tricked into writing. The shop's own contact address is masked too. |
+| Screens | `/guard`, the support desk's tool calls and the dashboard show emails as `a***@example.com` and card numbers by their last 4 digits. The black box keeps the full record as evidence, behind the demo password. |
+
+`/support` shows how many fields were hidden at each step and what was masked in the ticket and the reply.

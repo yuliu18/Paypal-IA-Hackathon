@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import type { ChainCheck } from '@/lib/guard/adapters/sqlite-audit-log';
+import { maskEmail, maskPersonalData } from '@/lib/guard/domain/redact';
 import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
 import { HeldQueue, type HeldRefund } from './held-queue';
@@ -47,10 +48,10 @@ export default async function GuardLogPage() {
       return {
         id: e.id,
         at: e.at,
-        customer: e.task.mandate.customerEmail,
+        customer: maskEmail(e.task.mandate.customerEmail),
         amount: amount?.value ? `${amount.value} ${amount.currency_code ?? ''}`.trim() : 'Full remaining amount',
         captureId: String(e.args.capture_id ?? ''),
-        reasons: e.decision.violations.map((v) => v.message).join('; '),
+        reasons: maskPersonalData(e.decision.violations.map((v) => v.message).join('; ')),
       };
     });
 
@@ -68,10 +69,11 @@ export default async function GuardLogPage() {
         verdict: e.decision.verdict,
         amount: e.moved ? e.moved.minor / 100 : null,
         currency: e.moved?.currency,
-        customer: e.task.mandate.customerEmail,
-        reasons: e.decision.violations.map((v) => `${v.code}: ${v.message}`).join('; '),
-        args: JSON.stringify(e.args),
-        detail: e.detail,
+        // The black box keeps the full record; the screen shows it masked.
+        customer: maskEmail(e.task.mandate.customerEmail),
+        reasons: maskPersonalData(e.decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ')),
+        args: maskPersonalData(JSON.stringify(e.args)),
+        detail: e.detail && maskPersonalData(e.detail),
         decides: e.resolves ? `#${e.resolves}` : null,
       }))}
       columns={[
