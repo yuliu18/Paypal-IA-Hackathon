@@ -7,6 +7,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Limits } from '@/lib/guard/domain/policy';
+import { normalizeBaseUrl, providerFor } from './providers.ts';
 import { openSecret, sealSecret } from './secret-box.ts';
 
 // The refund policy the agent follows and the guard's intent judge checks calls against.
@@ -103,9 +104,9 @@ function resolve(stored: Stored, env: Env) {
   const limits = stored.limits ?? DEFAULT_LIMITS;
   const money = (minor: number) => ({ minor, currency: limits.currency });
 
-  const baseUrl = stored.ai?.baseUrl ?? env.LLM_BASE_URL ?? '';
+  const baseUrl = stored.ai?.baseUrl ?? normalizeBaseUrl(env.LLM_BASE_URL ?? '');
   const agentModel = stored.ai?.agentModel ?? env.AGENT_MODEL ?? '';
-  const aiKey = savedKey(stored.ai?.apiKey, env) ?? envKey(env.LLM_API_KEY, baseUrl === env.LLM_BASE_URL);
+  const aiKey = savedKey(stored.ai?.apiKey, env) ?? envKey(env.LLM_API_KEY, baseUrl === normalizeBaseUrl(env.LLM_BASE_URL ?? ''));
 
   const clientId = stored.paypal?.clientId || env.PAYPAL_CLIENT_ID || '';
   const payPalSecret = savedKey(stored.paypal?.clientId ? stored.paypal.secret : undefined, env) ?? envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID);
@@ -118,7 +119,7 @@ function resolve(stored: Stored, env: Env) {
     },
     limits: { approvalThreshold: money(limits.autoRefundUpTo), perRefund: money(limits.approvalUpTo), daily: money(limits.dailyCap) },
     ai: {
-      provider: stored.ai?.provider ?? 'custom',
+      provider: stored.ai?.provider ?? providerFor(baseUrl),
       baseUrl,
       apiKey: aiKey.value,
       agentModel,
@@ -197,7 +198,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
     errors.autoRefundUpTo = 'Automatic refunds must stay within the approval limit.';
   }
 
-  const baseUrl = form.baseUrl.trim().replace(/\/+$/, '');
+  const baseUrl = normalizeBaseUrl(form.baseUrl);
   if (!/^https?:\/\/[^\s/]+/.test(baseUrl) || !URL.canParse(baseUrl)) errors.baseUrl = 'Enter an http(s) URL.';
   const agentModel = form.agentModel.trim();
   if (!MODEL.test(agentModel)) errors.agentModel = 'Choose the agent model.';
@@ -236,4 +237,21 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   await writeFile(partial, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600 });
   await rename(partial, file);
   return { ok: true };
+}
+
+// The keys a "Test connection" press may use: the one typed, else a saved or environment key, but
+// only for the URL or client id it belongs to, so the form can't send a stored key elsewhere.
+export async function testCredentials(form: SettingsForm, { env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}) {
+  const stored = await readStored(file);
+  const baseUrl = normalizeBaseUrl(form.baseUrl);
+  const clientId = form.paypalClientId.trim();
+  const apiKey =
+    form.apiKey.trim() ||
+    (stored.ai?.baseUrl === baseUrl ? savedKey(stored.ai.apiKey, env)?.value : '') ||
+    envKey(env.LLM_API_KEY, baseUrl === normalizeBaseUrl(env.LLM_BASE_URL ?? '')).value;
+  const secret =
+    form.paypalSecret.trim() ||
+    (clientId && stored.paypal?.clientId === clientId ? savedKey(stored.paypal.secret, env)?.value : '') ||
+    envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID).value;
+  return { ai: { baseUrl, apiKey }, paypal: { clientId, secret } };
 }

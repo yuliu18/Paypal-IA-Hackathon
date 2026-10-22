@@ -4,7 +4,8 @@
 
 import { loadSettings } from './settings/settings.ts';
 
-const BASE_URL = 'https://api-m.sandbox.paypal.com';
+export const PAYPAL_API = 'https://api-m.sandbox.paypal.com';
+const BASE_URL = PAYPAL_API;
 const MAX_ATTEMPTS = 4;
 
 export class PayPalApiError extends Error {
