@@ -23,6 +23,7 @@ function Card({ title, href, action, children }: { title: string; href: string; 
 
 const STEPS = [
   { href: '/settings', title: 'Configure', detail: 'Your refund policy, money limits, AI provider and PayPal app.' },
+  { href: '/evaluate', title: 'Evaluate the model', detail: 'Tickets your shop expects and nine attacks, scored in minutes.' },
   { href: '/support', title: 'Send a ticket', detail: 'The agent answers with PayPal tools; try a prompt injection too.' },
   { href: '/guard', title: 'Review the guard', detail: 'Every call allowed, held or blocked, in a tamper-evident log.' },
   { href: '/dashboard', title: 'Analyze', detail: 'Money protected and agent decisions in AG Studio reports.' },
@@ -76,7 +77,7 @@ export default async function Overview() {
       </div>
 
       <h2 className="mt-10 text-xs font-semibold uppercase tracking-wider text-pp-muted">How it works</h2>
-      <ol className="mt-3 grid gap-4 md:grid-cols-4">
+      <ol className="mt-3 grid gap-4 md:grid-cols-5">
         {STEPS.map((step, index) => (
           <li key={step.href}>
             <Link href={step.href} className="block h-full rounded-lg border border-pp-border bg-pp-surface p-4 hover:border-pp-blue">

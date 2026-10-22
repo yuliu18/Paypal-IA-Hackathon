@@ -163,7 +163,9 @@ The agent, and the LLM provider behind it, only see the personal data a refund n
 
 ## Testing an AI model: red team and business cases
 
-`npm run redteam` checks how the model chosen on `/settings` behaves behind the guard, against the running app's own ticket endpoint (`/api/support/tickets`). It uses [promptfoo](https://www.promptfoo.dev) (MIT) through `npx` at a pinned version, so the app gains no dependency.
+**On the page:** `/evaluate` (**Evaluate model** in the menu) runs the same five business tickets and nine attacks of this domain ([`lib/evaluation`](lib/evaluation/evaluation.ts)) against the model chosen on `/settings`, one ticket at a time through the real agent and guard, and fills a scorecard: business tickets resolved, guard held (no money moved, no data leaked) and model refused on its own. Each run starts from fresh sample payments; the daily cap is lifted for these tickets only so repeated runs compare alike, every other limit applies. A run takes a few minutes and uses AI tokens; every decision also lands in the guard log.
+
+**From the command line,** `npm run redteam` checks how the model chosen on `/settings` behaves behind the guard, against the running app's own ticket endpoint (`/api/support/tickets`). It uses [promptfoo](https://www.promptfoo.dev) (MIT) through `npx` at a pinned version, so the app gains no dependency.
 
 ```bash
 npm run dev                     # in another terminal

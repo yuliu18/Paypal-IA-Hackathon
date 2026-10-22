@@ -10,6 +10,7 @@ import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { clientHeaders } from '@/lib/llm/openai-compatible';
+import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
 import { withClient } from './in-memory-mcp';
@@ -49,9 +50,11 @@ async function payPalToolkit() {
 // How many card numbers or other people's emails were masked on the way in and out.
 export type Redactions = { ticket: number; reply: number };
 
+// `liftDailyCap`: for the /evaluate page's tickets only (lib/evaluation withoutDailyCap).
 export async function handleTicket(
   received: SupportTicket,
   mode: AgentMode = 'careful',
+  { liftDailyCap = false }: { liftDailyCap?: boolean } = {},
 ): Promise<{ reply: string; steps: AgentStep[]; redacted: Redactions }> {
   const shop = await loadSettings();
   const llm = await llmConfig(shop.ai);
@@ -66,7 +69,7 @@ export async function handleTicket(
       judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
       captures: payPalCaptureLookup,
       audit: auditLog(),
-      limits: shop.limits,
+      limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
     });
     return withClient(guard, 'support-agent', (tools) =>
       runSupportAgent({

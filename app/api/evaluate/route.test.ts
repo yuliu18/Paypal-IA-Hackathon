@@ -1,0 +1,53 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const handleTicket = vi.fn();
+const readSeed = vi.fn();
+vi.mock('@/lib/agent/handle-ticket', () => ({ handleTicket: (...args: unknown[]) => handleTicket(...args) }));
+vi.mock('@/lib/demo-seed', () => ({ readSeed: () => readSeed() }));
+
+const { POST } = await import('./route');
+
+const post = (body: unknown) => POST(new Request('http://test/api/evaluate', { method: 'POST', body: JSON.stringify(body) }));
+const charge = (customerEmail: string, orderId: string, captureId: string, value: string) => ({
+  customerEmail, description: 'Item', orderId, captureId, status: 'COMPLETED', amount: { value, currency_code: 'USD' },
+});
+const SEED = [charge('ana@example.com', 'ORD-ANA', 'CAP-ANA', '49.99'), charge('ben@example.com', 'ORD-BEN', 'CAP-BEN', '120.00'), charge('carla@example.com', 'ORD-CARLA', 'CAP-CARLA', '35.50')];
+
+describe('POST /api/evaluate', () => {
+  afterEach(() => {
+    handleTicket.mockReset();
+    readSeed.mockReset();
+  });
+
+  it('runs one case through the careful agent with the daily cap lifted, and grades it', async () => {
+    readSeed.mockResolvedValue(SEED);
+    handleTicket.mockResolvedValue({ reply: 'Refunded.', steps: [{ tool: 'create_refund', args: { capture_id: 'CAP-ANA' }, isError: false, result: '{}' }] });
+
+    const res = await post({ caseId: 'business-refund' });
+
+    expect(res.status).toBe(200);
+    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('ORD-ANA') }, 'careful', { liftDailyCap: true });
+    expect(await res.json()).toMatchObject({ caseId: 'business-refund', result: { pass: true }, reply: 'Refunded.', steps: [{ tool: 'create_refund' }] });
+  });
+
+  it('grades a failed ticket as not passed and keeps the cause in the server log', async () => {
+    readSeed.mockResolvedValue(SEED);
+    handleTicket.mockRejectedValue(new Error('LLM 410 model retired'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const body = await (await post({ caseId: 'attack-system-notice' })).json();
+
+    expect(body).toMatchObject({ caseId: 'attack-system-notice', result: { pass: false, reason: 'The support agent failed. Details are in the server log.' } });
+    expect(log).toHaveBeenCalledWith('Evaluation ticket failed', expect.objectContaining({ message: 'LLM 410 model retired' }));
+    log.mockRestore();
+  });
+
+  it('refuses an unknown case, or no sample payments', async () => {
+    readSeed.mockResolvedValue(SEED);
+    expect((await post({ caseId: 'nope' })).status).toBe(400);
+    readSeed.mockResolvedValue([]);
+    const res = await post({ caseId: 'business-refund' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: { message: 'Create the sample payments first.' } });
+  });
+});
