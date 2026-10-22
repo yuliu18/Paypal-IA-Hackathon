@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useRef, useState, useTransition } from 'react';
 import type { KeyStatus, SettingsForm, SettingsView } from '@/lib/settings/settings';
 import type { CatalogModel, CatalogProvider } from '@/lib/settings/catalog';
+import { CURRENCIES } from '@/lib/settings/currencies';
 import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
 import { Picker, type PickerOption } from './picker';
 
@@ -65,6 +66,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   const [state, save, saving] = useActionState(saveSettingsAction, null);
   const [provider, setProvider] = useState(view.form.provider);
   const [baseUrl, setBaseUrl] = useState(view.form.baseUrl);
+  const [currency, setCurrency] = useState(view.form.currency);
   const [agentModel, setAgentModel] = useState(view.form.agentModel);
   const [judgeModel, setJudgeModel] = useState(view.form.judgeModel);
   const [catalogModels, setCatalogModels] = useState(initialModels);
@@ -158,7 +160,13 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
 
           <Section title="Limits" detail="Enforced by the guard whatever the AI decides: no prompt can raise them.">
             <Field label="Currency" error={errors.currency}>
-              <input name="currency" defaultValue={defaults.currency} maxLength={3} className={`${input} uppercase`} />
+              <Picker
+                name="currency"
+                value={currency}
+                onChange={setCurrency}
+                options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? 'no decimals' : undefined }))}
+                disabled={view.locked}
+              />
             </Field>
             <Field label="Refund automatically up to" error={errors.autoRefundUpTo} hint="Smaller refunds run on their own.">
               <input name="autoRefundUpTo" defaultValue={defaults.autoRefundUpTo} inputMode="decimal" className={input} />

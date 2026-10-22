@@ -8,6 +8,7 @@ import { link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promis
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { Limits } from '@/lib/guard/domain/policy';
+import { currencyFor } from './currencies.ts';
 import { normalizeBaseUrl, providerFor } from './providers.ts';
 import { openSecret, sealSecret } from './secret-box.ts';
 
@@ -192,7 +193,8 @@ export async function loadSettings({ env = process.env, file = env.SETTINGS_FILE
   return resolve(await readStored(file), await withSecret(env, file, false)).settings;
 }
 
-const decimal = (minor: number) => (minor / 100).toFixed(2);
+// As the owner types it: "100.00", or "5000" in a currency without decimals.
+const decimal = (minor: number, currency: string) => (minor / 100).toFixed(currencyFor(currency)?.decimals ?? 2);
 
 // What the page shows: every value except the keys, which appear only as their last 4 characters.
 export async function settingsView({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SettingsView> {
@@ -206,9 +208,9 @@ export async function settingsView({ env = process.env, file = env.SETTINGS_FILE
       contactEmails: settings.business.contactEmails.join(', '),
       refundPolicy: settings.business.refundPolicy,
       currency: limits.currency,
-      autoRefundUpTo: decimal(limits.autoRefundUpTo),
-      approvalUpTo: decimal(limits.approvalUpTo),
-      dailyCap: decimal(limits.dailyCap),
+      autoRefundUpTo: decimal(limits.autoRefundUpTo, limits.currency),
+      approvalUpTo: decimal(limits.approvalUpTo, limits.currency),
+      dailyCap: decimal(limits.dailyCap, limits.currency),
       provider: settings.ai.provider,
       baseUrl: settings.ai.baseUrl,
       agentModel: settings.ai.agentModel,
@@ -246,12 +248,19 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (refundPolicy.length < 20 || refundPolicy.length > 4000) errors.refundPolicy = 'Describe the refund policy in at least 20 characters.';
 
   const currency = form.currency.trim();
-  if (!/^[A-Z]{3}$/.test(currency)) errors.currency = 'Use a 3-letter currency code, like USD or EUR.';
+  const known = currencyFor(currency);
+  if (!known) errors.currency = 'Choose a currency PayPal supports.';
   const amount = 'Enter an amount above 0 with at most 2 decimals.';
   const [autoRefundUpTo, approvalUpTo, dailyCap] = [form.autoRefundUpTo, form.approvalUpTo, form.dailyCap].map(toMinor);
   if (autoRefundUpTo === undefined) errors.autoRefundUpTo = amount;
   if (approvalUpTo === undefined) errors.approvalUpTo = amount;
   if (dailyCap === undefined) errors.dailyCap = amount;
+  if (known?.decimals === 0) {
+    const whole = `${currency} has no decimals: enter a whole amount.`;
+    for (const name of ['autoRefundUpTo', 'approvalUpTo', 'dailyCap'] as const) {
+      if (form[name].includes('.') && !errors[name]) errors[name] = whole;
+    }
+  }
   if (autoRefundUpTo !== undefined && approvalUpTo !== undefined && autoRefundUpTo > approvalUpTo) {
     errors.autoRefundUpTo = 'Automatic refunds must stay within the approval limit.';
   }

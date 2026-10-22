@@ -151,7 +151,7 @@ describe('saveSettings', () => {
         name: 'Enter the business name.',
         contactEmails: 'Not an email: not-an-email',
         refundPolicy: 'Describe the refund policy in at least 20 characters.',
-        currency: 'Use a 3-letter currency code, like USD or EUR.',
+        currency: 'Choose a currency PayPal supports.',
         autoRefundUpTo: 'Automatic refunds must stay within the approval limit.',
         dailyCap: 'Enter an amount above 0 with at most 2 decimals.',
         baseUrl: 'Enter an http(s) URL.',
@@ -206,6 +206,16 @@ describe('saveSettings', () => {
       ok: false,
       errors: { paypalClientId: 'Enter the client ID that goes with this secret.' },
     });
+  });
+
+  it('takes whole amounts only in currencies without decimals, like JPY', async () => {
+    expect(await saveSettings(form({ currency: 'JPY', autoRefundUpTo: '5000.50', approvalUpTo: '20000', dailyCap: '30000' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { autoRefundUpTo: 'JPY has no decimals: enter a whole amount.' },
+    });
+    expect(await saveSettings(form({ currency: 'JPY', autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' }), { file, env: ENV })).toEqual({ ok: true });
+    expect((await loadSettings({ file, env: ENV })).limits.approvalThreshold).toEqual({ minor: 5000_00, currency: 'JPY' });
+    expect((await settingsView({ file, env: ENV })).form).toMatchObject({ autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' });
   });
 
   it('changes nothing when the settings are locked', async () => {
