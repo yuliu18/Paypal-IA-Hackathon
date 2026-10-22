@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { setNavSlot } from './nav-slot';
 
 // The control panel's side menu, on every page: the agent and its guard first, then the reports,
-// the raw PayPal data and the settings. On the dashboard, its reports and their pages appear
+// and the settings. On the dashboard, its reports and their pages appear
 // under "Dashboard" (./nav-slot). The toggle at the bottom folds the menu into a rail of icons.
 // On small screens it is a scrolling top bar.
 
@@ -18,7 +18,6 @@ const Icons = {
   chart: <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />,
   collapse: <path d="M15 6l-6 6 6 6" />,
   expand: <path d="M9 6l6 6-6 6" />,
-  table: <path d="M3 5h18v14H3zM3 10h18M9 10v9" />,
   gear: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />,
 };
 
@@ -33,16 +32,6 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
     ],
   },
   { title: 'Insights', items: [{ href: '/dashboard', label: 'Dashboard', icon: 'chart' }] },
-  {
-    title: 'PayPal data',
-    items: [
-      { href: '/transactions', label: 'Transactions', icon: 'table' },
-      { href: '/balances', label: 'Balances', icon: 'table' },
-      { href: '/invoices', label: 'Invoices', icon: 'table' },
-      { href: '/products', label: 'Products', icon: 'table' },
-      { href: '/plans', label: 'Billing plans', icon: 'table' },
-    ],
-  },
   { title: 'Setup', items: [{ href: '/settings', label: 'Settings', icon: 'gear' }] },
 ];
 

@@ -67,7 +67,7 @@ export default async function Overview() {
             </li>
           </ul>
         </Card>
-        <Card title="PayPal" href="/transactions" action="See transactions">
+        <Card title="PayPal" href="/dashboard" action="See your PayPal data">
           <p className="font-semibold text-pp-navy">Sandbox</p>
           <p className="mt-1 text-pp-muted">{paypal.clientId && paypal.secret ? 'App credentials set. Money here is fictitious.' : 'No app credentials yet: add them in Settings.'}</p>
         </Card>
