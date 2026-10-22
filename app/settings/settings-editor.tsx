@@ -68,6 +68,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   const [agentModel, setAgentModel] = useState(view.form.agentModel);
   const [judgeModel, setJudgeModel] = useState(view.form.judgeModel);
   const [catalogModels, setCatalogModels] = useState(initialModels);
+  const latestProvider = useRef(view.form.provider);
   // Models the provider itself listed on "Test connection", for providers the catalog doesn't cover.
   const [liveModels, setLiveModels] = useState<string[]>([]);
   const [aiCheck, setAiCheck] = useState<Check>(null);
@@ -83,8 +84,11 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
     setLiveModels([]);
     setCatalogModels([]);
     setAiCheck(null);
+    latestProvider.current = id;
     startTesting(async () => {
       const models = await catalogModelsAction(id);
+      // A quicker pick of another provider wins: its models must not be replaced by this late answer.
+      if (latestProvider.current !== id) return;
       setCatalogModels(models);
       // Start from the provider's newest model, so a provider switch never keeps another's model id.
       setAgentModel(models[0]?.id ?? '');

@@ -95,8 +95,16 @@ async function withSecret(env: Env, file: string, create: boolean): Promise<Env>
   try {
     await link(partial, keyFile);
   } catch (error) {
-    // Another save created it first: use theirs.
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const code = (error as NodeJS.ErrnoException).code;
+    // EEXIST: another save created it first, so use theirs. Any other code: the disk has no hard
+    // links, so create it directly (a crash mid-write then leaves an empty file, reported on save).
+    if (code !== 'EEXIST') {
+      try {
+        await writeFile(keyFile, await readFile(partial), { mode: 0o600, flag: 'wx' });
+      } catch (fallback) {
+        if ((fallback as NodeJS.ErrnoException).code !== 'EEXIST') throw fallback;
+      }
+    }
   } finally {
     await unlink(partial);
   }
