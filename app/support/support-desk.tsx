@@ -64,10 +64,7 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-8 py-6 font-paypal text-pp-ink">
-      <Link href="/" className="text-sm font-semibold text-pp-blue hover:underline">
-        ← All pages
-      </Link>
-      <h1 className="mt-3 text-[28px] font-semibold text-pp-navy">Support agent demo</h1>
+      <h1 className="text-[28px] font-semibold text-pp-navy">Support agent demo</h1>
       <p className="mt-2 text-sm text-pp-muted">
         An AI support agent answers the ticket with PayPal tools. Every call goes through the payment guard; decisions are
         listed in the{' '}
