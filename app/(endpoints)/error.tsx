@@ -9,7 +9,7 @@ export default function EndpointError({ error, retry }: { error: Error & { diges
   }, [error]);
 
   return (
-    <main className="flex h-dvh flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
+    <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
       <h1 className="text-[28px] font-semibold text-pp-navy">We couldn&apos;t load this PayPal data</h1>
       <p className="mt-2 text-sm text-pp-muted">
         Check the API credentials in <code>.env.local</code>, and that the sandbox app has the features this endpoint needs.
