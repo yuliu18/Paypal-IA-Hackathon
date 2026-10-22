@@ -9,9 +9,11 @@
 > 
 > https://paypalaihackathon.devpost.com
 
-# PayPal SDK data pages
+# Payment Guard
 
-A Next.js app that reads PayPal sandbox data over the [PayPal REST API](https://developer.paypal.com/api/rest/), and puts a payment guard between an AI support agent and PayPal:
+A Next.js control panel that puts a payment guard between an AI support agent and PayPal, and reads PayPal sandbox data over the [PayPal REST API](https://developer.paypal.com/api/rest/):
+
+- **Settings** (`/settings`): a shop adapts the agent to its business without touching code: refund policy, money limits, AI provider and models, PayPal app. See [Settings](#settings).
 
 - **Endpoint pages**: one [AG Grid](https://www.ag-grid.com/react-data-grid/) per PayPal endpoint the demo calls, showing what each returns.
 - **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over all of that data, joined together, which you can edit and save in the browser.
@@ -30,6 +32,21 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). Next.js only loads the dotted `.env.local`; it is git-ignored, so credentials stay out of the repo.
 
 Other scripts: `npm run build` (production build), `npm run start` (serve the build), `npm run lint`.
+
+## Settings
+
+`/settings` configures everything the agent and the guard use, with the environment variables as fallback, so a server with only `.env.local` works as before:
+
+| Section | What it sets |
+|---|---|
+| Business | Name, contact emails replies may include, and the refund policy the agent follows and the judge checks against |
+| Limits | Currency, refunds that run on their own, refunds a person approves (above: blocked), daily cap |
+| AI | Provider from the catalog, base URL, API key, agent and judge models; **Test connection** lists the provider's models |
+| PayPal | Sandbox client ID and secret; **Test connection** asks PayPal for a token |
+
+The AI catalog ([`lib/settings/providers.ts`](lib/settings/providers.ts)) covers Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio; any other OpenAI-compatible URL works as **Custom**. The agent needs a model with tool calling.
+
+Settings are saved in `data/settings.json` (`SETTINGS_FILE` moves it). Keys are encrypted with AES-256-GCM under `SETTINGS_SECRET` and the page only ever shows their last 4 characters; without `SETTINGS_SECRET`, keys can't be saved on the page and come from the environment. A key is only sent to the URL or PayPal client ID it was saved or set for: changing the URL on the page never sends an existing key elsewhere. `SETTINGS_LOCKED=true` makes the page read-only and turns off the connection tests, for a public demo. On hosts with an ephemeral disk (Render's free plan), saved settings last until the next deploy; the environment variables are the durable configuration there.
 
 ### AG Studio licence (optional)
 
@@ -101,7 +118,7 @@ An AI agent with refund tools can be talked into refunding the wrong order, the 
 
 ### Try it
 
-1. Fill in the LLM variables in `.env.local` (`LLM_BASE_URL`, `LLM_API_KEY`, `AGENT_MODEL`, optionally `JUDGE_MODEL`); any OpenAI-compatible endpoint works.
+1. Choose an AI provider and model on `/settings`, or fill in the LLM variables in `.env.local` (`LLM_BASE_URL`, `LLM_API_KEY`, `AGENT_MODEL`, optionally `JUDGE_MODEL`); any OpenAI-compatible endpoint works.
 2. `npm run seed`, or **Create sample payments** / **New sample payments** on `/support`, charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Do it again before each demo: a refunded order can't be refunded twice. On a deployed app use the button: `data/` isn't in git, so a local seed never reaches the host.
 3. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
 4. Open `/guard` to see every decision, approve or reject held refunds, and check the black box.
@@ -118,7 +135,7 @@ Reads pass through only for single records that belong to the ticket customer (`
 | The judge is unsure (answers `review`) | Held for a person |
 | Up to 100 USD, no rule broken, judge agrees | Runs |
 
-The limits (100 / 250 USD per refund, 200 USD per day) are set in [`lib/agent/handle-ticket.ts`](lib/agent/handle-ticket.ts) for a small shop and the seeded payments. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
+These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
 
 ### Approving a held refund
 
@@ -145,7 +162,7 @@ The agent, and the LLM provider behind it, only see the personal data a refund n
 |---|---|
 | PayPal answers | A successful `get_order` is cut to an allowlist ([`lib/guard/domain/privacy.ts`](lib/guard/domain/privacy.ts)): order, purchase unit, capture and refund ids, status, amounts, dates and the item description (with any email or card number in it masked). PayPal's error messages reach the agent with emails and card numbers masked. Card details, payer and payee, names, addresses, the shop's `custom_id`, notes and links are withheld; the answer lists their paths in `withheld_by_guard`, and the black box records them. |
 | Incoming ticket | Card numbers (recognised by their Luhn check digit, however their groups are separated; digits glued to letters are an id, like PayPal's, and are left alone) become `[card •••• 1111]` before the agent, the intent judge or the black box see the ticket ([`lib/guard/domain/redact.ts`](lib/guard/domain/redact.ts)). |
-| Reply to the customer | Card numbers and every email other than the ticket customer's or the shop's own (`SHOP_CONTACT_EMAIL`, comma-separated) are masked, whatever the agent was tricked into writing. |
+| Reply to the customer | Card numbers and every email other than the ticket customer's or the shop's own (contact emails on `/settings`, or `SHOP_CONTACT_EMAIL`, comma-separated) are masked, whatever the agent was tricked into writing. |
 | Screens | `/guard`, the support desk's tool calls and the dashboard show emails as `a***@example.com` and card numbers by their last 4 digits. The black box keeps the full record as evidence, behind the demo password. |
 
 `/support` shows how many fields were hidden at each step and what was masked in the ticket and the reply.
