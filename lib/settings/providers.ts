@@ -2,7 +2,7 @@
 // `/chat/completions` with tool calling, which is all the agent and the judge need; any other
 // such endpoint works as "custom". Models are listed live from the provider, never hard-coded.
 
-export type Provider = { id: string; label: string; group: 'Global' | 'China' | 'Local' | 'Gateway'; baseUrl: string; keyRequired: boolean };
+export type Provider = { id: string; label: string; group: 'Global' | 'China' | 'Local' | 'Gateway' | 'More providers'; baseUrl: string; keyRequired: boolean };
 
 export const PROVIDERS: Provider[] = [
   { id: 'anthropic', label: 'Anthropic (Claude)', group: 'Global', baseUrl: 'https://api.anthropic.com/v1', keyRequired: true },

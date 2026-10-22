@@ -22,9 +22,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col md:flex-row">
-        <AppNav />
-        <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <body className="h-full overflow-hidden">
+        {/* The frame fills the window exactly and pages scroll inside it, so popups that libraries
+            append to <body> can never stretch the page and leave a gap below the menu. */}
+        <div className="flex h-dvh flex-col md:flex-row">
+          <AppNav />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
+        </div>
       </body>
     </html>
   );

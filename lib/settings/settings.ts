@@ -4,9 +4,11 @@
 // the environment, then to the demo defaults, so an unconfigured server behaves as before.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import type { Limits } from '@/lib/guard/domain/policy';
+import { currencyFor } from './currencies.ts';
 import { normalizeBaseUrl, providerFor } from './providers.ts';
 import { openSecret, sealSecret } from './secret-box.ts';
 
@@ -74,6 +76,58 @@ type Stored = {
 
 const isLocked = (env: Env) => env.SETTINGS_LOCKED === 'true';
 const settingsSecret = (env: Env) => (env.SETTINGS_SECRET && env.SETTINGS_SECRET.length >= 16 ? env.SETTINGS_SECRET : undefined);
+
+// Without SETTINGS_SECRET, keys are encrypted with a random key kept in settings.key next to the
+// settings, readable only by the server account. It protects a copied settings.json, not a copied
+// data folder; SETTINGS_SECRET from a secrets manager protects both. Created on the first saved key.
+async function withSecret(env: Env, file: string, create: boolean): Promise<Env> {
+  if (settingsSecret(env)) return env;
+  const keyFile = join(dirname(file), 'settings.key');
+  const current = await readKeyFile(keyFile);
+  if (current === 'unreadable') return env;
+  if (current) return { ...env, SETTINGS_SECRET: current };
+  if (!create) return env;
+  // Missing or empty: an empty file (left by a crash) never sealed a key, so it can be replaced.
+  let pending = creating.get(keyFile);
+  if (!pending) {
+    pending = createKeyFile(keyFile).finally(() => creating.delete(keyFile));
+    creating.set(keyFile, pending);
+  }
+  await pending;
+  const created = await readKeyFile(keyFile);
+  return created && created !== 'unreadable' ? { ...env, SETTINGS_SECRET: created } : env;
+}
+
+// The key, '' when the file is missing or too short to be one, or 'unreadable'.
+async function readKeyFile(keyFile: string): Promise<string> {
+  try {
+    const key = (await readFile(keyFile, 'utf8')).trim();
+    return key.length >= 16 ? key : '';
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? '' : 'unreadable';
+  }
+}
+
+// Saves in this process wait for one creation; link() keeps other processes from overwriting it.
+const creating = new Map<string, Promise<void>>();
+
+// Written whole to a temp file, then linked or renamed into place, so no reader ever sees it half
+// written. Disks without hard links get a rename, after checking again that nobody created it.
+async function createKeyFile(keyFile: string): Promise<void> {
+  if (await readKeyFile(keyFile)) return;
+  await mkdir(dirname(keyFile), { recursive: true });
+  const partial = `${keyFile}.${crypto.randomUUID()}.tmp`;
+  await writeFile(partial, `${randomBytes(32).toString('hex')}\n`, { mode: 0o600 });
+  try {
+    await link(partial, keyFile);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // EEXIST: an empty file to replace, or another process's key to keep.
+    if (code !== 'EEXIST' || !(await readKeyFile(keyFile))) await rename(partial, keyFile);
+  } finally {
+    await unlink(partial).catch(() => {});
+  }
+}
 const splitEmails = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
 const hint = (key: string) => `••••${key.length >= 8 ? key.slice(-4) : ''}`;
 
@@ -153,26 +207,27 @@ function resolve(stored: Stored, env: Env) {
 }
 
 export async function loadSettings({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<ShopSettings> {
-  return resolve(await readStored(file), env).settings;
+  return resolve(await readStored(file), await withSecret(env, file, false)).settings;
 }
 
-const decimal = (minor: number) => (minor / 100).toFixed(2);
+// As the owner types it: "100.00", or "5000" in a currency without decimals.
+const decimal = (minor: number, currency: string) => (minor / 100).toFixed(currencyFor(currency)?.decimals ?? 2);
 
 // What the page shows: every value except the keys, which appear only as their last 4 characters.
 export async function settingsView({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SettingsView> {
   const stored = await readStored(file);
-  const { settings, limits, keys } = resolve(stored, env);
+  const { settings, limits, keys } = resolve(stored, await withSecret(env, file, false));
   return {
     locked: isLocked(env),
-    canStoreKeys: !!settingsSecret(env),
+    canStoreKeys: !isLocked(env),
     form: {
       name: settings.business.name,
       contactEmails: settings.business.contactEmails.join(', '),
       refundPolicy: settings.business.refundPolicy,
       currency: limits.currency,
-      autoRefundUpTo: decimal(limits.autoRefundUpTo),
-      approvalUpTo: decimal(limits.approvalUpTo),
-      dailyCap: decimal(limits.dailyCap),
+      autoRefundUpTo: decimal(limits.autoRefundUpTo, limits.currency),
+      approvalUpTo: decimal(limits.approvalUpTo, limits.currency),
+      dailyCap: decimal(limits.dailyCap, limits.currency),
       provider: settings.ai.provider,
       baseUrl: settings.ai.baseUrl,
       agentModel: settings.ai.agentModel,
@@ -210,12 +265,19 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (refundPolicy.length < 20 || refundPolicy.length > 4000) errors.refundPolicy = 'Describe the refund policy in at least 20 characters.';
 
   const currency = form.currency.trim();
-  if (!/^[A-Z]{3}$/.test(currency)) errors.currency = 'Use a 3-letter currency code, like USD or EUR.';
+  const known = currencyFor(currency);
+  if (!known) errors.currency = 'Choose a currency PayPal supports.';
   const amount = 'Enter an amount above 0 with at most 2 decimals.';
   const [autoRefundUpTo, approvalUpTo, dailyCap] = [form.autoRefundUpTo, form.approvalUpTo, form.dailyCap].map(toMinor);
   if (autoRefundUpTo === undefined) errors.autoRefundUpTo = amount;
   if (approvalUpTo === undefined) errors.approvalUpTo = amount;
   if (dailyCap === undefined) errors.dailyCap = amount;
+  if (known?.decimals === 0) {
+    const whole = `${currency} has no decimals: enter a whole amount.`;
+    for (const name of ['autoRefundUpTo', 'approvalUpTo', 'dailyCap'] as const) {
+      if (form[name].includes('.') && !errors[name]) errors[name] = whole;
+    }
+  }
   if (autoRefundUpTo !== undefined && approvalUpTo !== undefined && autoRefundUpTo > approvalUpTo) {
     errors.autoRefundUpTo = 'Automatic refunds must stay within the approval limit.';
   }
@@ -231,17 +293,18 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
 
   const apiKey = form.apiKey.trim();
   const paypalSecret = form.paypalSecret.trim();
-  const secret = settingsSecret(env);
-  const noSecret = (variable: string) => `Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use ${variable}.`;
   // Keys travel in HTTP headers, which can't hold spaces or control characters.
   const badKey = 'Paste the key without spaces or line breaks.';
   if (/[\s\p{Cc}]/u.test(apiKey)) errors.apiKey = badKey;
-  else if (apiKey && !secret) errors.apiKey = noSecret('LLM_API_KEY');
   if (paypalSecret && !paypalClientId) errors.paypalClientId = 'Enter the client ID that goes with this secret.';
   if (/[\s\p{Cc}]/u.test(paypalSecret)) errors.paypalSecret = badKey;
-  else if (paypalSecret && !secret) errors.paypalSecret = noSecret('PAYPAL_SECRET');
   if (Object.keys(errors).length) return { ok: false, errors };
 
+  const secret = apiKey || paypalSecret ? settingsSecret(await withSecret(env, file, true)) : undefined;
+  // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
+  if ((apiKey || paypalSecret) && !secret) {
+    return { ok: false, errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' } };
+  }
   const previous = await readStored(file);
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
@@ -269,7 +332,8 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
 
 // The keys a "Test connection" press may use: the one typed, else a saved or environment key, but
 // only for the URL or client id it belongs to, so the form can't send a stored key elsewhere.
-export async function testCredentials(form: SettingsForm, { env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}) {
+export async function testCredentials(form: SettingsForm, { env: given = process.env, file = given.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}) {
+  const env = await withSecret(given, file, false);
   const stored = await readStored(file);
   const baseUrl = normalizeBaseUrl(form.baseUrl);
   const clientId = form.paypalClientId.trim();

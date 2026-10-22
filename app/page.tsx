@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import type { Money } from '@/lib/guard/domain/policy';
-import { PROVIDERS } from '@/lib/settings/providers';
+import { loadCatalog } from '@/lib/settings/catalog';
 import { loadSettings } from '@/lib/settings/settings';
 
 export const metadata: Metadata = { title: 'Overview' };
@@ -32,8 +32,8 @@ const STEPS = [
 // Shows no keys, only which provider and limits are in force.
 export default async function Overview() {
   await connection();
-  const { business, limits, ai, paypal } = await loadSettings();
-  const provider = PROVIDERS.find((p) => p.id === ai.provider)?.label ?? 'Custom provider';
+  const [{ business, limits, ai, paypal }, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
+  const provider = catalog.providers.find((p) => p.id === ai.provider)?.label ?? 'Custom provider';
 
   return (
     <main className="mx-auto w-full max-w-5xl p-8 font-paypal text-pp-ink">
@@ -67,7 +67,7 @@ export default async function Overview() {
             </li>
           </ul>
         </Card>
-        <Card title="PayPal" href="/transactions" action="See transactions">
+        <Card title="PayPal" href="/dashboard" action="See your PayPal data">
           <p className="font-semibold text-pp-navy">Sandbox</p>
           <p className="mt-1 text-pp-muted">{paypal.clientId && paypal.secret ? 'App credentials set. Money here is fictitious.' : 'No app credentials yet: add them in Settings.'}</p>
         </Card>

@@ -1,13 +1,45 @@
 'use client';
 
 import { useState } from 'react';
-import { CloseIcon, MoreIcon, PlusIcon, ReportIcon } from './ui/icons';
+import { CloseIcon, MoreIcon, PlusIcon, RefreshIcon, ReportIcon } from './ui/icons';
 import { pagesFor, type ReportPage } from '../page-titles';
 import type { SavedReport } from '../reports-store';
 import { Button, Menu, MenuItem } from './ui/ui';
 
 // Reports, each listing its pages. The open report shows its live pages (including unsaved
 // ones); the others show their saved pages. Double-click a report or page to rename it.
+// `tone`: light in the dashboard's own panel, dark inside the app's navy side menu.
+
+const TONES = {
+  light: {
+    title: 'px-6 pb-2 pt-6 text-xs font-semibold uppercase tracking-wider text-pp-muted',
+    list: 'flex-1 space-y-1 overflow-y-auto px-3 pb-4',
+    report: (active: boolean) => (active ? 'font-semibold text-pp-navy' : 'text-pp-ink hover:bg-pp-canvas'),
+    reportIcon: 'text-pp-blue',
+    more: 'text-pp-muted hover:bg-white hover:text-pp-navy',
+    pages: 'border-pp-border',
+    page: (selected: boolean) => (selected ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-muted hover:bg-pp-canvas hover:text-pp-navy'),
+    remove: 'text-pp-muted hover:bg-white hover:text-pp-danger',
+    add: 'text-pp-blue hover:bg-pp-highlight',
+    footer: 'border-t border-pp-border p-4',
+    note: 'text-pp-muted',
+    reset: 'text-pp-blue',
+  },
+  dark: {
+    title: 'sr-only',
+    list: 'space-y-0.5 pb-1 pl-3',
+    report: (active: boolean) => (active ? 'font-semibold text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'),
+    reportIcon: '',
+    more: 'text-white/60 hover:bg-white/10 hover:text-white',
+    pages: 'border-white/15',
+    page: (selected: boolean) => (selected ? 'bg-white/15 font-semibold text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'),
+    remove: 'text-white/60 hover:bg-white/10 hover:text-white',
+    add: 'text-white/75 hover:bg-white/10 hover:text-white',
+    footer: 'space-y-0.5 pb-2 pl-3',
+    note: 'text-white/50',
+    reset: 'text-white/75',
+  },
+};
 export function ReportsSidebar({
   reports,
   activeId,
@@ -25,7 +57,9 @@ export function ReportsSidebar({
   onDuplicate,
   onDelete,
   onReset,
+  tone = 'light',
 }: {
+  tone?: keyof typeof TONES;
   reports: SavedReport[];
   activeId: string;
   activePages: ReportPage[];
@@ -46,6 +80,7 @@ export function ReportsSidebar({
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const t = TONES[tone];
 
   const finishRename = (value: string, commit: (title: string) => void) => {
     setRenaming(null);
@@ -54,8 +89,8 @@ export function ReportsSidebar({
 
   return (
     <>
-      <p className="px-6 pb-2 pt-6 text-xs font-semibold uppercase tracking-wider text-pp-muted">Reports</p>
-      <ul className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+      <p className={t.title}>Reports</p>
+      <ul className={t.list}>
         {reports.map((report) => {
           const active = report.id === activeId;
           const open = expanded[report.id] ?? active;
@@ -85,11 +120,11 @@ export function ReportsSidebar({
                     }}
                     onDoubleClick={() => setRenaming(report.id)}
                     aria-expanded={open}
-                    className={`flex w-full items-center gap-3 rounded-full py-2.5 pl-4 pr-10 text-left text-[15px] transition-colors ${
-                      active ? 'font-semibold text-pp-navy' : 'text-pp-ink hover:bg-pp-canvas'
-                    }`}
+                    className={`flex w-full items-center pr-10 text-left transition-colors ${
+                      tone === 'dark' ? 'gap-2.5 rounded px-2 py-1.5 text-sm' : 'gap-3 rounded-full py-2.5 pl-4 text-[15px]'
+                    } ${t.report(active)}`}
                   >
-                    <ReportIcon className={`size-5 shrink-0 ${active ? 'text-pp-blue' : ''}`} />
+                    <ReportIcon className={`${tone === 'dark' ? 'size-4' : 'size-5'} shrink-0 ${active ? t.reportIcon : ''}`} />
                     <span className="truncate">{report.name}</span>
                   </button>
                 )}
@@ -100,7 +135,7 @@ export function ReportsSidebar({
                     aria-haspopup="menu"
                     aria-expanded={menuFor === report.id}
                     onClick={() => setMenuFor(menuFor === report.id ? null : report.id)}
-                    className={`flex size-8 items-center justify-center rounded-full text-pp-muted hover:bg-white hover:text-pp-navy ${
+                    className={`flex size-8 items-center justify-center rounded-full ${t.more} ${
                       menuFor === report.id ? 'opacity-100' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100'
                     }`}
                   >
@@ -137,7 +172,7 @@ export function ReportsSidebar({
               </div>
 
               {open && (
-                <ul className="mb-2 ml-[26px] mt-1 space-y-0.5 border-l border-pp-border pl-3" aria-label={`${report.name} pages`}>
+                <ul className={`mb-2 mt-1 space-y-0.5 border-l ${tone === 'dark' ? 'ml-4 pl-2' : 'ml-[26px] pl-3'} ${t.pages}`} aria-label={`${report.name} pages`}>
                   {pages.map((page) => {
                     const selected = active && page.id === selectedPageId;
                     return (
@@ -158,9 +193,7 @@ export function ReportsSidebar({
                             onDoubleClick={() => active && editing && setRenaming(page.id)}
                             aria-current={selected ? 'page' : undefined}
                             title={active && editing ? 'Double-click to rename' : undefined}
-                            className={`block w-full truncate rounded-full py-2 pl-4 pr-8 text-left text-sm transition-colors ${
-                              selected ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-muted hover:bg-pp-canvas hover:text-pp-navy'
-                            }`}
+                            className={`block w-full truncate pr-8 text-left text-sm transition-colors ${tone === 'dark' ? 'rounded px-2 py-1.5' : 'rounded-full py-2 pl-4'} ${t.page(selected)}`}
                           >
                             {page.title}
                           </button>
@@ -171,7 +204,7 @@ export function ReportsSidebar({
                             aria-label={`Remove page ${page.title}`}
                             title="Remove page"
                             onClick={() => onRemovePage(page.id)}
-                            className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-pp-muted opacity-0 hover:bg-white hover:text-pp-danger focus-visible:opacity-100 group-hover:opacity-100"
+                            className={`absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full opacity-0 focus-visible:opacity-100 group-hover:opacity-100 ${t.remove}`}
                           >
                             <CloseIcon className="size-3.5" />
                           </button>
@@ -188,7 +221,7 @@ export function ReportsSidebar({
                           const id = onAddPage();
                           if (id) setRenaming(id);
                         }}
-                        className="flex w-full items-center gap-1.5 rounded-full py-2 pl-4 text-left text-sm font-semibold text-pp-blue hover:bg-pp-highlight"
+                        className={`flex w-full items-center text-left text-sm ${tone === 'dark' ? 'gap-2.5 rounded px-2 py-1.5' : 'gap-1.5 rounded-full py-2 pl-4 font-semibold'} ${t.add}`}
                       >
                         <PlusIcon className="size-4" /> Add page
                       </button>
@@ -200,17 +233,35 @@ export function ReportsSidebar({
           );
         })}
       </ul>
-      <div className="border-t border-pp-border p-4">
-        <Button variant="primary" className="w-full" onClick={onCreate}>
-          <PlusIcon /> New report
-        </Button>
-        <p className="mt-3 text-center text-xs text-pp-muted">
-          Reports are saved in this browser.{' '}
-          <button type="button" onClick={onReset} disabled={!ready} className="font-semibold text-pp-blue hover:underline">
-            Reset demo
+      {tone === 'dark' ? (
+        // In the side menu: plain menu entries, like the rest of the menu.
+        <div className={t.footer}>
+          <button type="button" onClick={onCreate} className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-sm ${t.add}`}>
+            <PlusIcon className="size-4" /> New report
           </button>
-        </p>
-      </div>
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={!ready}
+            title="Reports are saved in this browser. Reset brings back the demo reports."
+            className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-sm ${t.add}`}
+          >
+            <RefreshIcon className="size-4" /> Reset demo
+          </button>
+        </div>
+      ) : (
+        <div className={t.footer}>
+          <Button variant="primary" className="w-full" onClick={onCreate}>
+            <PlusIcon /> New report
+          </Button>
+          <p className={`mt-2 text-center text-xs ${t.note}`}>
+            Reports are saved in this browser.{' '}
+            <button type="button" onClick={onReset} disabled={!ready} className={`font-semibold hover:underline ${t.reset}`}>
+              Reset demo
+            </button>
+          </p>
+        </div>
+      )}
     </>
   );
 }

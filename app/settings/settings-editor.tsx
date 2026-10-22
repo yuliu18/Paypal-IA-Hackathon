@@ -2,13 +2,17 @@
 
 import { startTransition, useActionState, useRef, useState, useTransition } from 'react';
 import type { KeyStatus, SettingsForm, SettingsView } from '@/lib/settings/settings';
-import type { Provider } from '@/lib/settings/providers';
-import { saveSettingsAction, testAiAction, testPayPalAction } from './actions';
+import type { CatalogModel, CatalogProvider } from '@/lib/settings/catalog';
+import { CURRENCIES } from '@/lib/settings/currencies';
+import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
+import { Picker, type PickerOption } from './picker';
+import { latestOnly } from './picker-logic';
 
 type Check = { ok: boolean; message: string } | null;
 
+// Every one-line field is h-10, so inputs and pickers line up.
 const input =
-  'w-full rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
+  'h-10 w-full rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
 const button =
   'rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight disabled:opacity-60';
 
@@ -33,14 +37,23 @@ function Field({ label, error, hint, wide, children }: { label: string; error?: 
   );
 }
 
-function keyHint(status: KeyStatus, canStoreKeys: boolean, variable: string) {
-  const current = {
+function keyHint(status: KeyStatus, variable: string) {
+  return {
     saved: `Saved key ${status.hint}. Leave blank to keep it.`,
     env: `Using ${variable} from the server environment (${status.hint}). Leave blank to keep it.`,
-    unreadable: 'The saved key cannot be read any more (SETTINGS_SECRET changed). Enter it again.',
+    unreadable: 'The saved key cannot be read any more (its encryption key changed). Enter it again.',
     none: 'No key yet.',
   }[status.source];
-  return canStoreKeys ? current : `${current} To store keys here, set SETTINGS_SECRET on the server.`;
+}
+
+const GROUPS = ['Global', 'China', 'Gateway', 'Local', 'More providers'] as const;
+
+const tokens = (n: number) => (n >= 1_000_000 ? `${Number((n / 1_000_000).toFixed(1))}M` : `${Math.round(n / 1000)}k`);
+
+// "128k context · $0.30 / $1.20 per 1M" (input / output per million tokens), as far as the catalog knows.
+function modelDetail(model: CatalogModel) {
+  const parts = [model.context && `${tokens(model.context)} context`, model.input === 0 && model.output === 0 ? 'free' : model.input !== undefined && model.output !== undefined && `$${model.input} / $${model.output} per 1M`];
+  return parts.filter(Boolean).join(' · ') || undefined;
 }
 
 function CheckResult({ check }: { check: Check }) {
@@ -49,12 +62,19 @@ function CheckResult({ check }: { check: Check }) {
 
 // The shop owner's settings: business, refund limits, AI provider and PayPal. Keys are write-only:
 // the page only ever receives their last 4 characters.
-export function SettingsEditor({ view, providers }: { view: SettingsView; providers: Provider[] }) {
+export function SettingsEditor({ view, providers, initialModels }: { view: SettingsView; providers: CatalogProvider[]; initialModels: CatalogModel[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, save, saving] = useActionState(saveSettingsAction, null);
   const [provider, setProvider] = useState(view.form.provider);
   const [baseUrl, setBaseUrl] = useState(view.form.baseUrl);
-  const [models, setModels] = useState<string[]>([]);
+  const [currency, setCurrency] = useState(view.form.currency);
+  const [agentModel, setAgentModel] = useState(view.form.agentModel);
+  const [judgeModel, setJudgeModel] = useState(view.form.judgeModel);
+  const [catalogModels, setCatalogModels] = useState(initialModels);
+  // Only the provider picked last may fill the model lists (./picker-logic).
+  const [loadModels] = useState(() => latestOnly<CatalogModel[]>());
+  // Models the provider itself listed on "Test connection", for providers the catalog doesn't cover.
+  const [liveModels, setLiveModels] = useState<string[]>([]);
   const [aiCheck, setAiCheck] = useState<Check>(null);
   const [payPalCheck, setPayPalCheck] = useState<Check>(null);
   const [testing, startTesting] = useTransition();
@@ -65,14 +85,39 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
     setProvider(id);
     const preset = providers.find((p) => p.id === id);
     if (preset) setBaseUrl(preset.baseUrl);
-    setModels([]);
+    setLiveModels([]);
+    setCatalogModels([]);
     setAiCheck(null);
+    loadModels(
+      () => catalogModelsAction(id),
+      (models) => {
+        setCatalogModels(models);
+        // Start from the provider's newest model, so a provider switch never keeps another's model id.
+        setAgentModel(models[0]?.id ?? '');
+        setJudgeModel('');
+      },
+      // Without an answer the owner can still type a model id.
+      [],
+    );
   }
+
+  const providerOptions: PickerOption[] = [
+    ...GROUPS.flatMap((group) =>
+      providers
+        .filter((p) => p.group === group)
+        .map((p) => ({ value: p.id, label: p.label, group, icon: p.logo, detail: p.modelCount ? `${p.modelCount} models` : undefined })),
+    ),
+    { value: 'custom', label: 'Custom (any OpenAI-compatible URL)', group: 'Other' },
+  ];
+  const modelOptions: PickerOption[] = [
+    ...catalogModels.map((m) => ({ value: m.id, label: m.name, detail: modelDetail(m) })),
+    ...liveModels.filter((id) => !catalogModels.some((m) => m.id === id)).map((id) => ({ value: id, label: id, group: 'Listed by the provider' })),
+  ];
 
   function testAi() {
     startTesting(async () => {
       const result = await testAiAction(new FormData(formRef.current!));
-      setModels(result.ok ? result.models : []);
+      setLiveModels(result.ok ? result.models : []);
       if (!result.ok) return setAiCheck({ ok: false, message: result.error });
       setAiCheck({ ok: true, message: result.models.length ? `Connected: ${result.models.length} models to choose from.` : 'Connected with the agent model.' });
     });
@@ -91,8 +136,6 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
     const data = new FormData(event.currentTarget);
     startTransition(() => save(data));
   }
-
-  const groups = ['Global', 'China', 'Gateway', 'Local'] as const;
 
   return (
     <main className="mx-auto w-full max-w-4xl p-8 font-paypal text-pp-ink">
@@ -114,13 +157,19 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
               <input name="contactEmails" defaultValue={defaults.contactEmails} placeholder="help@yourshop.com" className={input} />
             </Field>
             <Field label="Refund policy" error={errors.refundPolicy} wide>
-              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={4} className={input} />
+              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={4} className={`${input} h-auto`} />
             </Field>
           </Section>
 
           <Section title="Limits" detail="Enforced by the guard whatever the AI decides: no prompt can raise them.">
             <Field label="Currency" error={errors.currency}>
-              <input name="currency" defaultValue={defaults.currency} maxLength={3} className={`${input} uppercase`} />
+              <Picker
+                name="currency"
+                value={currency}
+                onChange={setCurrency}
+                options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? 'no decimals' : undefined }))}
+                disabled={view.locked}
+              />
             </Field>
             <Field label="Refund automatically up to" error={errors.autoRefundUpTo} hint="Smaller refunds run on their own.">
               <input name="autoRefundUpTo" defaultValue={defaults.autoRefundUpTo} inputMode="decimal" className={input} />
@@ -134,44 +183,33 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
           </Section>
 
           <Section title="AI" detail="Any provider with an OpenAI-compatible API: cloud, Chinese or running on your own machine.">
-            <Field label="Provider">
-              <select name="provider" value={provider} onChange={(e) => chooseProvider(e.target.value)} className={input}>
-                {groups.map((group) => (
-                  <optgroup key={group} label={group}>
-                    {providers
-                      .filter((p) => p.group === group)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-                <option value="custom">Custom (any OpenAI-compatible URL)</option>
-              </select>
+            <Field label="Provider" hint={`${providers.length} providers from the models.dev catalog, plus any OpenAI-compatible URL.`}>
+              <Picker name="provider" value={provider} onChange={chooseProvider} options={providerOptions} disabled={view.locked} />
             </Field>
             <Field label="Base URL" error={errors.baseUrl}>
               <input name="baseUrl" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} readOnly={provider !== 'custom'} className={input} />
             </Field>
-            <Field label="API key" error={errors.apiKey} hint={keyHint(view.ai.apiKey, view.canStoreKeys, 'LLM_API_KEY')} wide>
-              <input name="apiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.ai.apiKey.hint} className={input} />
+            <Field label="API key" error={errors.apiKey} hint={keyHint(view.ai.apiKey, 'LLM_API_KEY')} wide>
+              <input name="apiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.ai.apiKey.hint || 'Paste your API key'} className={input} />
             </Field>
             {view.ai.apiKey.source === 'saved' && (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input type="checkbox" name="clearApiKey" /> Remove the saved key
               </label>
             )}
-            <Field label="Agent model" error={errors.agentModel} hint="Answers the tickets and calls PayPal tools.">
-              <input name="agentModel" defaultValue={defaults.agentModel} list="models" className={input} />
+            <Field label="Agent model" error={errors.agentModel} hint="Answers the tickets and calls PayPal tools. Only models that can call tools are listed.">
+              <Picker name="agentModel" value={agentModel} onChange={setAgentModel} options={modelOptions} allowCustom placeholder="Choose or type a model id" disabled={view.locked} />
             </Field>
-            <Field label="Judge model" error={errors.judgeModel} hint="Checks each refund against the policy. Blank: same as the agent.">
-              <input name="judgeModel" defaultValue={defaults.judgeModel} list="models" className={input} />
+            <Field label="Judge model" error={errors.judgeModel} hint="Checks each refund against the policy.">
+              <Picker
+                name="judgeModel"
+                value={judgeModel}
+                onChange={setJudgeModel}
+                options={[{ value: '', label: 'Same as the agent' }, ...modelOptions]}
+                allowCustom
+                disabled={view.locked}
+              />
             </Field>
-            <datalist id="models">
-              {models.map((model) => (
-                <option key={model} value={model} />
-              ))}
-            </datalist>
             <div className="flex items-center gap-3 sm:col-span-2">
               <button type="button" onClick={testAi} disabled={testing} className={button}>
                 Test connection
@@ -184,7 +222,7 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
             <Field label="Client ID" error={errors.paypalClientId}>
               <input name="paypalClientId" defaultValue={defaults.paypalClientId} autoComplete="off" className={input} />
             </Field>
-            <Field label="Secret" error={errors.paypalSecret} hint={keyHint(view.paypal.secret, view.canStoreKeys, 'PAYPAL_SECRET')}>
+            <Field label="Secret" error={errors.paypalSecret} hint={keyHint(view.paypal.secret, 'PAYPAL_SECRET')}>
               <input name="paypalSecret" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.paypal.secret.hint} className={input} />
             </Field>
             {view.paypal.secret.source === 'saved' && (

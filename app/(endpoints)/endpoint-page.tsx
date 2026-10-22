@@ -25,19 +25,26 @@ export function EndpointPage({
   children?: ReactNode;
 }) {
   return (
-    <main className="flex h-dvh flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
+    <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
       <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-pp-muted">
-        {calls.map((call) => (
-          <code key={call} className="rounded bg-pp-highlight px-2 py-0.5 text-pp-navy">
-            {call}
-          </code>
-        ))}
-        <span>
-          via <code className="text-pp-navy">{source}</code> · {rows.length} {rows.length === 1 ? 'row' : 'rows'}
-        </span>
-      </div>
-      {note && <p className="mt-2 max-w-4xl text-sm text-pp-muted">{note}</p>}
+      <p className="mt-1 text-sm text-pp-muted">
+        {rows.length} {rows.length === 1 ? 'row' : 'rows'} from your PayPal sandbox account.
+      </p>
+      {/* The PayPal calls behind the page, for developers; folded away for everyone else. */}
+      <details className="mt-2 max-w-4xl text-sm text-pp-muted">
+        <summary className="cursor-pointer select-none font-semibold text-pp-blue">API details</summary>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {calls.map((call) => (
+            <code key={call} className="rounded bg-pp-highlight px-2 py-0.5 text-pp-navy">
+              {call}
+            </code>
+          ))}
+          <span>
+            via <code className="text-pp-navy">{source}</code>
+          </span>
+        </div>
+        {note && <p className="mt-2">{note}</p>}
+      </details>
       {children}
       <div className="mt-5 flex min-h-0 flex-1 flex-col">
         <DataGrid rows={rows} columns={columns} />

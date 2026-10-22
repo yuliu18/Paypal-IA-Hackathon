@@ -15,8 +15,7 @@ A Next.js control panel that puts a payment guard between an AI support agent an
 
 - **Settings** (`/settings`): a shop adapts the agent to its business without touching code: refund policy, money limits, AI provider and models, PayPal app. See [Settings](#settings).
 
-- **Endpoint pages**: one [AG Grid](https://www.ag-grid.com/react-data-grid/) per PayPal endpoint the demo calls, showing what each returns.
-- **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over all of that data, joined together, which you can edit and save in the browser.
+- **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over the shop's PayPal data (invoices, transactions, balances, products, plans) and the guard's decisions, joined together, which you can edit and save in the browser.
 - **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, keeps the customer's personal data from the agent, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
 
 ## Run locally
@@ -44,9 +43,9 @@ Other scripts: `npm run build` (production build), `npm run start` (serve the bu
 | AI | Provider from the catalog, base URL, API key, agent and judge models; **Test connection** lists the provider's models |
 | PayPal | Sandbox client ID and secret; **Test connection** asks PayPal for a token |
 
-The AI catalog ([`lib/settings/providers.ts`](lib/settings/providers.ts)) covers Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio; any other OpenAI-compatible URL works as **Custom**. The agent needs a model with tool calling.
+The AI catalog ([`lib/settings/catalog.ts`](lib/settings/catalog.ts)) comes from [models.dev](https://models.dev), the open provider and model database OpenCode and Pi use: every provider it serves through an OpenAI-compatible API, and for each only the models that can call tools, with context size and price. Verified presets ([`lib/settings/providers.ts`](lib/settings/providers.ts)) come first: Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio. Any other OpenAI-compatible URL works as **Custom**. The catalog is fetched once every 6 hours; if models.dev can't be reached, the presets still work and models can be typed.
 
-Settings are saved in `data/settings.json` (`SETTINGS_FILE` moves it). Keys are encrypted with AES-256-GCM under `SETTINGS_SECRET` and the page only ever shows their last 4 characters; without `SETTINGS_SECRET`, keys can't be saved on the page and come from the environment. A key is only sent to the URL or PayPal client ID it was saved or set for: changing the URL on the page never sends an existing key elsewhere. `SETTINGS_LOCKED=true` makes the page read-only and turns off the connection tests, for a public demo. On hosts with an ephemeral disk (Render's free plan), saved settings last until the next deploy; the environment variables are the durable configuration there.
+Settings are saved in `data/settings.json` (`SETTINGS_FILE` moves it). Keys are encrypted with AES-256-GCM and the page only ever shows their last 4 characters. The encryption key is `SETTINGS_SECRET` when set (best kept in the host's secrets manager); otherwise a random key is generated in `data/settings.key`, readable only by the server account, which protects a copied `settings.json` but not a copied `data/` folder. A key is only sent to the URL or PayPal client ID it was saved or set for: changing the URL on the page never sends an existing key elsewhere. `SETTINGS_LOCKED=true` makes the page read-only and turns off the connection tests, for a public demo. On hosts with an ephemeral disk (Render's free plan), saved settings last until the next deploy; the environment variables are the durable configuration there.
 
 ### AG Studio licence (optional)
 
@@ -72,7 +71,6 @@ In production `.env.local` isn't deployed: set the variable in your host's envir
 ```
 lib/paypal.ts            Every PayPal call: OAuth token, paging, retries, response types
 lib/dashboard-data.ts    Turns those responses into the dashboard's related tables
-app/(endpoints)/         One page per endpoint, each rendering an AG Grid
 app/dashboard/           The AG Studio dashboard
 app/api/ai/responses/    Server-side proxy for the dashboard's AI assistant
 lib/agent/               The AI support agent and the wiring of one ticket (handle-ticket.ts)
@@ -85,32 +83,28 @@ app/(endpoints)/guard/   Guard log, approval queue and black box check
 
 Every page is a server component that calls `await connection()`, so it renders per request with live data instead of being prerendered at build time. PayPal credentials never leave the server.
 
-## Endpoint pages
+## PayPal data
 
-Each page in [`app/(endpoints)`](app/(endpoints)) calls one function in `lib/paypal.ts`, maps the response to flat rows, and passes them with plain column definitions to the shared [`DataGrid`](app/(endpoints)/data-grid.tsx). The page header shows the REST calls behind it.
+The dashboard reads the shop's PayPal data through one function each in [`lib/paypal.ts`](lib/paypal.ts):
 
-| Page | `lib/paypal.ts` function | REST calls |
+| Data | `lib/paypal.ts` function | REST calls |
 |---|---|---|
-| [`/products`](app/(endpoints)/products/page.tsx) | `listProducts()` | `GET /v1/catalogs/products`, then `GET /v1/catalogs/products/{id}` per product |
-| [`/plans`](app/(endpoints)/plans/page.tsx) | `listPlans()` | `GET /v1/billing/plans`, then `GET /v1/billing/plans/{id}` per plan |
-| [`/invoices`](app/(endpoints)/invoices/page.tsx) | `listInvoices()` | `GET /v2/invoicing/invoices`, then `GET /v2/invoicing/invoices/{id}` per invoice |
-| [`/transactions`](app/(endpoints)/transactions/page.tsx) | `searchTransactions(start, end)` | `GET /v1/reporting/transactions` |
-| [`/balances`](app/(endpoints)/balances/page.tsx) | `getBalances()` | `GET /v1/reporting/balances` |
+| Products | `listProducts()` | `GET /v1/catalogs/products`, then `GET /v1/catalogs/products/{id}` per product |
+| Billing plans | `listPlans()` | `GET /v1/billing/plans`, then `GET /v1/billing/plans/{id}` per plan |
+| Invoices | `listInvoices()` | `GET /v2/invoicing/invoices`, then `GET /v2/invoicing/invoices/{id}` per invoice |
+| Transactions | `searchTransactions(start, end)` | `GET /v1/reporting/transactions` |
+| Balances | `getBalances()` | `GET /v1/reporting/balances` |
 
 Things worth knowing about these endpoints:
 
-- **List endpoints return summaries.** Products have no type or category, plans no billing cycles, and invoices no line items, payments or refunds. So each record is fetched again in full, which is why these pages take a second or two.
+- **List endpoints return summaries.** Products have no type or category, plans no billing cycles, and invoices no line items, payments or refunds. So each record is fetched again in full, which is why the dashboard takes a second or two to load.
 - **Billing plans keep their price in `billing_cycles`.** There is an optional `TRIAL` cycle, then the `REGULAR` cycle; `total_cycles: 0` means it bills until cancelled.
 - **Transaction Search covers at most 31 days per request** and rejects fractional seconds in dates. New activity can take up to three hours to appear. `fields=all` adds `payer_info` to each `transaction_info`. Event codes are [PayPal T-codes](https://developer.paypal.com/docs/transaction-search/transaction-event-codes/) (`T0001` = payout); status is `S` success, `P` pending, `D` denied, `V` reversed or `F` partially refunded.
 - **Amounts are decimal strings with a currency**, e.g. `{ "value": "2.99", "currency_code": "USD" }`. `amountOf()` turns them into numbers, and the grid formats money columns in each row's currency.
 
-### The grid
-
-Pages are server components, so the column definitions they pass to the grid must be plain data, with no functions. Money columns use the `type: 'money'` column type, defined in `data-grid.tsx`, which formats the value in the row's `currency`. Date columns use AG Grid's built-in `cellDataType: 'dateString'` or `'dateTimeString'`. Every column can be sorted and filtered, and the search box filters across all columns.
-
 ## Dashboard
 
-[`/dashboard`](app/dashboard/page.tsx) fetches all five endpoints at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. It adds the payment guard's decisions from its audit log ([`lib/guard/dashboard-rows.ts`](lib/guard/dashboard-rows.ts)) as two more tables, guard decisions and guard violations. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). Reports you create or edit are saved in the browser's localStorage; a browser that saved the built-in report keeps that copy, so use **Reset demo** to see pages added to it later, such as Payment guard.
+[`/dashboard`](app/dashboard/page.tsx) fetches all five at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. It adds the payment guard's decisions from its audit log ([`lib/guard/dashboard-rows.ts`](lib/guard/dashboard-rows.ts)) as two more tables, guard decisions and guard violations. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). Reports you create or edit are saved in the browser's localStorage; a browser that saved the built-in report keeps that copy, so use **Reset demo** to see pages added to it later, such as Payment guard.
 
 ## Payment guard
 

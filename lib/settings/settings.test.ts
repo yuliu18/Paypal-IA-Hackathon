@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -151,7 +151,7 @@ describe('saveSettings', () => {
         name: 'Enter the business name.',
         contactEmails: 'Not an email: not-an-email',
         refundPolicy: 'Describe the refund policy in at least 20 characters.',
-        currency: 'Use a 3-letter currency code, like USD or EUR.',
+        currency: 'Choose a currency PayPal supports.',
         autoRefundUpTo: 'Automatic refunds must stay within the approval limit.',
         dailyCap: 'Enter an amount above 0 with at most 2 decimals.',
         baseUrl: 'Enter an http(s) URL.',
@@ -161,16 +161,38 @@ describe('saveSettings', () => {
     await expect(stat(file)).rejects.toThrow();
   });
 
-  it('refuses to store keys without SETTINGS_SECRET, pointing to the environment variables', async () => {
+  it('stores keys without SETTINGS_SECRET, encrypted with a generated key file only the server can read', async () => {
     const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form(), { file, env })).toEqual({ ok: true });
+    const keyFile = join(dir, 'data', 'settings.key');
+    expect((await stat(keyFile)).mode & 0o777).toBe(0o600);
+    expect(await readFile(file, 'utf8')).not.toContain('sk-deepseek');
+    await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env });
+    const settings = await loadSettings({ file, env });
+    expect([settings.ai.apiKey, settings.paypal.secret]).toEqual(['sk-deepseek-abcd1234', 'shop-paypal-secret-5678']);
+    expect((await settingsView({ file, env })).canStoreKeys).toBe(true);
+  });
+
+  it('replaces an empty key file, which can hold no saved key, when a key is saved', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    await mkdir(join(dir, 'data'), { recursive: true });
+    await writeFile(join(dir, 'data', 'settings.key'), '');
+    expect(await saveSettings(form(), { file, env })).toEqual({ ok: true });
+    expect((await loadSettings({ file, env })).ai.apiKey).toBe('sk-deepseek-abcd1234');
+  });
+
+  it('answers with a form error, not a crash, when the key file cannot be read', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    await mkdir(join(dir, 'data', 'settings.key'), { recursive: true });
     expect(await saveSettings(form(), { file, env })).toEqual({
       ok: false,
-      errors: {
-        apiKey: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use LLM_API_KEY.',
-        paypalSecret: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use PAYPAL_SECRET.',
-      },
+      errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' },
     });
-    expect(await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env })).toEqual({ ok: true });
+  });
+
+  it('writes no key file when no key is saved', async () => {
+    await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env: { ...ENV, SETTINGS_SECRET: undefined } });
+    await expect(stat(join(dir, 'data', 'settings.key'))).rejects.toThrow();
   });
 
   it('saves twice at the same time without failing', async () => {
@@ -191,6 +213,16 @@ describe('saveSettings', () => {
       ok: false,
       errors: { paypalClientId: 'Enter the client ID that goes with this secret.' },
     });
+  });
+
+  it('takes whole amounts only in currencies without decimals, like JPY', async () => {
+    expect(await saveSettings(form({ currency: 'JPY', autoRefundUpTo: '5000.50', approvalUpTo: '20000', dailyCap: '30000' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { autoRefundUpTo: 'JPY has no decimals: enter a whole amount.' },
+    });
+    expect(await saveSettings(form({ currency: 'JPY', autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' }), { file, env: ENV })).toEqual({ ok: true });
+    expect((await loadSettings({ file, env: ENV })).limits.approvalThreshold).toEqual({ minor: 5000_00, currency: 'JPY' });
+    expect((await settingsView({ file, env: ENV })).form).toMatchObject({ autoRefundUpTo: '5000', approvalUpTo: '20000', dailyCap: '30000' });
   });
 
   it('changes nothing when the settings are locked', async () => {
