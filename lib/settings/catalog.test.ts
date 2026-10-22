@@ -66,6 +66,19 @@ describe('createCatalogLoader', () => {
     expect(catalog.models.get('deepseek')).toHaveLength(2);
   });
 
+  it('keeps the last good catalog when a refresh fails', async () => {
+    let now = 0;
+    let up = true;
+    const load = createCatalogLoader(async () => {
+      if (!up) throw new TypeError('fetch failed');
+      return Response.json(RAW);
+    }, () => now);
+    await load();
+    up = false;
+    now += 7 * 60 * 60_000;
+    expect((await load()).models.get('deepseek')).toHaveLength(2);
+  });
+
   it('falls back to the presets without models when models.dev is unreachable, and retries later', async () => {
     let now = 0;
     let up = false;

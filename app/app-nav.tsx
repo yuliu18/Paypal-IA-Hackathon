@@ -63,7 +63,7 @@ export function AppNav() {
   const label = compact ? 'md:sr-only' : '';
   return (
     <nav
-      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-navy px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
+      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-navy px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto [scrollbar-color:rgb(255_255_255/0.25)_transparent] [scrollbar-width:thin] md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
     >
       <Link href="/" title="Payment Guard" className="mr-3 flex shrink-0 items-center gap-2 px-2 font-semibold text-white md:mb-6 md:mr-0">
         <svg viewBox="0 0 24 24" className="size-6 shrink-0 fill-pp-sky" aria-hidden>

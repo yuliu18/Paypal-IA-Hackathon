@@ -88,7 +88,8 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
     setAiCheck(null);
     latestProvider.current = id;
     startTesting(async () => {
-      const models = await catalogModelsAction(id);
+      // Without an answer the owner can still type a model id.
+      const models = await catalogModelsAction(id).catch(() => [] as CatalogModel[]);
       // A quicker pick of another provider wins: its models must not be replaced by this late answer.
       if (latestProvider.current !== id) return;
       setCatalogModels(models);

@@ -75,16 +75,18 @@ const CACHE_MS = 6 * 60 * 60_000;
 const RETRY_MS = 60_000;
 
 export function createCatalogLoader(fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
-  let cached: { catalog: Catalog; until: number } | undefined;
+  let cached: { catalog: Catalog; until: number; complete: boolean } | undefined;
   return async function loadCatalog(): Promise<Catalog> {
     if (cached && now() < cached.until) return cached.catalog;
     try {
       const res = await fetchImpl(MODELS_DEV_URL, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) throw new Error(`models.dev answered ${res.status}`);
-      cached = { catalog: buildCatalog((await res.json()) as Record<string, RawProvider>), until: now() + CACHE_MS };
+      cached = { catalog: buildCatalog((await res.json()) as Record<string, RawProvider>), until: now() + CACHE_MS, complete: true };
     } catch (error) {
-      console.error('The models.dev catalog could not be loaded; offering the built-in providers only', error);
-      cached = { catalog: buildCatalog({}), until: now() + RETRY_MS };
+      // A stale full catalog beats the presets alone; either way, try again in a minute.
+      const keep = cached?.complete ? cached.catalog : undefined;
+      console.error(`The models.dev catalog could not be loaded; ${keep ? 'keeping the last one' : 'offering the built-in providers only'}`, error);
+      cached = { catalog: keep ?? buildCatalog({}), until: now() + RETRY_MS, complete: !!keep };
     }
     return cached.catalog;
   };
