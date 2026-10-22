@@ -65,9 +65,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       try {
         const res = await fetch('/api/evaluate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caseId: c.id }) });
         const body = await res.json();
-        update(c.id, res.ok ? { status: 'done', result: body.result, reply: body.reply, steps: body.steps } : { status: 'done', result: { pass: false, reason: body.error?.message ?? `Request failed (${res.status})` } });
+        update(c.id, res.ok ? { status: 'done', result: body.result, reply: body.reply, steps: body.steps } : { status: 'done', result: { pass: false, failed: true, reason: body.error?.message ?? `Request failed (${res.status})` } });
       } catch (error) {
-        update(c.id, { status: 'done', result: { pass: false, reason: error instanceof Error ? error.message : String(error) } });
+        // The request itself failed (network, timeout): no answer, so not scored either.
+        update(c.id, { status: 'done', result: { pass: false, failed: true, reason: error instanceof Error ? error.message : String(error) } });
       }
     }
     setRunning(false);
