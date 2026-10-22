@@ -53,11 +53,13 @@ function toolModels(raw: RawProvider | undefined): CatalogModel[] {
 export function buildCatalog(raw: Record<string, RawProvider>): Catalog {
   const models = new Map<string, CatalogModel[]>();
   const providers: CatalogProvider[] = PROVIDERS.map((preset) => {
-    const list = toolModels(raw[PRESET_SOURCES[preset.id]]);
+    const source = PRESET_SOURCES[preset.id];
+    const list = source && Object.hasOwn(raw, source) ? toolModels(raw[source]) : [];
     if (list.length) models.set(preset.id, list);
     return { ...preset, modelCount: list.length, logo: logo(PRESET_SOURCES[preset.id] ?? preset.id) };
   });
-  const taken = new Set([...PROVIDERS.map((p) => p.id), ...Object.values(PRESET_SOURCES)]);
+  // 'custom' is the page's own "any URL" choice: no catalog entry may take its id.
+  const taken = new Set(['custom', ...PROVIDERS.map((p) => p.id), ...Object.values(PRESET_SOURCES)]);
   const more = Object.entries(raw)
     .filter(([id, p]) => !taken.has(id) && /^[a-z0-9-]{1,40}$/.test(id) && p.npm === '@ai-sdk/openai-compatible' && typeof p.api === 'string' && /^https?:\/\//.test(p.api))
     .map(([id, p]): CatalogProvider => {

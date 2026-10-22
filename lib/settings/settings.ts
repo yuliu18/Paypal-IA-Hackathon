@@ -4,7 +4,7 @@
 // the environment, then to the demo defaults, so an unconfigured server behaves as before.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { Limits } from '@/lib/guard/domain/policy';
@@ -88,12 +88,17 @@ async function withSecret(env: Env, file: string, create: boolean): Promise<Env>
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || !create) return env;
   }
+  // Written whole to a temp file, then linked into place, so no reader ever sees it half written.
   await mkdir(dirname(keyFile), { recursive: true });
+  const partial = `${keyFile}.${crypto.randomUUID()}.tmp`;
+  await writeFile(partial, `${randomBytes(32).toString('hex')}\n`, { mode: 0o600 });
   try {
-    await writeFile(keyFile, `${randomBytes(32).toString('hex')}\n`, { mode: 0o600, flag: 'wx' });
+    await link(partial, keyFile);
   } catch (error) {
     // Another save created it first: use theirs.
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  } finally {
+    await unlink(partial);
   }
   return { ...env, SETTINGS_SECRET: await read() };
 }
@@ -262,6 +267,10 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (Object.keys(errors).length) return { ok: false, errors };
 
   const secret = apiKey || paypalSecret ? settingsSecret(await withSecret(env, file, true)) : undefined;
+  // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
+  if ((apiKey || paypalSecret) && !secret) {
+    return { ok: false, errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' } };
+  }
   const previous = await readStored(file);
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;

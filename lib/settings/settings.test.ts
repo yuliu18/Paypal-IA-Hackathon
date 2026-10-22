@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -171,6 +171,16 @@ describe('saveSettings', () => {
     const settings = await loadSettings({ file, env });
     expect([settings.ai.apiKey, settings.paypal.secret]).toEqual(['sk-deepseek-abcd1234', 'shop-paypal-secret-5678']);
     expect((await settingsView({ file, env })).canStoreKeys).toBe(true);
+  });
+
+  it('answers with a form error, not a crash, when the key file is unusable', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    await mkdir(join(dir, 'data'), { recursive: true });
+    await writeFile(join(dir, 'data', 'settings.key'), '');
+    expect(await saveSettings(form(), { file, env })).toEqual({
+      ok: false,
+      errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' },
+    });
   });
 
   it('writes no key file when no key is saved', async () => {

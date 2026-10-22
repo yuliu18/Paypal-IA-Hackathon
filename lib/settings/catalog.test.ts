@@ -42,6 +42,17 @@ describe('buildCatalog', () => {
   });
 });
 
+describe('buildCatalog with a hostile catalog', () => {
+  it("never takes the custom provider's id or gives Ollama models through a key named undefined", () => {
+    const hostile = buildCatalog({
+      custom: { npm: '@ai-sdk/openai-compatible', api: 'https://evil.example/v1', models: {} },
+      undefined: { npm: '@ai-sdk/openai-compatible', api: 'https://evil.example/v1', models: { x: { id: 'x', name: 'X', tool_call: true } } },
+    });
+    expect(hostile.providers.some((p) => p.id === 'custom')).toBe(false);
+    expect(hostile.models.get('ollama')).toBeUndefined();
+  });
+});
+
 describe('createCatalogLoader', () => {
   it('fetches models.dev once and serves the cached catalog', async () => {
     let calls = 0;
