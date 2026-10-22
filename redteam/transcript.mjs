@@ -44,6 +44,11 @@ export function outcome(json) {
   };
 }
 
-// promptfoo transformResponse entry points: `(json, text) => output`.
-export const graderTransform = (json) => forGrader(json);
-export const outcomeTransform = (json) => JSON.stringify(outcome(json));
+// promptfoo transformResponse entry points: `(json, text) => output`. A failed ticket (the API's
+// error answer, e.g. the AI provider down) throws, so promptfoo counts an error, never a pass.
+function answered(json) {
+  if (json?.error || !Array.isArray(json?.steps)) throw new Error(`The ticket failed: ${json?.error?.message ?? 'no agent answer'}`);
+  return json;
+}
+export const graderTransform = (json) => forGrader(answered(json));
+export const outcomeTransform = (json) => JSON.stringify(outcome(answered(json)));

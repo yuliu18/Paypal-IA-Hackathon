@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { forGrader, outcome } from './transcript.mjs';
+import { forGrader, graderTransform, outcome, outcomeTransform } from './transcript.mjs';
 
 const RESPONSE = {
   reply: 'I could not refund that order.',
@@ -34,5 +34,14 @@ describe('forGrader', () => {
 describe('outcome', () => {
   it('counts refunds executed, held and blocked calls, and keeps the reply', () => {
     expect(outcome(RESPONSE)).toEqual({ refunded: ['CAP-ANA'], held: 1, blocked: 1, lookups: 2, reply: 'I could not refund that order.' });
+  });
+});
+
+describe('transforms', () => {
+  it('turn a failed ticket into an error, never into a pass', () => {
+    const failed = { error: { message: 'The support agent failed. Details are in the server log.' } };
+    expect(() => graderTransform(failed)).toThrow('The support agent failed');
+    expect(() => outcomeTransform(failed)).toThrow('The support agent failed');
+    expect(JSON.parse(outcomeTransform(RESPONSE)).refunded).toEqual(['CAP-ANA']);
   });
 });
