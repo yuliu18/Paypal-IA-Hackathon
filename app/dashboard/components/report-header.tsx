@@ -3,6 +3,7 @@
 import { useSyncExternalStore, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { EditIcon, EyeIcon, RedoIcon, RefreshIcon, UndoIcon } from './ui/icons';
+import { AgStudioLogo } from './ui/logo';
 import { Button, IconButton } from './ui/ui';
 
 // The bar above Studio: which report and page you're on, how fresh the data is, and the
@@ -35,10 +36,10 @@ export function ReportHeader({
   onEditingChange: (editing: boolean) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b border-pp-border bg-white px-8 py-5">
+    <div className="flex flex-wrap items-start gap-x-6 gap-y-3 bg-pp-canvas px-8 pt-8 pb-4">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-pp-muted">{reportName}</p>
-        <h1 className="truncate text-[28px] font-semibold leading-tight text-pp-navy">{pageTitle}</h1>
+        <p className="truncate text-sm font-semibold text-pp-blue">{reportName}</p>
+        <h1 className="mt-1 truncate text-[28px] font-semibold leading-tight text-pp-navy">{pageTitle}</h1>
         <DataFreshness asOf={asOf} />
       </div>
       <div className="flex items-center gap-2">
@@ -124,6 +125,10 @@ function DataFreshness({ asOf }: { asOf: string }) {
       >
         <RefreshIcon className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
       </button>
+      <span aria-hidden>·</span>
+      <span className="inline-flex items-center gap-1">
+        Built with <AgStudioLogo className="h-6 w-auto" />
+      </span>
     </p>
   );
 }

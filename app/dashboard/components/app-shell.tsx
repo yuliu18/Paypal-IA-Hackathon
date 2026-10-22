@@ -1,39 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AgStudioLogo } from './ui/logo';
 
-// The dashboard frame, laid out like the PayPal Developer Dashboard: a white top bar, a left sidebar
-// and a light canvas, inside the app's side menu. Shared by the dashboard, its loading skeleton and its error page.
-
-function PayPalWordmark({ className = '' }: { className?: string }) {
-  return (
-    <span className={`font-bold italic tracking-tight ${className}`}>
-      <span className="text-pp-blue-dark">Pay</span>
-      <span className="text-pp-sky">Pal</span>
-    </span>
-  );
-}
-
-function BrandLockup() {
-  return (
-    <div className="flex items-center gap-3">
-      <AgStudioLogo className="-ml-3 h-12 w-auto" />
-      <span className="h-6 w-px bg-pp-border" aria-hidden />
-      <span className="flex items-baseline gap-1 text-xs text-pp-muted">
-        powered by <PayPalWordmark className="text-base" /> APIs
-      </span>
-    </div>
-  );
-}
-
-function TopBar() {
-  return (
-    <header className="flex h-16 shrink-0 items-center gap-6 border-b border-pp-border bg-white px-6">
-      <BrandLockup />
-    </header>
-  );
-}
+// The dashboard frame inside the app's side menu: the reports panel (only while the menu is
+// collapsed; otherwise the reports sit in the menu) and the canvas, styled like the other pages. Shared by the dashboard, its loading skeleton and its error page.
 
 export function AppShell({
   sidebar,
@@ -44,7 +14,6 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-full shrink-0 flex-col bg-pp-canvas font-paypal text-pp-ink">
-      <TopBar />
       <div className="flex flex-1">
         {sidebar && (
           <nav className="flex w-64 shrink-0 flex-col border-r border-pp-border bg-white" aria-label="Reports">
