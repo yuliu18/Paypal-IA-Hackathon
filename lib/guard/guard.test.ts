@@ -95,7 +95,7 @@ function fakePayPal() {
 
 async function connect(
   captures: CaptureLookup = { getCapture: async (captureId) => ({ ...facts, captureId }) },
-  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined } = {},
+  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined, throwMessage = 'socket hang up' } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
@@ -105,7 +105,7 @@ async function connect(
     // A transport failure after PayPal may already have executed the call.
     upstream.callTool = async (params) => {
       upstreamCalls.push({ name: params.name, args: params.arguments });
-      throw new Error('socket hang up');
+      throw new Error(throwMessage);
     };
   }
   if (upstreamHangs) {
@@ -306,6 +306,13 @@ describe('payment guard', () => {
     const big = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } };
     await Promise.all(agents.map((agent) => agent.callTool({ name: 'create_refund', arguments: big })));
     expect(upstreamCalls).toHaveLength(4);
+  });
+
+  it("masks personal data in a failed refund's error before the agent sees it", async () => {
+    const agent = await connect(undefined, { upstreamThrows: true, throwMessage: 'payer ben@example.com unreachable' });
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '10.00' } } });
+    expect(text(result)).toContain('payer b***@example.com unreachable');
+    expect(entries[0].detail).toBe('payer ben@example.com unreachable');
   });
 
   it('counts a refund whose PayPal call failed ambiguously toward the daily limit', async () => {

@@ -5,8 +5,9 @@
 // Digits in groups split by up to 3 spaces (any kind, line breaks included), dots or dashes; a card
 // is any run of whole groups with 13-19 digits that passes Luhn, so "4111 1111 1111 1111 12/30" is
 // found but a card is never cut out of a longer unseparated number. Digits glued to letters belong
-// to an id (PayPal's are letters and digits) and are left alone.
-const DIGIT_RUN = /(?<![\p{L}\p{N}])\d(?:[\s.-]{0,3}\d)*(?![\p{L}\p{N}])/gu;
+// to an id (PayPal's are letters and digits) and are left alone; the ordinal signs º and ª ("Nº")
+// don't count as letters.
+const DIGIT_RUN = /(?<!(?![ºª])[\p{L}\p{N}])\d(?:[\s.-]{0,3}\d)*(?![\p{L}\p{N}])/gu;
 // Letters of any script; an apostrophe only inside the name, so a quoted address isn't swallowed.
 const EMAIL = /[\p{L}\p{N}._%+-][\p{L}\p{N}._%+'-]*@[\p{L}\p{N}.-]+\.\p{L}{2,}/gu;
 

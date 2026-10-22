@@ -16,6 +16,7 @@ describe('privateTicket', () => {
       ['card 4111 1111 1111 1111 123', 'card [card •••• 1111] 123'],
       ['paid with 4111111111111111 2 times', 'paid with [card •••• 1111] 2 times'],
       ['Order 12 4111 1111 1111 1111', 'Order 12 [card •••• 1111]'],
+      ['Nº4111 1111 1111 1111', 'Nº[card •••• 1111]'],
     ];
     for (const [message, masked] of cases) expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(masked);
     expect(privateReply('Your card 4111 1111 1111 1111 12/30 is noted', 'ana@example.com').reply).toBe('Your card [card •••• 1111] 12/30 is noted');

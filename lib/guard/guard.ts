@@ -164,7 +164,8 @@ async function executeWrite(
         ),
       () => undefined,
     );
-    return failedResult(message(error));
+    // The log keeps the raw message; the agent gets it masked, like any PayPal error text.
+    return failedResult(maskPersonalData(message(error)));
   }
 }
 
