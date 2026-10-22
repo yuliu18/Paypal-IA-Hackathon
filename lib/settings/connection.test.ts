@@ -63,6 +63,16 @@ describe('listModels', () => {
   });
 });
 
+describe('listModels errors', () => {
+  it('never repeats the key when fetch throws', async () => {
+    const thrower = (async () => {
+      throw new Error('Headers.append: "Bearer sk-saved-abcd1234" is an invalid header value.');
+    }) as unknown as typeof fetch;
+    const result = await listModels({ baseUrl: 'https://o.example/v1', apiKey: 'sk-saved-abcd1234' }, thrower);
+    expect(JSON.stringify(result)).not.toContain('sk-saved-abcd1234');
+  });
+});
+
 describe('listModels without a model list', () => {
   it("checks the key with a one-token chat when the provider has no /models, as OpenCode Go", async () => {
     const { calls, fetchImpl } = fakeFetch(({ url }) =>

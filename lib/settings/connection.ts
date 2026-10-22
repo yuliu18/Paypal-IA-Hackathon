@@ -42,7 +42,8 @@ export async function listModels(
     });
     return chat.ok ? { ok: true, models: [] } : { ok: false, error: await providerError(chat, apiKey) };
   } catch (error) {
-    return { ok: false, error: `Could not reach ${base} (${error instanceof Error ? error.message : 'no answer'})` };
+    // fetch's own errors can quote a header, key included.
+    return { ok: false, error: `Could not reach ${base} (${hideKey(error instanceof Error ? error.message : 'no answer', apiKey)})` };
   }
 }
 

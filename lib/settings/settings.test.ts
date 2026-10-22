@@ -173,6 +173,18 @@ describe('saveSettings', () => {
     expect(await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env })).toEqual({ ok: true });
   });
 
+  it('saves twice at the same time without failing', async () => {
+    const results = await Promise.all([saveSettings(form(), { file, env: ENV }), saveSettings(form({ name: 'Other' }), { file, env: ENV })]);
+    expect(results).toEqual([{ ok: true }, { ok: true }]);
+  });
+
+  it('refuses keys with control characters, which could not be sent as a header', async () => {
+    expect(await saveSettings(form({ apiKey: 'sk-ab\ncd', paypalSecret: 'se\u0000cret' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { apiKey: 'Paste the key without spaces or line breaks.', paypalSecret: 'Paste the key without spaces or line breaks.' },
+    });
+  });
+
   it('changes nothing when the settings are locked', async () => {
     const env = { ...ENV, SETTINGS_LOCKED: 'true' };
     expect(await saveSettings(form(), { file, env })).toEqual({

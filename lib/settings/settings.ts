@@ -77,10 +77,13 @@ const settingsSecret = (env: Env) => (env.SETTINGS_SECRET && env.SETTINGS_SECRET
 const splitEmails = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
 const hint = (key: string) => `••••${key.length >= 8 ? key.slice(-4) : ''}`;
 
+// What was saved; nothing when the file doesn't exist. A file that can't be read or parsed is
+// logged and ignored, so the server falls back to the environment instead of failing.
 async function readStored(file: string): Promise<Stored> {
   try {
     return JSON.parse(await readFile(file, 'utf8')) as Stored;
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`Ignoring ${file}: it could not be read`, error);
     return {};
   }
 }
@@ -211,8 +214,12 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   const paypalSecret = form.paypalSecret.trim();
   const secret = settingsSecret(env);
   const noSecret = (variable: string) => `Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use ${variable}.`;
-  if (apiKey && !secret) errors.apiKey = noSecret('LLM_API_KEY');
-  if (paypalSecret && !secret) errors.paypalSecret = noSecret('PAYPAL_SECRET');
+  // Keys travel in HTTP headers, which can't hold spaces or control characters.
+  const badKey = 'Paste the key without spaces or line breaks.';
+  if (/[\s\p{Cc}]/u.test(apiKey)) errors.apiKey = badKey;
+  else if (apiKey && !secret) errors.apiKey = noSecret('LLM_API_KEY');
+  if (/[\s\p{Cc}]/u.test(paypalSecret)) errors.paypalSecret = badKey;
+  else if (paypalSecret && !secret) errors.paypalSecret = noSecret('PAYPAL_SECRET');
   if (Object.keys(errors).length) return { ok: false, errors };
 
   const previous = await readStored(file);
@@ -233,7 +240,8 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   };
 
   await mkdir(dirname(file), { recursive: true });
-  const partial = `${file}.${process.pid}.tmp`;
+  // A temp name per save, so two saves at once never rename each other's file.
+  const partial = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
   await writeFile(partial, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600 });
   await rename(partial, file);
   return { ok: true };
