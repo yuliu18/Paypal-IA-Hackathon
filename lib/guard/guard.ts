@@ -8,6 +8,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { toMinor } from './adapters/paypal-capture-lookup';
 import { minimizeOrder, withheldDetail } from './domain/privacy';
+import { maskPersonalData } from './domain/redact';
 import { evaluateRefund, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type { AgentTask, AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
 
@@ -163,7 +164,8 @@ async function executeWrite(
         ),
       () => undefined,
     );
-    return failedResult(message(error));
+    // The log keeps the raw message; the agent gets it masked, like any PayPal error text.
+    return failedResult(maskPersonalData(message(error)));
   }
 }
 
@@ -173,6 +175,12 @@ function withoutPersonalData(result: CallToolResult): { result: CallToolResult; 
   const part = result.content[0];
   const { order, withheld } = minimizeOrder(JSON.parse(part?.type === 'text' ? part.text : ''));
   return { result: { content: [{ type: 'text', text: JSON.stringify({ ...order, withheld_by_guard: withheld }) }] }, withheld };
+}
+
+// PayPal's error answers are free text that can quote the payer: masked, not cut, so the agent
+// still learns what went wrong.
+function withoutPersonalText(result: CallToolResult): CallToolResult {
+  return { ...result, content: result.content.map((part) => (part.type === 'text' ? { ...part, text: maskPersonalData(part.text) } : part)) };
 }
 
 export type HeldRefundDecision = {
@@ -286,7 +294,7 @@ export function createPaymentGuard({
         }
         if (result.isError) {
           await audit.record({ at, tool: name, args, task, decision, outcome: 'error' }).catch(() => undefined);
-          return result;
+          return withoutPersonalText(result);
         }
         const minimized = withoutPersonalData(result);
         const detail = withheldDetail(minimized.withheld);
@@ -294,7 +302,7 @@ export function createPaymentGuard({
         return minimized.result;
       } catch (error) {
         await audit.record({ at, tool: name, args, task, decision, outcome: 'error', detail: message(error) }).catch(() => undefined);
-        return failedResult(message(error));
+        return failedResult(maskPersonalData(message(error)));
       }
     }
 

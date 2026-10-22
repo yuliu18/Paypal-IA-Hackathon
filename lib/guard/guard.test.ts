@@ -75,6 +75,7 @@ function fakePayPal() {
   };
   server.registerTool('get_order', { description: 'get', inputSchema: { id: z.string() } }, async (args) => {
     upstreamCalls.push({ name: 'get_order', args });
+    if (args.id === 'ORD-PII-ERROR') return { isError: true, content: [{ type: 'text' as const, text: 'RESOURCE_NOT_FOUND for payer ben@example.com, card 4111111111111111' }] };
     return { content: [{ type: 'text' as const, text: ORDERS[args.id] ?? 'not found' }] };
   });
   server.registerTool('get_refund', { description: 'get refund', inputSchema: { id: z.string() } }, ok('get_refund'));
@@ -94,7 +95,7 @@ function fakePayPal() {
 
 async function connect(
   captures: CaptureLookup = { getCapture: async (captureId) => ({ ...facts, captureId }) },
-  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined } = {},
+  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined, throwMessage = 'socket hang up' } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
@@ -104,7 +105,7 @@ async function connect(
     // A transport failure after PayPal may already have executed the call.
     upstream.callTool = async (params) => {
       upstreamCalls.push({ name: params.name, args: params.arguments });
-      throw new Error('socket hang up');
+      throw new Error(throwMessage);
     };
   }
   if (upstreamHangs) {
@@ -307,6 +308,13 @@ describe('payment guard', () => {
     expect(upstreamCalls).toHaveLength(4);
   });
 
+  it("masks personal data in a failed refund's error before the agent sees it", async () => {
+    const agent = await connect(undefined, { upstreamThrows: true, throwMessage: 'payer ben@example.com unreachable' });
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '10.00' } } });
+    expect(text(result)).toContain('payer b***@example.com unreachable');
+    expect(entries[0].detail).toBe('payer ben@example.com unreachable');
+  });
+
   it('counts a refund whose PayPal call failed ambiguously toward the daily limit', async () => {
     const agent = await connect(undefined, { upstreamThrows: true });
     const big = (i: number) => ({ capture_id: `CAP-${i}`, amount: { currency_code: 'USD', value: '50.00' } });
@@ -414,6 +422,13 @@ describe('payment guard', () => {
     const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1' } });
     expect(text(result)).toContain('CAPTURE_LOOKUP_FAILED');
     expect(upstreamCalls).toEqual([]);
+  });
+
+  it("masks personal data in PayPal's error answers before the agent sees them", async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'get_order', arguments: { id: 'ORD-PII-ERROR' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe('RESOURCE_NOT_FOUND for payer b***@example.com, card [card •••• 1111]');
   });
 
   it('returns a structured error and logs a read whose PayPal call fails', async () => {

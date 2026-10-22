@@ -143,9 +143,9 @@ The agent, and the LLM provider behind it, only see the personal data a refund n
 
 | Where | What happens |
 |---|---|
-| PayPal answers | A successful `get_order` is cut to an allowlist ([`lib/guard/domain/privacy.ts`](lib/guard/domain/privacy.ts)): order, purchase unit, capture and refund ids, status, amounts, dates and the item description (with any email or card number in it masked). PayPal error messages pass through as they are. Card details, payer and payee, names, addresses, the shop's `custom_id`, notes and links are withheld; the answer lists their paths in `withheld_by_guard`, and the black box records them. |
-| Incoming ticket | Card numbers (recognised by their Luhn check digit, however their groups are separated) become `[card •••• 1111]` before the agent, the intent judge or the black box see the ticket ([`lib/guard/domain/redact.ts`](lib/guard/domain/redact.ts)). |
-| Reply to the customer | Card numbers and every email other than the ticket customer's are masked, whatever the agent was tricked into writing. The shop's own contact address is masked too. |
+| PayPal answers | A successful `get_order` is cut to an allowlist ([`lib/guard/domain/privacy.ts`](lib/guard/domain/privacy.ts)): order, purchase unit, capture and refund ids, status, amounts, dates and the item description (with any email or card number in it masked). PayPal's error messages reach the agent with emails and card numbers masked. Card details, payer and payee, names, addresses, the shop's `custom_id`, notes and links are withheld; the answer lists their paths in `withheld_by_guard`, and the black box records them. |
+| Incoming ticket | Card numbers (recognised by their Luhn check digit, however their groups are separated; digits glued to letters are an id, like PayPal's, and are left alone) become `[card •••• 1111]` before the agent, the intent judge or the black box see the ticket ([`lib/guard/domain/redact.ts`](lib/guard/domain/redact.ts)). |
+| Reply to the customer | Card numbers and every email other than the ticket customer's or the shop's own (`SHOP_CONTACT_EMAIL`, comma-separated) are masked, whatever the agent was tricked into writing. |
 | Screens | `/guard`, the support desk's tool calls and the dashboard show emails as `a***@example.com` and card numbers by their last 4 digits. The black box keeps the full record as evidence, behind the demo password. |
 
 `/support` shows how many fields were hidden at each step and what was masked in the ticket and the reply.

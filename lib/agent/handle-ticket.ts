@@ -85,8 +85,10 @@ export async function handleTicket(
       }),
     );
   });
-  // Whatever the agent was tricked into writing, the customer gets no one else's data.
-  const answer = privateReply(reply, ticket.customerEmail);
+  // Whatever the agent was tricked into writing, the customer gets no one else's data except the
+  // shop's own contact addresses (SHOP_CONTACT_EMAIL, comma-separated).
+  const shopEmails = (process.env.SHOP_CONTACT_EMAIL ?? '').split(',').map((email) => email.trim()).filter(Boolean);
+  const answer = privateReply(reply, ticket.customerEmail, shopEmails);
   return { reply: answer.reply, steps, redacted: { ticket: ticketRemoved, reply: answer.removed } };
 }
 
