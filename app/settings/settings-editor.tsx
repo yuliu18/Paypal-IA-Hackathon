@@ -33,14 +33,13 @@ function Field({ label, error, hint, wide, children }: { label: string; error?: 
   );
 }
 
-function keyHint(status: KeyStatus, canStoreKeys: boolean, variable: string) {
-  const current = {
+function keyHint(status: KeyStatus, variable: string) {
+  return {
     saved: `Saved key ${status.hint}. Leave blank to keep it.`,
     env: `Using ${variable} from the server environment (${status.hint}). Leave blank to keep it.`,
     unreadable: 'The saved key cannot be read any more (SETTINGS_SECRET changed). Enter it again.',
     none: 'No key yet.',
   }[status.source];
-  return canStoreKeys ? current : `${current} To store keys here, set SETTINGS_SECRET on the server.`;
 }
 
 function CheckResult({ check }: { check: Check }) {
@@ -153,7 +152,7 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
             <Field label="Base URL" error={errors.baseUrl}>
               <input name="baseUrl" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} readOnly={provider !== 'custom'} className={input} />
             </Field>
-            <Field label="API key" error={errors.apiKey} hint={keyHint(view.ai.apiKey, view.canStoreKeys, 'LLM_API_KEY')} wide>
+            <Field label="API key" error={errors.apiKey} hint={keyHint(view.ai.apiKey, 'LLM_API_KEY')} wide>
               <input name="apiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.ai.apiKey.hint} className={input} />
             </Field>
             {view.ai.apiKey.source === 'saved' && (
@@ -184,7 +183,7 @@ export function SettingsEditor({ view, providers }: { view: SettingsView; provid
             <Field label="Client ID" error={errors.paypalClientId}>
               <input name="paypalClientId" defaultValue={defaults.paypalClientId} autoComplete="off" className={input} />
             </Field>
-            <Field label="Secret" error={errors.paypalSecret} hint={keyHint(view.paypal.secret, view.canStoreKeys, 'PAYPAL_SECRET')}>
+            <Field label="Secret" error={errors.paypalSecret} hint={keyHint(view.paypal.secret, 'PAYPAL_SECRET')}>
               <input name="paypalSecret" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.paypal.secret.hint} className={input} />
             </Field>
             {view.paypal.secret.source === 'saved' && (

@@ -161,16 +161,21 @@ describe('saveSettings', () => {
     await expect(stat(file)).rejects.toThrow();
   });
 
-  it('refuses to store keys without SETTINGS_SECRET, pointing to the environment variables', async () => {
+  it('stores keys without SETTINGS_SECRET, encrypted with a generated key file only the server can read', async () => {
     const env = { ...ENV, SETTINGS_SECRET: undefined };
-    expect(await saveSettings(form(), { file, env })).toEqual({
-      ok: false,
-      errors: {
-        apiKey: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use LLM_API_KEY.',
-        paypalSecret: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use PAYPAL_SECRET.',
-      },
-    });
-    expect(await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env })).toEqual({ ok: true });
+    expect(await saveSettings(form(), { file, env })).toEqual({ ok: true });
+    const keyFile = join(dir, 'data', 'settings.key');
+    expect((await stat(keyFile)).mode & 0o777).toBe(0o600);
+    expect(await readFile(file, 'utf8')).not.toContain('sk-deepseek');
+    await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env });
+    const settings = await loadSettings({ file, env });
+    expect([settings.ai.apiKey, settings.paypal.secret]).toEqual(['sk-deepseek-abcd1234', 'shop-paypal-secret-5678']);
+    expect((await settingsView({ file, env })).canStoreKeys).toBe(true);
+  });
+
+  it('writes no key file when no key is saved', async () => {
+    await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env: { ...ENV, SETTINGS_SECRET: undefined } });
+    await expect(stat(join(dir, 'data', 'settings.key'))).rejects.toThrow();
   });
 
   it('saves twice at the same time without failing', async () => {
