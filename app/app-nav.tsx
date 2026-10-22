@@ -96,10 +96,11 @@ export function AppNav() {
         type="button"
         onClick={() => setChoice({ onDashboard, compact: !compact })}
         title={compact ? 'Expand menu' : 'Collapse menu'}
+        aria-expanded={!compact}
         className={`mt-auto hidden items-center gap-2.5 rounded px-2 py-1.5 text-white/60 hover:bg-white/10 hover:text-white md:flex ${compact ? 'md:justify-center' : ''}`}
       >
         <Icon name={compact ? 'expand' : 'collapse'} />
-        <span className={label}>Collapse menu</span>
+        <span className={label}>{compact ? 'Expand menu' : 'Collapse menu'}</span>
       </button>
     </nav>
   );
