@@ -51,7 +51,9 @@ export function Evaluator({ model, provider }: { model: string; provider: string
     setRunning(true);
     setMessage('Creating fresh sample payments…');
     stop.current = false;
-    const prepared = await prepareEvaluationAction(full);
+    // The action reports its own errors; a failed call (network, expired password) must not leave
+    // the page stuck in "Evaluating…" either.
+    const prepared = await prepareEvaluationAction(full).catch(() => ({ ok: false as const, message: 'The evaluation could not start: reload the page and try again.' }));
     if (!prepared.ok) {
       setMessage(prepared.message);
       setRunning(false);
