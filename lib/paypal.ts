@@ -1,8 +1,11 @@
 // PayPal REST client: every call this demo makes to PayPal goes through here. It covers
 // catalog products, billing plans, invoicing, Transaction Search, balances and the order and
-// capture lookups the payment guard needs and the sandbox card charges the demo seed makes, with plain fetch and no SDK. Server-side only: it reads the client secret from the environment.
+// capture lookups the payment guard needs and the sandbox card charges the demo seed makes, with plain fetch and no SDK. Server-side only: it reads the client secret from the shop's settings or the environment.
 
-const BASE_URL = 'https://api-m.sandbox.paypal.com';
+import { loadSettings } from './settings/settings.ts';
+
+export const PAYPAL_API = 'https://api-m.sandbox.paypal.com';
+const BASE_URL = PAYPAL_API;
 const MAX_ATTEMPTS = 4;
 
 export class PayPalApiError extends Error {
@@ -16,18 +19,20 @@ export class PayPalApiError extends Error {
   }
 }
 
-let cachedToken: { value: string; expiresAt: number } | undefined;
+// The token is kept for the credentials it was minted with, so saving new ones on /settings
+// takes effect on the next call.
+let cachedToken: { value: string; expiresAt: number; credentials: string } | undefined;
 
 export async function accessToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt) return cachedToken.value;
-
-  const { PAYPAL_CLIENT_ID: id, PAYPAL_SECRET: secret } = process.env;
-  if (!id || !secret) throw new Error('PAYPAL_CLIENT_ID and PAYPAL_SECRET must be set (see .env.local)');
+  const { clientId: id, secret } = (await loadSettings()).paypal;
+  if (!id || !secret) throw new Error('Set the PayPal client ID and secret on /settings, or PAYPAL_CLIENT_ID and PAYPAL_SECRET in .env.local');
+  const credentials = `${id}:${secret}`;
+  if (cachedToken && cachedToken.credentials === credentials && Date.now() < cachedToken.expiresAt) return cachedToken.value;
 
   const res = await fetch(`${BASE_URL}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`,
+      Authorization: `Basic ${Buffer.from(credentials).toString('base64')}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: 'grant_type=client_credentials',
@@ -37,7 +42,7 @@ export async function accessToken(): Promise<string> {
 
   const { access_token, expires_in } = (await res.json()) as { access_token: string; expires_in: number };
   // Refresh a minute early so an in-flight request never carries an expired token.
-  cachedToken = { value: access_token, expiresAt: Date.now() + (expires_in - 60) * 1000 };
+  cachedToken = { value: access_token, expiresAt: Date.now() + (expires_in - 60) * 1000, credentials };
   return access_token;
 }
 

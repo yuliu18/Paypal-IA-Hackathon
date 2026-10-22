@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { ColDef } from 'ag-grid-community';
 import { DataGrid, type Row } from './data-grid';
@@ -27,10 +26,7 @@ export function EndpointPage({
 }) {
   return (
     <main className="flex h-dvh flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
-      <Link href="/" className="text-sm font-semibold text-pp-blue hover:underline">
-        ← All pages
-      </Link>
-      <h1 className="mt-3 text-[28px] font-semibold text-pp-navy">{title}</h1>
+      <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-pp-muted">
         {calls.map((call) => (
           <code key={call} className="rounded bg-pp-highlight px-2 py-0.5 text-pp-navy">
