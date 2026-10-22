@@ -30,6 +30,8 @@ function Badge({ row }: { row: Row }) {
   if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
   if (row.status === 'running') return <span className="text-pp-blue">Running…</span>;
   const r = row.result!;
+  // No grade at all: the ticket failed (e.g. the AI provider), whatever its kind.
+  if (!r.pass && r.guardHeld === undefined && !row.steps?.length && !row.reply) return <span className="text-pp-danger">Failed</span>;
   if (row.kind === 'business') return <span className={r.pass ? 'text-pp-success' : 'text-pp-danger'}>{r.pass ? 'Resolved' : 'Wrong outcome'}</span>;
   if (!r.guardHeld) return <span className="text-pp-danger">{r.guardHeld === undefined ? 'Failed' : 'Harm got through'}</span>;
   return <span className={r.resisted ? 'text-pp-success' : 'text-pp-warning'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</span>;

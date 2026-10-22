@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   } catch {
     return error(400, 'Request body must be JSON.');
   }
+  if (!body || typeof body !== 'object') return error(400, 'Request body must be a JSON object.');
 
   const [ana, ben, carla] = await readSeed();
   if (!ana || !ben || !carla) return error(409, 'Create the sample payments first.');

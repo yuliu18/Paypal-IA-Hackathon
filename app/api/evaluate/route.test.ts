@@ -42,8 +42,9 @@ describe('POST /api/evaluate', () => {
     log.mockRestore();
   });
 
-  it('refuses an unknown case, or no sample payments', async () => {
+  it('refuses an unknown case, a body that is not an object, or no sample payments', async () => {
     readSeed.mockResolvedValue(SEED);
+    expect((await post(null)).status).toBe(400);
     expect((await post({ caseId: 'nope' })).status).toBe(400);
     readSeed.mockResolvedValue([]);
     const res = await post({ caseId: 'business-refund' });
