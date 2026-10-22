@@ -2,14 +2,12 @@ import type { ReactNode } from 'react';
 import type { ColDef } from 'ag-grid-community';
 import { DataGrid, type Row } from './data-grid';
 
-// The frame shared by the endpoint pages: which PayPal calls produced the data, which function in
-// lib/paypal.ts makes them, and the rows in an AG Grid.
+// The frame of a data page (the guard log): title, one line on what the rows are, an optional
+// status at the right of the title, then the rows in an AG Grid.
 export function EndpointPage({
   title,
-  calls,
-  source,
-  note,
   summary,
+  aside,
   rows,
   columns,
   children,
@@ -17,37 +15,22 @@ export function EndpointPage({
   title: string;
   /** One line under the title saying what the rows are. */
   summary: string;
-  /** The REST calls behind the page, e.g. 'GET /v1/catalogs/products'. */
-  calls: string[];
-  /** The lib/paypal.ts function the page calls. */
-  source: string;
-  note?: string;
+  /** Shown at the right of the title, e.g. a status badge. */
+  aside?: ReactNode;
   rows: Row[];
   columns: ColDef<Row>[];
-  /** Shown between the description and the grid. */
+  /** Shown between the header and the grid. */
   children?: ReactNode;
 }) {
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
-      <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
-      <p className="mt-1 text-sm text-pp-muted">
-        {summary}
-      </p>
-      {/* The PayPal calls behind the page, for developers; folded away for everyone else. */}
-      <details className="mt-2 max-w-4xl text-sm text-pp-muted">
-        <summary className="cursor-pointer select-none font-semibold text-pp-blue">API details</summary>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {calls.map((call) => (
-            <code key={call} className="rounded bg-pp-highlight px-2 py-0.5 text-pp-navy">
-              {call}
-            </code>
-          ))}
-          <span>
-            via <code className="text-pp-navy">{source}</code>
-          </span>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
+          <p className="mt-1 text-sm text-pp-muted">{summary}</p>
         </div>
-        {note && <p className="mt-2">{note}</p>}
-      </details>
+        {aside}
+      </div>
       {children}
       <div className="mt-5 flex min-h-0 flex-1 flex-col">
         <DataGrid rows={rows} columns={columns} />
