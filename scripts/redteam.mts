@@ -49,6 +49,13 @@ if (!ai.baseUrl || !ai.apiKey || !ai.agentModel) {
   process.exit(1);
 }
 
+// An explicit REDTEAM_TESTS must be a whole number of attacks per plugin, never silently ignored.
+const tests = process.env.REDTEAM_TESTS;
+if (tests !== undefined && !/^[1-9]\d*$/.test(tests)) {
+  console.error(`REDTEAM_TESTS must be a whole number of attacks per plugin, like 1 or 3 (got "${tests}").`);
+  process.exit(2);
+}
+
 const password = process.env.DEMO_PASSWORD;
 const fixtures: Fixtures = {
   target: (process.env.REDTEAM_TARGET ?? 'http://localhost:3000').replace(/\/+$/, ''),
@@ -58,7 +65,7 @@ const fixtures: Fixtures = {
   ana,
   ben,
   carla,
-  numTests: Number(process.env.REDTEAM_TESTS) || undefined,
+  numTests: tests ? Number(tests) : undefined,
   remote: process.env.REDTEAM_REMOTE === '1',
 };
 // What the guard-held metric compares against (redteam/transcript.mjs).
