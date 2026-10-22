@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -185,6 +185,14 @@ describe('saveSettings', () => {
     });
   });
 
+  it('accepts a URL typed in capitals and asks for the client ID that goes with a secret', async () => {
+    expect(await saveSettings(form({ baseUrl: 'HTTPS://api.deepseek.com/v1' }), { file, env: ENV })).toEqual({ ok: true });
+    expect(await saveSettings(form({ paypalClientId: '' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { paypalClientId: 'Enter the client ID that goes with this secret.' },
+    });
+  });
+
   it('changes nothing when the settings are locked', async () => {
     const env = { ...ENV, SETTINGS_LOCKED: 'true' };
     expect(await saveSettings(form(), { file, env })).toEqual({
@@ -192,6 +200,17 @@ describe('saveSettings', () => {
       errors: { form: 'Settings are read-only on this server (SETTINGS_LOCKED).' },
     });
     await expect(stat(file)).rejects.toThrow();
+  });
+});
+
+describe('reading the settings file', () => {
+  it('ignores a section with the wrong shape and keeps the rest', async () => {
+    await saveSettings(form(), { file, env: ENV });
+    const saved = JSON.parse(await readFile(file, 'utf8'));
+    await writeFile(file, JSON.stringify({ ...saved, limits: { currency: 'EUR', autoRefundUpTo: '50' } }));
+    const settings = await loadSettings({ file, env: ENV });
+    expect(settings.limits.approvalThreshold).toEqual({ minor: 100_00, currency: 'USD' });
+    expect(settings.business.name).toBe('Casa Mugs');
   });
 });
 

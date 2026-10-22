@@ -127,6 +127,12 @@ describe('testCredentials', () => {
     agentModel: 'm', judgeModel: '', apiKey: 'saved-key', paypalClientId: 'saved-id', paypalSecret: 'saved-secret',
   };
 
+  it('tests with no key when the saved one can no longer be read, as the agent would run', async () => {
+    await saveSettings({ ...form, baseUrl: env.LLM_BASE_URL }, { file, env });
+    const changed = { ...env, SETTINGS_SECRET: 'a-different-settings-secret' };
+    expect((await testCredentials({ ...form, baseUrl: env.LLM_BASE_URL, apiKey: '', paypalSecret: '' }, { file, env: changed })).ai.apiKey).toBe('');
+  });
+
   it('uses a typed key first, then a saved or environment key only for its own URL or client id', async () => {
     await saveSettings(form, { file, env });
     const blank = { ...form, apiKey: '', paypalSecret: '' };

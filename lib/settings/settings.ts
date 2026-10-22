@@ -77,15 +77,34 @@ const settingsSecret = (env: Env) => (env.SETTINGS_SECRET && env.SETTINGS_SECRET
 const splitEmails = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
 const hint = (key: string) => `••••${key.length >= 8 ? key.slice(-4) : ''}`;
 
-// What was saved; nothing when the file doesn't exist. A file that can't be read or parsed is
-// logged and ignored, so the server falls back to the environment instead of failing.
+const isText = (value: unknown) => typeof value === 'string';
+const isMinor = (value: unknown) => Number.isSafeInteger(value) && (value as number) > 0;
+const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) => boolean> = {
+  business: (b) => isText(b.name) && isText(b.refundPolicy) && Array.isArray(b.contactEmails) && b.contactEmails.every(isText),
+  limits: (l) => isText(l.currency) && isMinor(l.autoRefundUpTo) && isMinor(l.approvalUpTo) && isMinor(l.dailyCap),
+  ai: (a) => isText(a.provider) && isText(a.baseUrl) && isText(a.agentModel) && isText(a.judgeModel) && (a.apiKey === undefined || isText(a.apiKey)),
+  paypal: (p) => isText(p.clientId) && (p.secret === undefined || isText(p.secret)),
+};
+
+// What was saved; nothing when the file doesn't exist. A file that can't be read or parsed, or a
+// section edited into the wrong shape, is logged and ignored, so the server falls back to the
+// environment for it instead of failing.
 async function readStored(file: string): Promise<Stored> {
+  let parsed: unknown;
   try {
-    return JSON.parse(await readFile(file, 'utf8')) as Stored;
+    parsed = JSON.parse(await readFile(file, 'utf8'));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`Ignoring ${file}: it could not be read`, error);
     return {};
   }
+  const stored: Record<string, unknown> = {};
+  for (const [name, valid] of Object.entries(SECTION_SHAPES)) {
+    const section = (parsed as Record<string, unknown> | null)?.[name];
+    if (section === undefined) continue;
+    if (section && typeof section === 'object' && valid(section as Record<string, unknown>)) stored[name] = section;
+    else console.error(`Ignoring the "${name}" settings in ${file}: they are not in the expected shape`);
+  }
+  return stored as Stored;
 }
 
 type Key = { value: string; status: KeyStatus };
@@ -202,7 +221,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   }
 
   const baseUrl = normalizeBaseUrl(form.baseUrl);
-  if (!/^https?:\/\/[^\s/]+/.test(baseUrl) || !URL.canParse(baseUrl)) errors.baseUrl = 'Enter an http(s) URL.';
+  if (!/^https?:\/\/[^\s/]+/i.test(baseUrl) || !URL.canParse(baseUrl)) errors.baseUrl = 'Enter an http(s) URL.';
   const agentModel = form.agentModel.trim();
   if (!MODEL.test(agentModel)) errors.agentModel = 'Choose the agent model.';
   const judgeModel = form.judgeModel.trim();
@@ -218,6 +237,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   const badKey = 'Paste the key without spaces or line breaks.';
   if (/[\s\p{Cc}]/u.test(apiKey)) errors.apiKey = badKey;
   else if (apiKey && !secret) errors.apiKey = noSecret('LLM_API_KEY');
+  if (paypalSecret && !paypalClientId) errors.paypalClientId = 'Enter the client ID that goes with this secret.';
   if (/[\s\p{Cc}]/u.test(paypalSecret)) errors.paypalSecret = badKey;
   else if (paypalSecret && !secret) errors.paypalSecret = noSecret('PAYPAL_SECRET');
   if (Object.keys(errors).length) return { ok: false, errors };
@@ -253,13 +273,10 @@ export async function testCredentials(form: SettingsForm, { env = process.env, f
   const stored = await readStored(file);
   const baseUrl = normalizeBaseUrl(form.baseUrl);
   const clientId = form.paypalClientId.trim();
-  const apiKey =
-    form.apiKey.trim() ||
-    (stored.ai?.baseUrl === baseUrl ? savedKey(stored.ai.apiKey, env)?.value : '') ||
-    envKey(env.LLM_API_KEY, baseUrl === normalizeBaseUrl(env.LLM_BASE_URL ?? '')).value;
-  const secret =
-    form.paypalSecret.trim() ||
-    (clientId && stored.paypal?.clientId === clientId ? savedKey(stored.paypal.secret, env)?.value : '') ||
-    envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID).value;
+  // Same choice as the agent makes (resolve): a saved key for this URL, even unreadable, wins over the environment's.
+  const savedApiKey = stored.ai?.baseUrl === baseUrl ? savedKey(stored.ai.apiKey, env) : undefined;
+  const apiKey = form.apiKey.trim() || (savedApiKey ?? envKey(env.LLM_API_KEY, baseUrl === normalizeBaseUrl(env.LLM_BASE_URL ?? ''))).value;
+  const savedSecret = clientId && stored.paypal?.clientId === clientId ? savedKey(stored.paypal.secret, env) : undefined;
+  const secret = form.paypalSecret.trim() || (savedSecret ?? envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID)).value;
   return { ai: { baseUrl, apiKey }, paypal: { clientId, secret } };
 }
