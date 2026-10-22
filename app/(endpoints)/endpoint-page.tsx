@@ -9,11 +9,14 @@ export function EndpointPage({
   calls,
   source,
   note,
+  summary,
   rows,
   columns,
   children,
 }: {
   title: string;
+  /** One line under the title saying what the rows are. */
+  summary: string;
   /** The REST calls behind the page, e.g. 'GET /v1/catalogs/products'. */
   calls: string[];
   /** The lib/paypal.ts function the page calls. */
@@ -28,7 +31,7 @@ export function EndpointPage({
     <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
       <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
       <p className="mt-1 text-sm text-pp-muted">
-        {rows.length} {rows.length === 1 ? 'row' : 'rows'} from your PayPal sandbox account.
+        {summary}
       </p>
       {/* The PayPal calls behind the page, for developers; folded away for everyone else. */}
       <details className="mt-2 max-w-4xl text-sm text-pp-muted">
