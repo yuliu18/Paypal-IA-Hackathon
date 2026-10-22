@@ -81,6 +81,11 @@ describe('minimizeOrder', () => {
     for (const secret of ['1111', '2030-12', 'Sandbox Buyer', '@', 'Ana Lopez', 'Calle Mayor', 'ZR6AR9JXYUB68']) expect(text).not.toContain(secret);
   });
 
+  it('masks emails and card numbers the shop wrote into the item description', () => {
+    const order = { id: 'O-1', purchase_units: [{ description: 'Gift for ben@example.com, paid 4111111111111111' }] };
+    expect(minimizeOrder(order).order).toEqual({ id: 'O-1', purchase_units: [{ description: 'Gift for b***@example.com, paid [card •••• 1111]' }] });
+  });
+
   it('withholds keys that only exist on JavaScript objects instead of failing', () => {
     const odd = JSON.parse('{"id":"O-1","constructor":{"name":{"x":1}},"toString":{"length":{"x":1}}}');
     expect(minimizeOrder(odd)).toEqual({ order: { id: 'O-1' }, withheld: ['constructor', 'toString'] });

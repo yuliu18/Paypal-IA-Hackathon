@@ -2,11 +2,12 @@
 // agent, the intent judge or the black box, and a reply to a customer never carries a card number
 // or anyone else's email. Card numbers are recognised by their Luhn check digit.
 
-// Digits in groups split by single spaces or dashes; a card is any run of whole groups with 13-19
-// digits that passes Luhn, so "4111 1111 1111 1111 12/30" is found but a card is never cut out of
-// a longer unseparated number.
-const DIGIT_RUN = /(?<!\d)\d(?:[ -]?\d)*(?!\d)/g;
-const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+// Digits in groups split by up to 3 spaces (any kind, line breaks included), dots or dashes; a card
+// is any run of whole groups with 13-19 digits that passes Luhn, so "4111 1111 1111 1111 12/30" is
+// found but a card is never cut out of a longer unseparated number.
+const DIGIT_RUN = /(?<!\d)\d(?:[\s.-]{0,3}\d)*(?!\d)/g;
+// Letters of any script; an apostrophe only inside the name, so a quoted address isn't swallowed.
+const EMAIL = /[\p{L}\p{N}._%+-][\p{L}\p{N}._%+'-]*@[\p{L}\p{N}.-]+\.\p{L}{2,}/gu;
 
 function passesLuhn(digits: string): boolean {
   let sum = 0;

@@ -2,7 +2,10 @@
 // An allowlist of the fields a refund needs; anything else, wherever PayPal adds it, is withheld:
 // card details, payer and payee, names, addresses, the shop's custom_id, notes and links.
 
-type Shape = 'scalar' | Shape[] | { [field: string]: Shape };
+import { maskPersonalData } from './redact';
+
+// 'text' is free text the shop wrote, kept with any email or card number in it masked.
+type Shape = 'scalar' | 'text' | Shape[] | { [field: string]: Shape };
 
 const MONEY: Shape = { currency_code: 'scalar', value: 'scalar' };
 const CAPTURE: Shape = { id: 'scalar', status: 'scalar', amount: MONEY, final_capture: 'scalar', create_time: 'scalar', update_time: 'scalar' };
@@ -14,7 +17,7 @@ const ORDER: Shape = {
   create_time: 'scalar',
   update_time: 'scalar',
   purchase_units: [
-    { reference_id: 'scalar', amount: MONEY, description: 'scalar', payments: { captures: [CAPTURE], refunds: [REFUND] } },
+    { reference_id: 'scalar', amount: MONEY, description: 'text', payments: { captures: [CAPTURE], refunds: [REFUND] } },
   ],
 };
 
@@ -23,6 +26,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 // The kept part of `value`, or undefined when its shape doesn't match, so the caller withholds it whole.
 function keep(value: unknown, shape: Shape, path: string, withheld: string[]): unknown {
   if (shape === 'scalar') return ['string', 'number', 'boolean'].includes(typeof value) ? value : undefined;
+  if (shape === 'text') return typeof value === 'string' ? maskPersonalData(value) : undefined;
   if (Array.isArray(shape)) {
     if (!Array.isArray(value)) return undefined;
     return value.flatMap((item, i) => {

@@ -22,6 +22,12 @@ describe('privateTicket', () => {
     expect(privateReply('Your card 4111 1111 1111 1111 12/30 is noted', 'ana@example.com').reply).toBe('Your card [card •••• 1111] 12/30 is noted');
   });
 
+  it('finds a card number however its groups are separated: double spaces, dots, line breaks, no-break spaces', () => {
+    for (const message of ['4111  1111  1111  1111', '4111 - 1111 - 1111 - 1111', '4111.1111.1111.1111', '4111\n1111\n1111\n1111', '4111\u00a01111\u00a01111\u00a01111']) {
+      expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe('[card •••• 1111]');
+    }
+  });
+
   it('does not cut a card number out of a longer unseparated number', () => {
     const message = 'Tracking 4111111111111111000017';
     expect(privateTicket({ customerEmail: 'ana@example.com', message }).ticket.message).toBe(message);
@@ -40,6 +46,11 @@ describe('privateReply', () => {
       reply: 'Hi ANA@example.com, order of [email removed] was paid with [card •••• 1111]; contact [email removed].',
       removed: 3,
     });
+  });
+
+  it('masks whole emails with accents or apostrophes, and keeps such a customer address', () => {
+    expect(privateReply('Write to bén@exämple.com', 'ana@example.com')).toEqual({ reply: 'Write to [email removed]', removed: 1 });
+    expect(privateReply("Hi o'brien@example.com", "o'brien@example.com")).toEqual({ reply: "Hi o'brien@example.com", removed: 0 });
   });
 
   it('returns a reply with nothing personal unchanged', () => {

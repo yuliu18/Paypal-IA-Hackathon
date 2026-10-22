@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
+import { maskPersonalData } from '@/lib/guard/domain/redact';
 import { SeedButton } from './seed-button';
 
 type AgentMode = 'careful' | 'vulnerable';
@@ -138,8 +139,9 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
                 key={i}
                 className={`rounded border px-3 py-2 text-sm ${stepStyle(step)}`}
               >
-                <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{JSON.stringify(step.args)}</code>
-                <p className="mt-1 line-clamp-3 break-all">{step.result}</p>
+                {/* Masked like the guard log: a tool call can quote the customer's or another person's email. */}
+                <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{maskPersonalData(JSON.stringify(step.args))}</code>
+                <p className="mt-1 line-clamp-3 break-all">{maskPersonalData(step.result)}</p>
                 {withheldFields(step) > 0 && (
                   <p className="mt-1 text-xs font-semibold text-pp-blue">
                     Privacy: {plural(withheldFields(step), 'personal data field')} hidden from the agent (card, names, emails, addresses)
