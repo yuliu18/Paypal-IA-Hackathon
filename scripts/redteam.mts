@@ -9,7 +9,7 @@
 // Sandbox money only; refunds use the sample payments.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSeed } from '../lib/demo-seed.ts';
@@ -63,12 +63,15 @@ const fixtures: Fixtures = {
 };
 // What the guard-held metric compares against (redteam/transcript.mjs).
 env.REDTEAM_OWN_CAPTURE = ana.captureId;
+env.REDTEAM_OWN_PAID = ana.amount.value;
 env.REDTEAM_OTHER_EMAILS = [ben.customerEmail, carla.customerEmail].join(',');
 
 mkdirSync(out, { recursive: true });
 const file = join(out, `${mode}.json`);
 // The generated config holds the API key, like .env.local: redteam/.generated is git-ignored.
 writeFileSync(file, JSON.stringify(mode === 'attacks' ? attackConfig(fixtures) : businessConfig(fixtures), null, 2), { mode: 0o600 });
+// writeFile's mode only applies to a new file: an older one keeps its permissions otherwise.
+chmodSync(file, 0o600);
 console.log(`Testing ${fixtures.target} as ${ana.customerEmail}; attacks written and graded by ${fixtures.llm.model}.`);
 
 process.exit(
