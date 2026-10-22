@@ -15,23 +15,26 @@ export const metadata: Metadata = { title: 'Payment guard log' };
 function ChainStatus({ check }: { check: ChainCheck }) {
   if (!check.intact) {
     return (
-      <p className="mt-3 rounded border border-pp-danger bg-pp-surface px-3 py-2 text-sm text-pp-danger">
+      <p className="mt-4 rounded border border-pp-danger bg-pp-surface px-3 py-2 text-sm text-pp-danger">
         <strong>Black box tampered:</strong> row #{check.brokenAt} {check.reason}. Entries from there on cannot be trusted.
       </p>
     );
   }
+  const how = [
+    'Every row carries the hash of the one before it, so an edited, reordered or deleted row breaks the chain.',
+    'New rows are checked on every visit, older ones in full at least once a minute.',
+    check.head && `A log rewritten from scratch would also chain: keep a copy of the head ${check.head.slice(0, 16)}… elsewhere to catch that.`,
+  ];
   return (
-    <p className="mt-3 rounded border border-pp-success bg-pp-surface px-3 py-2 text-sm text-pp-success">
-      <strong>Black box intact:</strong> {check.records} hash-chained {check.records === 1 ? 'row' : 'rows'}, none altered, reordered
-      or removed
-      {check.head && (
-        <>
-          {' '}· head <code title={check.head}>{check.head.slice(0, 16)}…</code>. A log rewritten from scratch would also
-          chain; keep a copy of this head elsewhere to catch that. New rows are checked on every visit, older ones in full at
-          least once a minute.
-        </>
-      )}
-    </p>
+    <span
+      title={how.filter(Boolean).join(' ')}
+      className="inline-flex cursor-help items-center gap-1.5 rounded-full bg-pp-success/10 px-3 py-1 text-sm font-semibold text-pp-success"
+    >
+      <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current" strokeWidth={2.2} aria-hidden>
+        <path d="M5 12l4 4 10-10" />
+      </svg>
+      Black box intact · {check.records} {check.records === 1 ? 'row' : 'rows'}
+    </span>
   );
 }
 
@@ -51,16 +54,17 @@ export default async function GuardLogPage() {
         customer: maskEmail(e.task.mandate.customerEmail),
         amount: amount?.value ? `${amount.value} ${amount.currency_code ?? ''}`.trim() : 'Full remaining amount',
         captureId: String(e.args.capture_id ?? ''),
-        reasons: maskPersonalData(e.decision.violations.map((v) => v.message).join('; ')),
+        codes: e.decision.violations.map((v) => v.code),
+        // One sentence per reason.
+        reasons: maskPersonalData(e.decision.violations.map((v) => (/[.!?]$/.test(v.message) ? v.message : `${v.message}.`)).join(' ')),
       };
     });
 
   return (
     <EndpointPage
       title="Payment guard log"
-      calls={['MCP create_refund', 'MCP get_order']}
-      source="lib/guard/guard.ts"
-      note="Every tool call the AI agent made through the payment guard, newest first, and every decision a person made on a held refund. Blocked and held calls never reached PayPal; pending means the call was logged before running and never settled, so its amount still counts toward the daily limit. The log is append-only and hash-chained, so any edited or deleted row shows up below."
+      summary={`The latest ${entries.length} decisions of the payment guard, newest first. Blocked and held calls never reached PayPal.`}
+      aside={chain.intact ? <ChainStatus check={chain} /> : undefined}
       rows={entries.map((e) => ({
         id: e.id,
         at: e.at,
@@ -90,7 +94,7 @@ export default async function GuardLogPage() {
         { field: 'decides', headerName: 'Decides held entry' },
       ]}
     >
-      <ChainStatus check={chain} />
+      {!chain.intact && <ChainStatus check={chain} />}
       <HeldQueue refunds={held} />
     </EndpointPage>
   );

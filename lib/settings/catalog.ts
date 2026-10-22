@@ -4,7 +4,7 @@
 // follows. Only models that can call tools are listed, since the agent works through PayPal tools.
 // Server-side: fetched once and kept for 6 hours; without models.dev the presets still work.
 
-import { normalizeBaseUrl, PROVIDERS, type Provider } from './providers';
+import { normalizeBaseUrl, PROVIDERS, type Provider } from './providers.ts';
 
 export type CatalogModel = { id: string; name: string; context?: number; input?: number; output?: number };
 // `logo`: the provider's icon on models.dev.
@@ -103,3 +103,14 @@ export function createCatalogLoader(fetchImpl: typeof fetch = fetch, now: () => 
 }
 
 export const loadCatalog = createCatalogLoader();
+
+type AiSettings = { provider: string; baseUrl: string; apiKey: string; agentModel: string; judgeModel: string };
+
+// The models a ticket runs with: the ones chosen on /settings, or else the provider's newest model
+// that can call tools from the catalog (so a fresh deploy works without choosing one). The judge
+// follows the agent unless chosen. `defaulted`: the agent model came from the catalog.
+export async function withDefaultModels(ai: AiSettings, load: () => Promise<Catalog> = loadCatalog) {
+  const chosen = ai.agentModel;
+  const agentModel = chosen || (await load()).models.get(ai.provider)?.[0]?.id || '';
+  return { ...ai, agentModel, judgeModel: ai.judgeModel || agentModel, defaulted: !chosen && !!agentModel };
+}

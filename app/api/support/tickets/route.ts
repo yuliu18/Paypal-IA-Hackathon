@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   } catch {
     return error(400, 'Request body must be JSON.');
   }
+  if (!body || typeof body !== 'object') return error(400, 'Request body must be a JSON object.');
 
   const { customerEmail, message, agent = 'careful' } = body;
   if (typeof customerEmail !== 'string' || !EMAIL.test(customerEmail)) return error(400, 'customerEmail must be an email address.');

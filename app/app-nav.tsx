@@ -16,6 +16,7 @@ const Icons = {
   chat: <path d="M4 5h16v11H8l-4 4z" />,
   shield: <path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" />,
   chart: <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />,
+  check: <path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />,
   collapse: <path d="M15 6l-6 6 6 6" />,
   expand: <path d="M9 6l6 6-6 6" />,
   gear: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />,
@@ -29,6 +30,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
     items: [
       { href: '/support', label: 'Support desk', icon: 'chat' },
       { href: '/guard', label: 'Guard log', icon: 'shield' },
+      { href: '/evaluate', label: 'Evaluate model', icon: 'check' },
     ],
   },
   { title: 'Insights', items: [{ href: '/dashboard', label: 'Dashboard', icon: 'chart' }] },

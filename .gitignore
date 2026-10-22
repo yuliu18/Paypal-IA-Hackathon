@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local sqlite data
 /data/
+
+# promptfoo configs written by npm run redteam (they hold the AI key)
+/redteam/.generated/

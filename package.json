@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "seed": "node --experimental-transform-types --env-file=.env.local scripts/seed-sandbox.mts"
+    "seed": "node --experimental-transform-types --env-file=.env.local scripts/seed-sandbox.mts",
+    "redteam": "node --experimental-transform-types --env-file-if-exists=.env.local scripts/redteam.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

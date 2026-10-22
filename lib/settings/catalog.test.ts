@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCatalog, createCatalogLoader } from './catalog';
+import { buildCatalog, createCatalogLoader, withDefaultModels } from './catalog';
 import { PROVIDERS } from './providers';
 
 // Shaped like https://models.dev/api.json.
@@ -124,5 +124,23 @@ describe('createCatalogLoader', () => {
     expect((await load()).models.size).toBe(0);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect((await load()).models.get('deepseek')).toHaveLength(2);
+  });
+});
+
+describe('withDefaultModels', () => {
+  const catalog = buildCatalog(RAW);
+  const ai = { provider: 'deepseek', baseUrl: 'https://api.deepseek.com/v1', apiKey: 'k', agentModel: '', judgeModel: '' };
+
+  it("uses the provider's newest tool-calling model when none was chosen, for the agent and the judge", async () => {
+    expect(await withDefaultModels(ai, async () => catalog)).toMatchObject({ agentModel: 'deepseek-new', judgeModel: 'deepseek-new', defaulted: true });
+  });
+
+  it('keeps the chosen models, the judge following the agent when left blank', async () => {
+    expect(await withDefaultModels({ ...ai, agentModel: 'mine' }, async () => catalog)).toMatchObject({ agentModel: 'mine', judgeModel: 'mine', defaulted: false });
+    expect(await withDefaultModels({ ...ai, agentModel: 'mine', judgeModel: 'strict' }, async () => catalog)).toMatchObject({ judgeModel: 'strict' });
+  });
+
+  it('leaves the model empty when the catalog knows none for the provider', async () => {
+    expect(await withDefaultModels({ ...ai, provider: 'custom' }, async () => catalog)).toMatchObject({ agentModel: '', defaulted: false });
   });
 });

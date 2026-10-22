@@ -39,4 +39,10 @@ describe('POST /api/support/tickets', () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: { message: 'customerEmail must be an email address.' } });
   });
+
+  it('refuses a JSON body that is not an object', async () => {
+    const res = await post(null);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: 'Request body must be a JSON object.' } });
+  });
 });
