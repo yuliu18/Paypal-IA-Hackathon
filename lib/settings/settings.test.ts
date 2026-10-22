@@ -173,10 +173,17 @@ describe('saveSettings', () => {
     expect((await settingsView({ file, env })).canStoreKeys).toBe(true);
   });
 
-  it('answers with a form error, not a crash, when the key file is unusable', async () => {
+  it('replaces an empty key file, which can hold no saved key, when a key is saved', async () => {
     const env = { ...ENV, SETTINGS_SECRET: undefined };
     await mkdir(join(dir, 'data'), { recursive: true });
     await writeFile(join(dir, 'data', 'settings.key'), '');
+    expect(await saveSettings(form(), { file, env })).toEqual({ ok: true });
+    expect((await loadSettings({ file, env })).ai.apiKey).toBe('sk-deepseek-abcd1234');
+  });
+
+  it('answers with a form error, not a crash, when the key file cannot be read', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    await mkdir(join(dir, 'data', 'settings.key'), { recursive: true });
     expect(await saveSettings(form(), { file, env })).toEqual({
       ok: false,
       errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' },

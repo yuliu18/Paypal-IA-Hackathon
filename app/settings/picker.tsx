@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { matchOptions, type PickerOption } from './picker-logic';
 
-export type PickerOption = { value: string; label: string; group?: string; detail?: string; icon?: string };
+export type { PickerOption };
 
 // A searchable dropdown styled like the other fields, for long lists such as the AI catalog. The
 // value is submitted through a hidden input named `name`. With `allowCustom`, whatever the owner
@@ -33,12 +34,7 @@ export function Picker({
   const listId = useId();
   const selected = options.find((o) => o.value === value);
 
-  const shown = useMemo(() => {
-    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    const matches = options.filter((o) => words.every((w) => `${o.label} ${o.value} ${o.group ?? ''}`.toLowerCase().includes(w)));
-    const custom = query.trim();
-    return allowCustom && custom && !options.some((o) => o.value === custom) ? [...matches, { value: custom, label: `Use “${custom}”` }] : matches;
-  }, [options, query, allowCustom]);
+  const shown = useMemo(() => matchOptions(options, query, allowCustom), [options, query, allowCustom]);
 
   useEffect(() => {
     if (!open) return;

@@ -31,4 +31,17 @@ describe('saveSettings on a disk without hard links', () => {
     expect((await stat(join(dir, 'settings.key'))).mode & 0o777).toBe(0o600);
     expect((await loadSettings({ file, env })).ai.apiKey).toBe('sk-nolink-12345678');
   });
+
+  it('gives saves that create the key file at the same time one key, so every saved key stays readable', async () => {
+    const file = join(dir, 'settings.json');
+    const env = {};
+    const form = (apiKey: string) => ({
+      name: 'Shop', contactEmails: '', refundPolicy: 'Refund damaged orders of the ticket customer.', currency: 'USD',
+      autoRefundUpTo: '100', approvalUpTo: '250', dailyCap: '200', provider: 'custom', baseUrl: 'https://llm.example/v1',
+      agentModel: 'm', judgeModel: '', apiKey, paypalClientId: '', paypalSecret: '',
+    });
+    const results = await Promise.all(['sk-first-12345678', 'sk-second-1234567', 'sk-third-12345678'].map((key) => saveSettings(form(key), { file, env })));
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect((await loadSettings({ file, env })).ai.apiKey).toMatch(/^sk-(first|second|third)-/);
+  });
 });

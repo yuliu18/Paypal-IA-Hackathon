@@ -66,6 +66,33 @@ describe('createCatalogLoader', () => {
     expect(catalog.models.get('deepseek')).toHaveLength(2);
   });
 
+  it('makes one request for callers that arrive together', async () => {
+    let calls = 0;
+    const load = createCatalogLoader(async () => {
+      calls++;
+      return Response.json(RAW);
+    });
+    await Promise.all([load(), load(), load()]);
+    expect(calls).toBe(1);
+  });
+
+  it('answers at once from the cache while a due refresh runs in the background', async () => {
+    let now = 0;
+    let release: (() => void) | undefined;
+    let calls = 0;
+    const load = createCatalogLoader(async () => {
+      calls++;
+      if (calls > 1) await new Promise<void>((resolve) => (release = resolve));
+      return Response.json(RAW);
+    }, () => now);
+    await load();
+    now += 7 * 60 * 60_000;
+    const answer = await Promise.race([load().then(() => 'cached'), new Promise((resolve) => setTimeout(() => resolve('waited'), 50))]);
+    expect(answer).toBe('cached');
+    expect(calls).toBe(2);
+    release?.();
+  });
+
   it('keeps the last good catalog when a refresh fails', async () => {
     let now = 0;
     let up = true;
@@ -76,6 +103,8 @@ describe('createCatalogLoader', () => {
     await load();
     up = false;
     now += 7 * 60 * 60_000;
+    await load();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect((await load()).models.get('deepseek')).toHaveLength(2);
   });
 
@@ -91,6 +120,9 @@ describe('createCatalogLoader', () => {
     expect(offline.models.size).toBe(0);
     up = true;
     now += 2 * 60_000;
+    // The due retry runs in the background: this call still gets the presets, the next the full catalog.
+    expect((await load()).models.size).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect((await load()).models.get('deepseek')).toHaveLength(2);
   });
 });

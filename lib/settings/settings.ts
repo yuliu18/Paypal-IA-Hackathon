@@ -83,13 +83,38 @@ const settingsSecret = (env: Env) => (env.SETTINGS_SECRET && env.SETTINGS_SECRET
 async function withSecret(env: Env, file: string, create: boolean): Promise<Env> {
   if (settingsSecret(env)) return env;
   const keyFile = join(dirname(file), 'settings.key');
-  const read = async () => (await readFile(keyFile, 'utf8')).trim();
-  try {
-    return { ...env, SETTINGS_SECRET: await read() };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || !create) return env;
+  const current = await readKeyFile(keyFile);
+  if (current === 'unreadable') return env;
+  if (current) return { ...env, SETTINGS_SECRET: current };
+  if (!create) return env;
+  // Missing or empty: an empty file (left by a crash) never sealed a key, so it can be replaced.
+  let pending = creating.get(keyFile);
+  if (!pending) {
+    pending = createKeyFile(keyFile).finally(() => creating.delete(keyFile));
+    creating.set(keyFile, pending);
   }
-  // Written whole to a temp file, then linked into place, so no reader ever sees it half written.
+  await pending;
+  const created = await readKeyFile(keyFile);
+  return created && created !== 'unreadable' ? { ...env, SETTINGS_SECRET: created } : env;
+}
+
+// The key, '' when the file is missing or too short to be one, or 'unreadable'.
+async function readKeyFile(keyFile: string): Promise<string> {
+  try {
+    const key = (await readFile(keyFile, 'utf8')).trim();
+    return key.length >= 16 ? key : '';
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? '' : 'unreadable';
+  }
+}
+
+// Saves in this process wait for one creation; link() keeps other processes from overwriting it.
+const creating = new Map<string, Promise<void>>();
+
+// Written whole to a temp file, then linked or renamed into place, so no reader ever sees it half
+// written. Disks without hard links get a rename, after checking again that nobody created it.
+async function createKeyFile(keyFile: string): Promise<void> {
+  if (await readKeyFile(keyFile)) return;
   await mkdir(dirname(keyFile), { recursive: true });
   const partial = `${keyFile}.${crypto.randomUUID()}.tmp`;
   await writeFile(partial, `${randomBytes(32).toString('hex')}\n`, { mode: 0o600 });
@@ -97,19 +122,11 @@ async function withSecret(env: Env, file: string, create: boolean): Promise<Env>
     await link(partial, keyFile);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    // EEXIST: another save created it first, so use theirs. Any other code: the disk has no hard
-    // links, so create it directly (a crash mid-write then leaves an empty file, reported on save).
-    if (code !== 'EEXIST') {
-      try {
-        await writeFile(keyFile, await readFile(partial), { mode: 0o600, flag: 'wx' });
-      } catch (fallback) {
-        if ((fallback as NodeJS.ErrnoException).code !== 'EEXIST') throw fallback;
-      }
-    }
+    // EEXIST: an empty file to replace, or another process's key to keep.
+    if (code !== 'EEXIST' || !(await readKeyFile(keyFile))) await rename(partial, keyFile);
   } finally {
-    await unlink(partial);
+    await unlink(partial).catch(() => {});
   }
-  return { ...env, SETTINGS_SECRET: await read() };
 }
 const splitEmails = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
 const hint = (key: string) => `••••${key.length >= 8 ? key.slice(-4) : ''}`;

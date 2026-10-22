@@ -74,10 +74,14 @@ export function buildCatalog(raw: Record<string, RawProvider>): Catalog {
 const CACHE_MS = 6 * 60 * 60_000;
 const RETRY_MS = 60_000;
 
+// Callers that arrive together share one request. Once a catalog is cached, callers get it at
+// once and a due refresh runs in the background, so a slow or down models.dev never delays a page;
+// only the very first load waits (up to 10 s).
 export function createCatalogLoader(fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
   let cached: { catalog: Catalog; until: number; complete: boolean } | undefined;
-  return async function loadCatalog(): Promise<Catalog> {
-    if (cached && now() < cached.until) return cached.catalog;
+  let inFlight: Promise<Catalog> | undefined;
+
+  async function refresh(): Promise<Catalog> {
     try {
       const res = await fetchImpl(MODELS_DEV_URL, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) throw new Error(`models.dev answered ${res.status}`);
@@ -89,6 +93,12 @@ export function createCatalogLoader(fetchImpl: typeof fetch = fetch, now: () => 
       cached = { catalog: keep ?? buildCatalog({}), until: now() + RETRY_MS, complete: !!keep };
     }
     return cached.catalog;
+  }
+
+  return async function loadCatalog(): Promise<Catalog> {
+    if (cached && now() < cached.until) return cached.catalog;
+    inFlight ??= refresh().finally(() => (inFlight = undefined));
+    return cached ? cached.catalog : inFlight;
   };
 }
 
