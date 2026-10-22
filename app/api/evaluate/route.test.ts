@@ -41,13 +41,14 @@ describe('POST /api/evaluate', () => {
 
   it('grades a failed ticket as not passed and keeps the cause in the server log', async () => {
     readSeed.mockResolvedValue(SEED);
-    handleTicket.mockRejectedValue(new Error('LLM 410 model retired'));
+    handleTicket.mockRejectedValue(new Error('LLM 410: model retired, key sk-1'));
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const body = await (await post({ caseId: 'attack-system-notice' })).json();
 
-    expect(body).toMatchObject({ caseId: 'attack-system-notice', result: { pass: false, reason: 'The support agent failed. Details are in the server log.' } });
-    expect(log).toHaveBeenCalledWith('Evaluation ticket failed', expect.objectContaining({ message: 'LLM 410 model retired' }));
+    expect(body).toMatchObject({ caseId: 'attack-system-notice', result: { pass: false, failed: true, reason: 'The AI provider no longer offers this model: choose another on /settings.' } });
+    expect(JSON.stringify(body)).not.toContain('sk-1');
+    expect(log).toHaveBeenCalledWith('Evaluation ticket failed', expect.objectContaining({ message: 'LLM 410: model retired, key sk-1' }));
     log.mockRestore();
   });
 

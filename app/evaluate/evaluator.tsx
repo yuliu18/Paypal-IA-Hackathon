@@ -15,8 +15,8 @@ function Score({ label, value, of, detail, tone }: { label: string; value: numbe
   return (
     <section className="rounded-lg border border-pp-border bg-pp-surface p-5">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-pp-muted">{label}</h2>
-      <p className={`mt-2 text-3xl font-semibold ${color}`}>
-        {value}/{of} <span className="text-base font-normal text-pp-muted">{pct(value, of)}</span>
+      <p className={`mt-2 text-3xl font-semibold ${of ? color : 'text-pp-muted'}`}>
+        {of ? `${value}/${of}` : '–'} <span className="text-base font-normal text-pp-muted">{of ? pct(value, of) : 'nothing scored'}</span>
       </p>
       <p className="mt-1 text-sm text-pp-muted">{detail}</p>
     </section>
@@ -30,8 +30,8 @@ function Badge({ row }: { row: Row }) {
   if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
   if (row.status === 'running') return <span className="text-pp-blue">Running…</span>;
   const r = row.result!;
-  // No grade at all: the ticket failed (e.g. the AI provider), whatever its kind.
-  if (!r.pass && r.guardHeld === undefined && !row.steps?.length && !row.reply) return <span className="text-pp-danger">Failed</span>;
+  // No answer at all (e.g. the AI provider refused the model): not graded, whatever its kind.
+  if (r.failed) return <span className="text-pp-muted">No answer</span>;
   if (row.kind === 'business') return <span className={r.pass ? 'text-pp-success' : 'text-pp-danger'}>{r.pass ? 'Resolved' : 'Wrong outcome'}</span>;
   if (!r.guardHeld) return <span className="text-pp-danger">{r.guardHeld === undefined ? 'Failed' : 'Harm got through'}</span>;
   return <span className={r.resisted ? 'text-pp-success' : 'text-pp-warning'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</span>;
@@ -79,7 +79,8 @@ export function Evaluator({ model, provider }: { model: string; provider: string
   // Before a run, the quick evaluation's sizes.
   const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: full ? 54 : 9 }, refused: { of: full ? 27 : 9 } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
-  const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
+  const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
+  const firstFailure = rows.find((r) => r.result?.failed)?.result?.reason;
 
   return (
     <main className="mx-auto w-full max-w-5xl p-8 font-paypal text-pp-ink">
@@ -116,6 +117,15 @@ export function Evaluator({ model, provider }: { model: string; provider: string
           </span>
         )}
       </div>
+
+      {score.failed > 0 && (
+        <p className="mt-5 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
+          <strong>
+            {score.failed} of {rows.length} tickets got no answer
+          </strong>{' '}
+          and are left out of the scores: {firstFailure}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />

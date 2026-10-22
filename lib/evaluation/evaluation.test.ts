@@ -55,7 +55,7 @@ describe('scoreCase', () => {
   });
 
   it('counts a failed ticket as not passed, with the error as the reason', () => {
-    expect(scoreCase(byId('business-refund'), { error: { message: 'The support agent failed.' } }, SEED)).toMatchObject({ pass: false, reason: 'The support agent failed.' });
+    expect(scoreCase(byId('business-refund'), { error: { message: 'The support agent failed.' } }, SEED)).toEqual({ pass: false, failed: true, reason: 'The support agent failed.' });
   });
 });
 
@@ -113,6 +113,34 @@ describe('full evaluation', () => {
         attack('vulnerable', false, false),
         { kind: 'attack', agent: 'careful' },
       ]),
-    ).toEqual({ business: { of: 2, passed: 1 }, guardHeld: { of: 5, passed: 3 }, refused: { of: 3, passed: 1 } });
+    ).toEqual({ business: { of: 2, passed: 1 }, guardHeld: { of: 5, passed: 3 }, refused: { of: 3, passed: 1 }, failed: 0 });
+  });
+});
+
+describe('summarize with failed tickets', () => {
+  it('leaves failed tickets out of every score and counts them apart', async () => {
+    const { summarize } = await import('./evaluation');
+    const failed = { pass: false, failed: true as const, reason: 'The AI provider no longer offers this model.' };
+    expect(
+      summarize([
+        { kind: 'business', agent: 'careful', result: failed },
+        { kind: 'business', agent: 'careful', result: { pass: true, reason: '' } },
+        { kind: 'attack', agent: 'careful', result: failed },
+        { kind: 'attack', agent: 'careful', result: { pass: true, guardHeld: true, resisted: true, reason: '' } },
+      ]),
+    ).toEqual({ business: { of: 1, passed: 1 }, guardHeld: { of: 1, passed: 1 }, refused: { of: 1, passed: 1 }, failed: 2 });
+  });
+});
+
+describe('providerFailure', () => {
+  it('names what the AI provider refused, without its answer', async () => {
+    const { providerFailure } = await import('./evaluation');
+    expect(providerFailure(new Error('LLM 410: {"error":"Model minimax-free has been deprecated","key":"sk-1"}'))).toBe('The AI provider no longer offers this model: choose another on /settings.');
+    expect(providerFailure(new Error('LLM 404: not found'))).toBe('The AI provider no longer offers this model: choose another on /settings.');
+    expect(providerFailure(new Error('LLM 401: bad key sk-1'))).toBe('The AI provider rejected the API key: check it on /settings.');
+    expect(providerFailure(new Error('LLM 429: slow down'))).toBe('The AI provider is limiting requests: try again in a few minutes.');
+    expect(providerFailure(Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }))).toBe('The AI provider did not answer in time.');
+    expect(providerFailure(new Error('LLM 503: down'))).toBe('The AI provider did not answer in time.');
+    expect(providerFailure(new Error('PayPal 500 on /v2/x'))).toBe('The support agent failed. Details are in the server log.');
   });
 });

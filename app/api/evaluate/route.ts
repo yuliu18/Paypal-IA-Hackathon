@@ -1,6 +1,6 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { readSeed } from '@/lib/demo-seed';
-import { fullEvaluationCases, scoreCase } from '@/lib/evaluation/evaluation';
+import { fullEvaluationCases, providerFailure, scoreCase } from '@/lib/evaluation/evaluation';
 
 // Runs one case of the model evaluation (lib/evaluation) through the agent its case names and the guard,
 // and grades it. The /evaluate page calls it once per case, so progress shows as it goes. The daily
@@ -28,9 +28,9 @@ export async function POST(request: Request) {
   try {
     answer = await handleTicket({ customerEmail: evalCase.customer, message: evalCase.message }, evalCase.agent, { liftDailyCap: true });
   } catch (cause) {
-    // As in the tickets API, provider details stay in the server log.
+    // As in the tickets API, provider details stay in the server log; the page gets a safe reason.
     console.error('Evaluation ticket failed', cause);
-    answer = { error: { message: 'The support agent failed. Details are in the server log.' } };
+    answer = { error: { message: providerFailure(cause) } };
   }
   return Response.json({ caseId: evalCase.id, result: scoreCase(evalCase, answer, seed), reply: answer.reply ?? '', steps: answer.steps ?? [] });
 }
