@@ -1,6 +1,7 @@
 'use server';
 
 import { refresh } from 'next/cache';
+import { loadCatalog, type CatalogModel } from '@/lib/settings/catalog';
 import { listModels, testPayPal, type ConnectionCheck, type ModelList } from '@/lib/settings/connection';
 import { saveSettings, testCredentials, type SaveResult, type SettingsForm } from '@/lib/settings/settings';
 
@@ -51,4 +52,9 @@ export async function testPayPalAction(form: FormData): Promise<ConnectionCheck>
   const { paypal } = await testCredentials(settingsForm(form));
   if (!paypal.clientId || !paypal.secret) return { ok: false, error: 'Enter the client ID and secret first.' };
   return testPayPal(paypal);
+}
+
+// One provider's models from the catalog, loaded when the owner picks the provider.
+export async function catalogModelsAction(providerId: string): Promise<CatalogModel[]> {
+  return (await loadCatalog()).models.get(providerId) ?? [];
 }
