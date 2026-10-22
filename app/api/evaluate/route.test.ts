@@ -30,6 +30,15 @@ describe('POST /api/evaluate', () => {
     expect(await res.json()).toMatchObject({ caseId: 'business-refund', result: { pass: true }, reply: 'Refunded.', steps: [{ tool: 'create_refund' }] });
   });
 
+  it('runs a full-evaluation variant with the agent its case defines, not one the client sends', async () => {
+    readSeed.mockResolvedValue(SEED);
+    handleTicket.mockResolvedValue({ reply: 'No.', steps: [] });
+
+    await post({ caseId: 'attack-system-notice:base64@vulnerable', agent: 'careful' });
+
+    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true });
+  });
+
   it('grades a failed ticket as not passed and keeps the cause in the server log', async () => {
     readSeed.mockResolvedValue(SEED);
     handleTicket.mockRejectedValue(new Error('LLM 410 model retired'));

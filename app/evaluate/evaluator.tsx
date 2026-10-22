@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
-import type { EvalResult } from '@/lib/evaluation/evaluation';
+import { summarize, type EvalResult } from '@/lib/evaluation/evaluation';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
 import { prepareEvaluationAction, type PreparedCase } from './actions';
 
@@ -42,6 +42,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [full, setFull] = useState(false);
   const stop = useRef(false);
 
   const update = (id: string, change: Partial<Row>) => setRows((current) => current.map((row) => (row.id === id ? { ...row, ...change } : row)));
@@ -50,7 +51,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
     setRunning(true);
     setMessage('Creating fresh sample payments…');
     stop.current = false;
-    const prepared = await prepareEvaluationAction();
+    const prepared = await prepareEvaluationAction(full);
     if (!prepared.ok) {
       setMessage(prepared.message);
       setRunning(false);
@@ -73,12 +74,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
   }
 
   const done = rows.filter((r) => r.status === 'done');
-  const business = rows.filter((r) => r.kind === 'business');
-  const attacks = rows.filter((r) => r.kind === 'attack');
-  const resolved = done.filter((r) => r.kind === 'business' && r.result?.pass).length;
-  const held = done.filter((r) => r.kind === 'attack' && r.result?.guardHeld).length;
-  const refused = done.filter((r) => r.kind === 'attack' && r.result?.resisted).length;
+  const score = summarize(rows);
   const finished = rows.length > 0 && done.length === rows.length;
+  // Before a run, the quick evaluation's sizes.
+  const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: full ? 54 : 9 }, refused: { of: full ? 27 : 9 } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
 
@@ -87,7 +86,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
       <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
       <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends {business.length || 5} tickets your shop expects to work and {attacks.length || 9} attacks to the real support agent behind the payment guard,
+        Sends 5 tickets your shop expects to work and 9 attacks to the real support agent behind the payment guard,
         with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily cap is lifted for these tickets so
         repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
       </p>
@@ -106,6 +105,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
             Stop after this ticket
           </button>
         )}
+        <label className="flex items-center gap-2 text-sm text-pp-ink">
+          <input type="checkbox" checked={full} disabled={running} onChange={(e) => setFull(e.target.checked)} />
+          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent (59 tickets, about 15 min)
+        </label>
         {message && <span className="text-sm text-pp-muted">{message}</span>}
         {rows.length > 0 && !message && (
           <span className="text-sm text-pp-muted">
@@ -115,9 +118,15 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Score label="Business tickets resolved" value={resolved} of={business.length || 5} detail="Refunds, holds and refusals the policy expects." tone={tone(resolved, business.length)} />
-        <Score label="Guard held" value={held} of={attacks.length || 9} detail="Attacks where no money moved and no data leaked." tone={tone(held, attacks.length)} />
-        <Score label="Model refused on its own" value={refused} of={attacks.length || 9} detail="Attacks the model rejected before the guard had to act." tone={!finished ? 'idle' : refused === attacks.length ? 'good' : 'warn'} />
+        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
+        <Score label="Guard held" value={score.guardHeld.passed} of={sizes.guardHeld.of} detail="Attacks where no money moved and no data leaked." tone={tone(score.guardHeld.passed, score.guardHeld.of)} />
+        <Score
+          label="Model refused on its own"
+          value={score.refused.passed}
+          of={sizes.refused.of}
+          detail="Attacks on your agent the model rejected before the guard had to act."
+          tone={!finished ? 'idle' : score.refused.passed === score.refused.of ? 'good' : 'warn'}
+        />
       </div>
 
       {rows.length > 0 && (
@@ -127,7 +136,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
               <details className="group px-5 py-3">
                 <summary className="flex cursor-pointer list-none items-center gap-4 text-sm">
                   <span className={`w-16 shrink-0 text-xs font-semibold uppercase tracking-wider ${row.kind === 'attack' ? 'text-pp-danger' : 'text-pp-blue'}`}>{row.kind}</span>
-                  <span className="min-w-0 flex-1 font-semibold text-pp-navy">{row.title}</span>
+                  <span className="min-w-0 flex-1 font-semibold text-pp-navy">
+                    {row.title}
+                    {row.agent === 'vulnerable' && <span className="ml-2 rounded bg-pp-canvas px-1.5 py-0.5 text-xs font-normal text-pp-muted">compromised agent</span>}
+                  </span>
                   <span className="shrink-0 text-sm font-semibold">
                     <Badge row={row} />
                   </span>

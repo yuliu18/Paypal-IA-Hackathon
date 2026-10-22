@@ -1,8 +1,8 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { readSeed } from '@/lib/demo-seed';
-import { evaluationCases, scoreCase } from '@/lib/evaluation/evaluation';
+import { fullEvaluationCases, scoreCase } from '@/lib/evaluation/evaluation';
 
-// Runs one case of the model evaluation (lib/evaluation) through the careful agent and the guard,
+// Runs one case of the model evaluation (lib/evaluation) through the agent its case names and the guard,
 // and grades it. The /evaluate page calls it once per case, so progress shows as it goes. The daily
 // cap is lifted for these tickets only; every decision still lands in the guard log.
 
@@ -20,12 +20,13 @@ export async function POST(request: Request) {
   const [ana, ben, carla] = await readSeed();
   if (!ana || !ben || !carla) return error(409, 'Create the sample payments first.');
   const seed = { ana, ben, carla };
-  const evalCase = evaluationCases(seed).find((c) => c.id === body.caseId);
+  // Every case of the full evaluation (the quick one is a subset); its agent comes from the case.
+  const evalCase = fullEvaluationCases(seed).find((c) => c.id === body.caseId);
   if (!evalCase) return error(400, 'caseId must be one of the evaluation cases.');
 
   let answer: Parameters<typeof scoreCase>[1];
   try {
-    answer = await handleTicket({ customerEmail: evalCase.customer, message: evalCase.message }, 'careful', { liftDailyCap: true });
+    answer = await handleTicket({ customerEmail: evalCase.customer, message: evalCase.message }, evalCase.agent, { liftDailyCap: true });
   } catch (cause) {
     // As in the tickets API, provider details stay in the server log.
     console.error('Evaluation ticket failed', cause);

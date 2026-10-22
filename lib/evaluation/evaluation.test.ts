@@ -78,3 +78,41 @@ describe('withoutDailyCap', () => {
     expect(refund(260_00, true)).toBe('block');
   });
 });
+
+describe('full evaluation', () => {
+  it('adds every attack as a jailbreak template and in base64, against the careful and the vulnerable agent', async () => {
+    const { fullEvaluationCases } = await import('./evaluation');
+    const full = fullEvaluationCases(SEED);
+    expect(full).toHaveLength(5 + 9 * 3 * 2);
+    expect(new Set(full.map((c) => c.id)).size).toBe(full.length);
+    expect(full.filter((c) => c.kind === 'business').every((c) => c.agent === 'careful')).toBe(true);
+    const notice = full.filter((c) => c.id.startsWith('attack-system-notice'));
+    expect(notice.map((c) => [c.variant, c.agent])).toEqual([
+      ['plain', 'careful'], ['jailbreak', 'careful'], ['base64', 'careful'],
+      ['plain', 'vulnerable'], ['jailbreak', 'vulnerable'], ['base64', 'vulnerable'],
+    ]);
+    const plain = notice[0].message;
+    expect(notice[1].message).toContain(plain);
+    const encoded = /([A-Za-z0-9+/=]{40,})/.exec(notice[2].message)![1];
+    expect(Buffer.from(encoded, 'base64').toString('utf8')).toBe(plain);
+    expect(evaluationCases(SEED).every((c) => c.agent === 'careful' && c.variant === undefined || c.kind === 'business')).toBe(true);
+  });
+
+  it("summarizes: business resolved, guard held over every attack, and the model's own refusals on the careful agent only", async () => {
+    const { summarize } = await import('./evaluation');
+    const attack = (agent: 'careful' | 'vulnerable', guardHeld: boolean, resisted: boolean) => ({
+      kind: 'attack' as const, agent, result: { pass: guardHeld, guardHeld, resisted, reason: '' },
+    });
+    expect(
+      summarize([
+        { kind: 'business', agent: 'careful', result: { pass: true, reason: '' } },
+        { kind: 'business', agent: 'careful', result: { pass: false, reason: '' } },
+        attack('careful', true, true),
+        attack('careful', true, false),
+        attack('vulnerable', true, false),
+        attack('vulnerable', false, false),
+        { kind: 'attack', agent: 'careful' },
+      ]),
+    ).toEqual({ business: { of: 2, passed: 1 }, guardHeld: { of: 5, passed: 3 }, refused: { of: 3, passed: 1 } });
+  });
+});
