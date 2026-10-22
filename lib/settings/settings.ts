@@ -7,7 +7,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Limits } from '@/lib/guard/domain/policy';
-import { openSecret, sealSecret } from './secret-box';
+import { openSecret, sealSecret } from './secret-box.ts';
 
 // The refund policy the agent follows and the guard's intent judge checks calls against.
 export const DEFAULT_REFUND_POLICY = `Refund an order only when the customer who wrote the ticket says it arrived damaged, defective or never arrived.
@@ -18,6 +18,7 @@ Look the order up first and refund only that order's capture, for at most what w
 // runs, and the day caps total exposure.
 const DEFAULT_LIMITS = { currency: 'USD', autoRefundUpTo: 100_00, approvalUpTo: 250_00, dailyCap: 200_00 };
 
+// SETTINGS_FILE in the environment moves it, e.g. onto a persistent disk.
 export const SETTINGS_FILE = 'data/settings.json';
 
 type Env = Record<string, string | undefined>;
@@ -128,14 +129,14 @@ function resolve(stored: Stored, env: Env) {
   return { settings, limits, keys: { ai: aiKey.status, paypal: payPalSecret.status } };
 }
 
-export async function loadSettings({ file = SETTINGS_FILE, env = process.env }: SettingsOptions = {}): Promise<ShopSettings> {
+export async function loadSettings({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<ShopSettings> {
   return resolve(await readStored(file), env).settings;
 }
 
 const decimal = (minor: number) => (minor / 100).toFixed(2);
 
 // What the page shows: every value except the keys, which appear only as their last 4 characters.
-export async function settingsView({ file = SETTINGS_FILE, env = process.env }: SettingsOptions = {}): Promise<SettingsView> {
+export async function settingsView({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SettingsView> {
   const stored = await readStored(file);
   const { settings, limits, keys } = resolve(stored, env);
   return {
@@ -173,7 +174,7 @@ function toMinor(text: string): number | undefined {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MODEL = /^\S{1,200}$/;
 
-export async function saveSettings(form: SettingsForm, { file = SETTINGS_FILE, env = process.env }: SettingsOptions = {}): Promise<SaveResult> {
+export async function saveSettings(form: SettingsForm, { env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SaveResult> {
   if (isLocked(env)) return { ok: false, errors: { form: 'Settings are read-only on this server (SETTINGS_LOCKED).' } };
   const errors: Extract<SaveResult, { ok: false }>['errors'] = {};
 

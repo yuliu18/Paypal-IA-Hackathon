@@ -1,5 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chargeCard } from './paypal';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { accessToken, chargeCard } from './paypal';
+import { saveSettings } from './settings/settings';
 
 describe('chargeCard', () => {
   afterEach(() => {
@@ -47,5 +51,40 @@ describe('chargeCard', () => {
     await expect(chargeCard({ amount: { value: '1.00', currency_code: 'USD' }, customerEmail: 'ana@example.com', description: 'x' })).rejects.toThrow(
       'Order ORD-2 was not captured (PAYER_ACTION_REQUIRED)',
     );
+  });
+});
+
+describe('accessToken', () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'paypal-settings-'));
+  });
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('uses the credentials saved on the settings page and gets a new token when they change', async () => {
+    const file = join(dir, 'settings.json');
+    const env = { PAYPAL_CLIENT_ID: 'env-id', PAYPAL_SECRET: 'env-secret', SETTINGS_SECRET: 'a-long-settings-secret-for-tests' };
+    for (const [name, value] of Object.entries({ ...env, SETTINGS_FILE: file })) vi.stubEnv(name, value);
+    const basics: string[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      basics.push(Buffer.from(new Headers(init.headers).get('authorization')!.slice('Basic '.length), 'base64').toString());
+      return Response.json({ access_token: `t${basics.length}`, expires_in: 3600 });
+    });
+    const form = {
+      name: 'Shop', contactEmails: '', refundPolicy: 'Refund damaged orders of the ticket customer.', currency: 'USD',
+      autoRefundUpTo: '100', approvalUpTo: '250', dailyCap: '200', provider: 'custom', baseUrl: 'https://llm.example/v1',
+      agentModel: 'm', judgeModel: '', apiKey: '',
+    };
+
+    await saveSettings({ ...form, paypalClientId: 'shop-id', paypalSecret: 'shop-secret' }, { file, env });
+    expect(await accessToken()).toBe('t1');
+    expect(await accessToken()).toBe('t1');
+    await saveSettings({ ...form, paypalClientId: 'other-id', paypalSecret: 'other-secret' }, { file, env });
+    expect(await accessToken()).toBe('t2');
+    expect(basics).toEqual(['shop-id:shop-secret', 'other-id:other-secret']);
   });
 });
