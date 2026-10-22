@@ -275,3 +275,15 @@ describe('settingsView', () => {
     expect((await loadSettings({ file, env })).ai.apiKey).toBe('');
   });
 });
+
+describe('retired model variables', () => {
+  it('warns once in the server log that AGENT_MODEL and JUDGE_MODEL are ignored now', async () => {
+    const { vi } = await import('vitest');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await loadSettings({ file, env: { ...ENV, JUDGE_MODEL: 'old-judge' } });
+    await loadSettings({ file, env: { ...ENV, JUDGE_MODEL: 'old-judge' } });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('AGENT_MODEL and JUDGE_MODEL are no longer read: choose the models on /settings (until then the provider default runs).');
+    warn.mockRestore();
+  });
+});

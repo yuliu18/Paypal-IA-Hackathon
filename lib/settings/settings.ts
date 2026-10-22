@@ -208,7 +208,18 @@ function resolve(stored: Stored, env: Env) {
   return { settings, limits, keys: { ai: aiKey.status, paypal: payPalSecret.status } };
 }
 
+// AGENT_MODEL and JUDGE_MODEL were read before the models moved to /settings: say once (per value)
+// that they no longer are, so a host that still sets them knows why another model runs.
+let warnedModels: string | undefined;
+function warnRetiredModelVariables(env: Env) {
+  const set = [env.AGENT_MODEL, env.JUDGE_MODEL].filter(Boolean).join(',');
+  if (!set || set === warnedModels) return;
+  warnedModels = set;
+  console.warn('AGENT_MODEL and JUDGE_MODEL are no longer read: choose the models on /settings (until then the provider default runs).');
+}
+
 export async function loadSettings({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<ShopSettings> {
+  warnRetiredModelVariables(env);
   return resolve(await readStored(file), await withSecret(env, file, false)).settings;
 }
 
