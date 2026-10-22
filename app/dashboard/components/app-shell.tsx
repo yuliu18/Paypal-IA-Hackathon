@@ -39,16 +39,18 @@ export function AppShell({
   sidebar,
   children,
 }: {
-  sidebar: ReactNode;
+  sidebar?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-pp-canvas font-paypal text-pp-ink">
+    <div className="flex min-h-full shrink-0 flex-col bg-pp-canvas font-paypal text-pp-ink">
       <TopBar />
-      <div className="flex min-h-0 flex-1">
-        <nav className="flex w-64 shrink-0 flex-col border-r border-pp-border bg-white" aria-label="Reports">
-          {sidebar}
-        </nav>
+      <div className="flex flex-1">
+        {sidebar && (
+          <nav className="flex w-64 shrink-0 flex-col border-r border-pp-border bg-white" aria-label="Reports">
+            {sidebar}
+          </nav>
+        )}
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </div>
     </div>

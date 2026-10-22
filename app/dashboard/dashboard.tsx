@@ -11,6 +11,7 @@
 // leaving a report compares Studio's state with the saved one there and then.
 
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AgStudioAiModule,
   enableStudioDevValidations,
@@ -20,6 +21,7 @@ import {
 } from 'ag-studio';
 import { AgStudio, AgStudioProvider } from 'ag-studio-react';
 import type { DashboardData } from '@/lib/dashboard-data';
+import { useNavSlot } from '../nav-slot';
 import { AppShell } from './components/app-shell';
 import {
   CreateReportDialog,
@@ -209,35 +211,40 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
       pageTitles: { ...report.pageTitles, [id]: title },
     }));
 
+  const navSlot = useNavSlot();
   const editing = mode === 'edit';
   const pages = pagesFor({ pageTitles: saved.pageTitles, state });
 
+  // The reports list lives in the app's side menu under "Dashboard" (app/nav-slot.ts), or in the
+  // dashboard's own panel while the menu is collapsed.
+  const reportsList = (tone: 'light' | 'dark') => (
+    <ReportsSidebar
+      tone={tone}
+      reports={reports}
+      activeId={saved.id}
+      activePages={pages}
+      selectedPageId={state.selectedPageId}
+      editing={editing}
+      ready={studioState !== null}
+      onSelectReport={openReport}
+      onSelectPage={selectPage}
+      onAddPage={() => (apiRef.current ? addPage() : undefined)}
+      onRemovePage={removePage}
+      onRenamePage={renamePage}
+      onRenameReport={renameReport}
+      onCreate={() => guard(() => setDialog({ kind: 'create' }))}
+      onDuplicate={duplicateReport}
+      onDelete={(id) => {
+        const report = findReport(reports, id);
+        if (report) setDialog({ kind: 'delete', report });
+      }}
+      onReset={() => setDialog({ kind: 'reset' })}
+    />
+  );
+
   return (
-    <AppShell
-      sidebar={
-        <ReportsSidebar
-          reports={reports}
-          activeId={saved.id}
-          activePages={pages}
-          selectedPageId={state.selectedPageId}
-          editing={editing}
-          ready={studioState !== null}
-          onSelectReport={openReport}
-          onSelectPage={selectPage}
-          onAddPage={() => (apiRef.current ? addPage() : undefined)}
-          onRemovePage={removePage}
-          onRenamePage={renamePage}
-          onRenameReport={renameReport}
-          onCreate={() => guard(() => setDialog({ kind: 'create' }))}
-          onDuplicate={duplicateReport}
-          onDelete={(id) => {
-            const report = findReport(reports, id);
-            if (report) setDialog({ kind: 'delete', report });
-          }}
-          onReset={() => setDialog({ kind: 'reset' })}
-        />
-      }
-    >
+    <AppShell sidebar={navSlot ? undefined : reportsList('light')}>
+      {navSlot && createPortal(reportsList('dark'), navSlot)}
       <ReportHeader
         reportName={saved.name}
         pageTitle={pages.find((p) => p.id === state.selectedPageId)?.title}
@@ -255,7 +262,8 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
         }
       />
 
-      <div className="min-h-0 flex-1">
+      {/* AG Studio needs at least 600px; on shorter windows the whole frame grows and scrolls. */}
+      <div className="min-h-[600px] flex-1">
         {hasData(data) ? (
           <AgStudioProvider licenseKey={licenseKey} modules={ai ? [AgStudioAiModule] : undefined}>
             <AgStudio

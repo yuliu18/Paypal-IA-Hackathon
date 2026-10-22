@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { setNavSlot } from './nav-slot';
 
 // The control panel's side menu, on every page: the agent and its guard first, then the reports,
-// the raw PayPal data and the settings. On the dashboard, which has its own reports panel, it
-// starts as a rail of icons; the toggle at the bottom switches. On small screens it is a
-// scrolling top bar.
+// the raw PayPal data and the settings. On the dashboard, its reports and their pages appear
+// under "Dashboard" (./nav-slot). The toggle at the bottom folds the menu into a rail of icons.
+// On small screens it is a scrolling top bar.
 
 const icon = 'size-4 shrink-0';
 const Icons = {
@@ -56,13 +57,13 @@ export function AppNav() {
   const onDashboard = pathname.startsWith('/dashboard');
   // The owner's choice holds until they move between the dashboard and the other pages.
   const [choice, setChoice] = useState<{ onDashboard: boolean; compact: boolean }>();
-  const compact = choice?.onDashboard === onDashboard ? choice.compact : onDashboard;
+  const compact = choice?.onDashboard === onDashboard ? choice.compact : false;
   const active = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   // Labels hide only from md up: the small-screen top bar always shows them.
   const label = compact ? 'md:sr-only' : '';
   return (
     <nav
-      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-navy px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-56 md:px-3'}`}
+      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-navy px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
     >
       <Link href="/" title="Payment Guard" className="mr-3 flex shrink-0 items-center gap-2 px-2 font-semibold text-white md:mb-6 md:mr-0">
         <svg viewBox="0 0 24 24" className="size-6 shrink-0 fill-pp-sky" aria-hidden>
@@ -90,6 +91,9 @@ export function AppNav() {
               <span className={label}>{item.label}</span>
             </Link>
           ))}
+          {section.items.some((item) => item.href === '/dashboard') && onDashboard && !compact && (
+            <div ref={setNavSlot} className="hidden md:block" />
+          )}
         </div>
       ))}
       <button
