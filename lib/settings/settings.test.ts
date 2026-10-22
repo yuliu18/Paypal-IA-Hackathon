@@ -1,0 +1,203 @@
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_REFUND_POLICY, loadSettings, saveSettings, settingsView, type SettingsForm } from './settings';
+
+let dir: string;
+let file: string;
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'settings-'));
+  file = join(dir, 'data', 'settings.json');
+});
+afterEach(() => rm(dir, { recursive: true, force: true }));
+
+const SECRET = 'a-long-settings-secret-for-tests';
+const ENV = {
+  LLM_BASE_URL: 'https://env-llm.example/v1',
+  LLM_API_KEY: 'env-llm-key-9999',
+  AGENT_MODEL: 'env-agent',
+  PAYPAL_CLIENT_ID: 'env-client',
+  PAYPAL_SECRET: 'env-paypal-secret-8888',
+  SHOP_CONTACT_EMAIL: 'help@shop.example, sales@shop.example',
+  SETTINGS_SECRET: SECRET,
+};
+
+const form = (changes: Partial<SettingsForm> = {}): SettingsForm => ({
+  name: 'Casa Mugs',
+  contactEmails: 'hola@casamugs.example',
+  refundPolicy: 'Refund damaged or lost orders of the customer who wrote, up to what was paid.',
+  currency: 'EUR',
+  autoRefundUpTo: '50',
+  approvalUpTo: '300.50',
+  dailyCap: '500',
+  provider: 'deepseek',
+  baseUrl: 'https://api.deepseek.com/v1',
+  agentModel: 'deepseek-chat',
+  judgeModel: '',
+  apiKey: 'sk-deepseek-abcd1234',
+  paypalClientId: 'shop-client',
+  paypalSecret: 'shop-paypal-secret-5678',
+  ...changes,
+});
+
+describe('loadSettings', () => {
+  it('uses the environment and the demo defaults when nothing was saved', async () => {
+    const settings = await loadSettings({ file, env: ENV });
+    expect(settings.business).toEqual({
+      name: 'Demo shop',
+      contactEmails: ['help@shop.example', 'sales@shop.example'],
+      refundPolicy: DEFAULT_REFUND_POLICY,
+    });
+    expect(settings.limits).toEqual({
+      approvalThreshold: { minor: 100_00, currency: 'USD' },
+      perRefund: { minor: 250_00, currency: 'USD' },
+      daily: { minor: 200_00, currency: 'USD' },
+    });
+    expect(settings.ai).toEqual({
+      provider: 'custom',
+      baseUrl: 'https://env-llm.example/v1',
+      apiKey: 'env-llm-key-9999',
+      agentModel: 'env-agent',
+      judgeModel: 'env-agent',
+    });
+    expect(settings.paypal).toEqual({ clientId: 'env-client', secret: 'env-paypal-secret-8888' });
+  });
+
+  it('uses what the owner saved, keys included, over the environment', async () => {
+    expect(await saveSettings(form(), { file, env: ENV })).toEqual({ ok: true });
+    const settings = await loadSettings({ file, env: ENV });
+    expect(settings.business).toEqual({
+      name: 'Casa Mugs',
+      contactEmails: ['hola@casamugs.example'],
+      refundPolicy: 'Refund damaged or lost orders of the customer who wrote, up to what was paid.',
+    });
+    expect(settings.limits).toEqual({
+      approvalThreshold: { minor: 50_00, currency: 'EUR' },
+      perRefund: { minor: 300_50, currency: 'EUR' },
+      daily: { minor: 500_00, currency: 'EUR' },
+    });
+    expect(settings.ai).toEqual({
+      provider: 'deepseek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: 'sk-deepseek-abcd1234',
+      agentModel: 'deepseek-chat',
+      judgeModel: 'deepseek-chat',
+    });
+    expect(settings.paypal).toEqual({ clientId: 'shop-client', secret: 'shop-paypal-secret-5678' });
+  });
+
+  it('never sends the environment key to a provider URL the owner typed', async () => {
+    await saveSettings(form({ baseUrl: 'https://other.example/v1', apiKey: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('');
+    await saveSettings(form({ baseUrl: ENV.LLM_BASE_URL, apiKey: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('env-llm-key-9999');
+  });
+
+  it('drops a saved key when the provider URL changes without a new key', async () => {
+    await saveSettings(form(), { file, env: ENV });
+    await saveSettings(form({ baseUrl: 'https://elsewhere.example/v1', apiKey: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('');
+  });
+
+  it('never sends the environment PayPal secret with another client id', async () => {
+    await saveSettings(form({ paypalSecret: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal).toEqual({ clientId: 'shop-client', secret: '' });
+    await saveSettings(form({ paypalClientId: 'env-client', paypalSecret: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('env-paypal-secret-8888');
+  });
+});
+
+describe('saveSettings', () => {
+  it('stores keys encrypted, readable only by the server account', async () => {
+    await saveSettings(form(), { file, env: ENV });
+    const raw = await readFile(file, 'utf8');
+    expect(raw).not.toContain('sk-deepseek');
+    expect(raw).not.toContain('shop-paypal-secret');
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
+  });
+
+  it('keeps a saved key when the key field is left blank, and removes it when asked', async () => {
+    await saveSettings(form(), { file, env: ENV });
+    await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('sk-deepseek-abcd1234');
+    await saveSettings(form({ apiKey: '', clearApiKey: true, paypalSecret: '', clearPaypalSecret: true }), { file, env: ENV });
+    const settings = await loadSettings({ file, env: ENV });
+    expect([settings.ai.apiKey, settings.paypal.secret]).toEqual(['', '']);
+  });
+
+  it('rejects invalid values field by field and saves nothing', async () => {
+    const result = await saveSettings(
+      form({
+        name: ' ',
+        contactEmails: 'hola@casamugs.example, not-an-email',
+        refundPolicy: 'short',
+        currency: 'euro',
+        autoRefundUpTo: '400',
+        dailyCap: '-1',
+        baseUrl: 'ftp://x',
+        agentModel: '',
+      }),
+      { file, env: ENV },
+    );
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        name: 'Enter the business name.',
+        contactEmails: 'Not an email: not-an-email',
+        refundPolicy: 'Describe the refund policy in at least 20 characters.',
+        currency: 'Use a 3-letter currency code, like USD or EUR.',
+        autoRefundUpTo: 'Automatic refunds must stay within the approval limit.',
+        dailyCap: 'Enter an amount above 0 with at most 2 decimals.',
+        baseUrl: 'Enter an http(s) URL.',
+        agentModel: 'Choose the agent model.',
+      },
+    });
+    await expect(stat(file)).rejects.toThrow();
+  });
+
+  it('refuses to store keys without SETTINGS_SECRET, pointing to the environment variables', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form(), { file, env })).toEqual({
+      ok: false,
+      errors: {
+        apiKey: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use LLM_API_KEY.',
+        paypalSecret: 'Set SETTINGS_SECRET (16+ characters) on the server to store keys here, or use PAYPAL_SECRET.',
+      },
+    });
+    expect(await saveSettings(form({ apiKey: '', paypalSecret: '' }), { file, env })).toEqual({ ok: true });
+  });
+
+  it('changes nothing when the settings are locked', async () => {
+    const env = { ...ENV, SETTINGS_LOCKED: 'true' };
+    expect(await saveSettings(form(), { file, env })).toEqual({
+      ok: false,
+      errors: { form: 'Settings are read-only on this server (SETTINGS_LOCKED).' },
+    });
+    await expect(stat(file)).rejects.toThrow();
+  });
+});
+
+describe('settingsView', () => {
+  it('shows only the last 4 characters of each key and where it comes from', async () => {
+    const before = await settingsView({ file, env: ENV });
+    expect(before.ai.apiKey).toEqual({ source: 'env', hint: '••••9999' });
+    expect(before.paypal.secret).toEqual({ source: 'env', hint: '••••8888' });
+    expect(before.form).toMatchObject({ baseUrl: ENV.LLM_BASE_URL, apiKey: '', paypalSecret: '', autoRefundUpTo: '100.00' });
+    expect([before.locked, before.canStoreKeys]).toEqual([false, true]);
+
+    await saveSettings(form(), { file, env: ENV });
+    const after = await settingsView({ file, env: { ...ENV, SETTINGS_LOCKED: 'true' } });
+    expect(after.ai.apiKey).toEqual({ source: 'saved', hint: '••••1234' });
+    expect(after.paypal.secret).toEqual({ source: 'saved', hint: '••••5678' });
+    expect(JSON.stringify(after)).not.toContain('sk-deepseek');
+    expect(after.locked).toBe(true);
+  });
+
+  it('says when a saved key can no longer be read because SETTINGS_SECRET changed', async () => {
+    await saveSettings(form(), { file, env: ENV });
+    const env = { ...ENV, SETTINGS_SECRET: 'a-different-settings-secret' };
+    expect((await settingsView({ file, env })).ai.apiKey).toEqual({ source: 'unreadable', hint: '' });
+    expect((await loadSettings({ file, env })).ai.apiKey).toBe('');
+  });
+});
