@@ -11,7 +11,10 @@ const post = (body: unknown, client = '10.0.0.1') =>
 const ticket = { customerEmail: 'ana@example.com', message: 'Broken mug.' };
 
 describe('POST /api/support/tickets', () => {
-  afterEach(() => handleTicket.mockReset());
+  afterEach(() => {
+    handleTicket.mockReset();
+    vi.restoreAllMocks();
+  });
 
   it('hides internal error details from the caller and logs them on the server', async () => {
     handleTicket.mockRejectedValue(new Error('LLM 401: {"error":"invalid key sk-abc"}'));
@@ -69,11 +72,12 @@ describe('POST /api/support/tickets', () => {
     await Promise.all(running);
   });
 
+  // Two tickets may run at once per address: a third failure in a row is only a 502, not a 429,
+  // if each failed ticket gave its slot back.
   it('frees the slot when the agent fails, so failures do not lock a client out', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     handleTicket.mockRejectedValue(new Error('down'));
     for (let i = 0; i < 3; i++) expect((await post(ticket, '10.0.0.40')).status).toBe(502);
-    vi.restoreAllMocks();
   });
 
   it('does not count invalid tickets against the quota', async () => {

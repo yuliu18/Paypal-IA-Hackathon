@@ -48,6 +48,18 @@ describe('TicketLimiter', () => {
     expect(tickets.acquire('3.3.3.3', 0).ok).toBe(true);
   });
 
+  it('drops expired windows before forgetting a live one, so new addresses cannot reset a used-up quota', () => {
+    const tickets = limiter({ perClient: 1, maxClients: 2 });
+    const used = (client: string, now: number) => {
+      const slot = tickets.acquire(client, now);
+      if (slot.ok) slot.release();
+    };
+    used('old', 0);
+    used('spent', 59_000);
+    used('new', 61_000);
+    expect(tickets.acquire('spent', 61_000).ok).toBe(false);
+  });
+
   it('forgets the oldest client when it tracks too many, so memory stays bounded', () => {
     const tickets = limiter({ perClient: 1, maxClients: 2 });
     for (const client of ['a', 'b', 'c']) {
