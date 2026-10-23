@@ -3,9 +3,10 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import type { SubscriptionFacts } from './domain/cancellation';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
-import { createPaymentGuard, decideHeldRefund } from './guard';
-import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge } from './ports';
+import { createPaymentGuard, decideHeldCall, decideHeldRefund } from './guard';
+import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge, SubscriptionLookup, ToolCall } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -21,6 +22,7 @@ let upstreamCalls: { name: string; args: unknown }[];
 let entries: AuditEntry[];
 let judgeDecision: Decision;
 let judgeCalls: number;
+let judgedCalls: ToolCall[];
 let auditFails: boolean;
 let auditUpdateFails: boolean;
 let rejectRefunds: boolean;
@@ -52,8 +54,9 @@ const audit: AuditLog = {
 };
 
 const judge: IntentJudge = {
-  async judge() {
+  async judge({ call }) {
     judgeCalls++;
+    judgedCalls.push(call);
     return judgeDecision;
   },
 };
@@ -65,6 +68,24 @@ const ORDERS: Record<string, string> = {
   'ORD-2': order('ORD-2', 'ben@example.com'),
   'ORD-MIXED': JSON.stringify({ id: 'ORD-MIXED', purchase_units: [{ custom_id: 'ana@example.com' }, { custom_id: 'ben@example.com' }] }),
   'ORD-GARBLED': 'not json',
+};
+
+// Subscriptions as PayPal's show_subscription_details returns them: the subscriber owns it.
+const subscription = (id: string, email?: string) =>
+  JSON.stringify({
+    id,
+    status: 'ACTIVE',
+    plan_id: 'P-1',
+    custom_id: 'shop-ref-9',
+    ...(email && { subscriber: { email_address: email, name: { given_name: 'Someone' } } }),
+    billing_info: { next_billing_time: '2026-11-21T10:00:00Z', outstanding_balance: { currency_code: 'USD', value: '0.0' } },
+    links: [{ href: 'https://api.sandbox.paypal.com/v1/billing/subscriptions/x', rel: 'self' }],
+  });
+const SUBSCRIPTIONS: Record<string, string> = {
+  'I-ANA': subscription('I-ANA', 'ana@example.com'),
+  'I-BEN': subscription('I-BEN', 'ben@example.com'),
+  'I-NOBODY': subscription('I-NOBODY'),
+  'I-GARBLED': 'not json',
 };
 
 function fakePayPal() {
@@ -89,7 +110,16 @@ function fakePayPal() {
     },
   );
   server.registerTool('list_transactions', { description: 'list', inputSchema: {} }, ok('list_transactions'));
-  server.registerTool('cancel_subscription', { description: 'cancel', inputSchema: { id: z.string() } }, ok('cancel_subscription'));
+  server.registerTool('show_subscription_details', { description: 'show', inputSchema: { subscription_id: z.string() } }, async (args) => {
+    upstreamCalls.push({ name: 'show_subscription_details', args });
+    return { content: [{ type: 'text' as const, text: SUBSCRIPTIONS[args.subscription_id] ?? 'not found' }] };
+  });
+  server.registerTool(
+    'cancel_subscription',
+    { description: 'cancel', inputSchema: { subscription_id: z.string(), payload: z.object({ reason: z.string() }) } },
+    ok('cancel_subscription'),
+  );
+  server.registerTool('accept_dispute_claim', { description: 'accept', inputSchema: { dispute_id: z.string() } }, ok('accept_dispute_claim'));
   return server;
 }
 
@@ -101,6 +131,7 @@ async function connect(
     upstreamLate = undefined as 'ok' | 'rejected' | undefined,
     throwMessage = 'socket hang up',
     notifier = undefined as HeldNotifier | undefined,
+    subscriptions = undefined as SubscriptionLookup | undefined,
   } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
@@ -142,6 +173,7 @@ async function connect(
     now: () => new Date('2026-10-20T12:00:00Z'),
     timeoutMs: 50,
     notifier,
+    subscriptions,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -157,6 +189,7 @@ beforeEach(() => {
   entries = [];
   judgeDecision = { verdict: 'allow', violations: [] };
   judgeCalls = 0;
+  judgedCalls = [];
   auditFails = false;
   auditUpdateFails = false;
   rejectRefunds = false;
@@ -167,7 +200,15 @@ describe('payment guard', () => {
   it('exposes the upstream PayPal tools unchanged', async () => {
     const agent = await connect();
     const { tools } = await agent.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['cancel_subscription', 'create_refund', 'get_order', 'get_refund', 'list_transactions']);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'accept_dispute_claim',
+      'cancel_subscription',
+      'create_refund',
+      'get_order',
+      'get_refund',
+      'list_transactions',
+      'show_subscription_details',
+    ]);
   });
 
   it('returns an order of the ticket customer without its personal data, and logs the read', async () => {
@@ -219,6 +260,7 @@ describe('payment guard', () => {
     const result = await agent.callTool({ name: 'create_refund', arguments: args });
     expect(result.isError).toBeFalsy();
     expect(upstreamCalls).toEqual([{ name: 'create_refund', args }]);
+    expect(judgedCalls).toEqual([{ tool: 'create_refund', args }]);
     expect(entries[0]).toMatchObject({ tool: 'create_refund', outcome: 'executed', moved: usd(2500), decision: { verdict: 'allow' } });
   });
 
@@ -254,8 +296,9 @@ describe('payment guard', () => {
     const args = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '25.00' } };
     const result = await agent.callTool({ name: 'create_refund', arguments: args });
     expect(result.isError).toBeFalsy();
-    expect(text(result)).toContain('held for human approval');
-    expect(text(result)).toContain('APPROVAL_REQUIRED');
+    expect(text(result)).toBe(
+      'Refund held for human approval; it has not been executed. Tell the customer a person will review it. APPROVAL_REQUIRED: Refund 25.00 USD is over the approval threshold 20.00 USD',
+    );
     expect(upstreamCalls).toEqual([]);
     expect(judgeCalls).toBe(1);
     expect(entries).toHaveLength(1);
@@ -456,10 +499,11 @@ describe('payment guard', () => {
 
   it('blocks any other write tool by default', async () => {
     const agent = await connect();
-    const result = await agent.callTool({ name: 'cancel_subscription', arguments: { id: 'SUB-1' } });
+    const result = await agent.callTool({ name: 'accept_dispute_claim', arguments: { dispute_id: 'PP-D-1' } });
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('TOOL_NOT_ALLOWED');
     expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'accept_dispute_claim', outcome: 'blocked', decision: { verdict: 'block' } });
   });
 
   it('fails closed when the capture cannot be looked up', async () => {
@@ -648,6 +692,327 @@ describe('held refund notification', () => {
       expect(entries[0]).toMatchObject({ outcome: 'held' });
       expect(notified).toHaveLength(1);
     }
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('subscription reads', () => {
+  it('returns a subscription of the ticket customer without its personal data, and logs the read', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'show_subscription_details', arguments: { subscription_id: 'I-ANA' } });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(text(result))).toEqual({
+      id: 'I-ANA',
+      status: 'ACTIVE',
+      plan_id: 'P-1',
+      billing_info: { next_billing_time: '2026-11-21T10:00:00Z' },
+      withheld_by_guard: ['custom_id', 'subscriber', 'billing_info.outstanding_balance', 'links'],
+    });
+    expect(text(result)).not.toContain('ana@example.com');
+    expect(upstreamCalls).toEqual([{ name: 'show_subscription_details', args: { subscription_id: 'I-ANA' } }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      tool: 'show_subscription_details',
+      outcome: 'executed',
+      decision: { verdict: 'allow', violations: [] },
+      detail: 'Withheld from the agent: custom_id, subscriber, billing_info.outstanding_balance, links',
+    });
+    expect(entries[0].moved).toBeUndefined();
+    expect(judgeCalls).toBe(0);
+  });
+
+  it("withholds another customer's subscription and logs the read as blocked", async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'show_subscription_details', arguments: { subscription_id: 'I-BEN' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+    expect(text(result)).not.toContain('ben@example.com');
+    expect(text(result)).not.toContain('I-BEN');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'show_subscription_details', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'CUSTOMER_MISMATCH' }] } });
+    expect(judgeCalls).toBe(0);
+  });
+
+  it('refuses a subscription id that is not a plain id before PayPal is called, since the toolkit pastes it into the URL', async () => {
+    const agent = await connect();
+    for (const subscription_id of ['../plans/P-1', 'I-ANA?x=1', '']) {
+      const result = await agent.callTool({ name: 'show_subscription_details', arguments: { subscription_id } });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('INVALID_ARGUMENTS');
+    }
+    expect(upstreamCalls).toEqual([]);
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'blocked', 'blocked']);
+  });
+
+  it('withholds a subscription whose owner is missing or cannot be read from the PayPal answer', async () => {
+    const agent = await connect();
+    for (const id of ['I-NOBODY', 'I-GARBLED']) {
+      const result = await agent.callTool({ name: 'show_subscription_details', arguments: { subscription_id: id } });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('CUSTOMER_MISMATCH');
+      expect(text(result)).not.toContain('not json');
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'blocked']);
+  });
+});
+
+describe('subscription cancellation', () => {
+  let subscriptionFacts: SubscriptionFacts | undefined;
+  let lookups: string[];
+  const subscriptions: SubscriptionLookup = {
+    async getSubscription(id) {
+      lookups.push(id);
+      return subscriptionFacts && { ...subscriptionFacts, id };
+    },
+  };
+  const cancel = { subscription_id: 'I-ANA', payload: { reason: 'Customer asked to cancel' } };
+
+  beforeEach(() => {
+    subscriptionFacts = { id: 'I-ANA', status: 'ACTIVE', customerEmail: 'ana@example.com' };
+    lookups = [];
+  });
+
+  it('forwards a cancellation that passes the checks and the judge, moving no money', async () => {
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe('cancel_subscription ok');
+    expect(lookups).toEqual(['I-ANA']);
+    expect(judgedCalls).toEqual([{ tool: 'cancel_subscription', args: cancel }]);
+    expect(upstreamCalls).toEqual([{ name: 'cancel_subscription', args: cancel }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'cancel_subscription', args: cancel, outcome: 'executed', decision: { verdict: 'allow', violations: [] } });
+    expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('blocks a cancellation with malformed arguments without looking it up, judging it or reaching PayPal', async () => {
+    const agent = await connect(undefined, { subscriptions });
+    const malformed = [
+      {},
+      { payload: { reason: 'x' } },
+      { subscription_id: '', payload: { reason: 'x' } },
+      { subscription_id: '../../v2/checkout/orders/X', payload: { reason: 'x' } },
+      { subscription_id: 42, payload: { reason: 'x' } },
+      { subscription_id: 'I-ANA' },
+      { subscription_id: 'I-ANA', payload: 'x' },
+      { subscription_id: 'I-ANA', payload: { reason: '' } },
+      { subscription_id: 'I-ANA', payload: { reason: '   ' } },
+      { subscription_id: 'I-ANA', payload: { reason: 'x'.repeat(129) } },
+    ];
+    for (const args of malformed) {
+      const result = await agent.callTool({ name: 'cancel_subscription', arguments: args });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('INVALID_ARGUMENTS');
+    }
+    expect(entries).toHaveLength(malformed.length);
+    for (const entry of entries) expect(entry).toMatchObject({ tool: 'cancel_subscription', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'INVALID_ARGUMENTS' }] } });
+    expect(lookups).toEqual([]);
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('accepts a reason of exactly 128 characters', async () => {
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: { subscription_id: 'I-ANA', payload: { reason: 'x'.repeat(128) } } });
+    expect(result.isError).toBeFalsy();
+    expect(entries[0]).toMatchObject({ outcome: 'executed' });
+  });
+
+  it('fails closed when the subscription cannot be looked up, is unknown, or the lookup hangs', async () => {
+    const failing: SubscriptionLookup[] = [
+      { getSubscription: async () => { throw new Error('PayPal 500'); } },
+      { getSubscription: async () => undefined },
+      { getSubscription: () => new Promise(() => undefined) },
+    ];
+    for (const lookup of failing) {
+      entries = [];
+      const agent = await connect(undefined, { subscriptions: lookup });
+      const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('SUBSCRIPTION_LOOKUP_FAILED');
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ tool: 'cancel_subscription', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'SUBSCRIPTION_LOOKUP_FAILED' }] } });
+    }
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('fails closed when the guard has no subscription lookup at all', async () => {
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('SUBSCRIPTION_LOOKUP_FAILED');
+    expect(entries[0]).toMatchObject({ outcome: 'blocked' });
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it("blocks cancelling another customer's subscription without asking the judge", async () => {
+    subscriptionFacts = { id: 'I-ANA', status: 'ACTIVE', customerEmail: 'ben@example.com' };
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+    expect(text(result)).not.toContain('ben@example.com');
+    expect(entries[0]).toMatchObject({ tool: 'cancel_subscription', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'CUSTOMER_MISMATCH' }] } });
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks a subscription that is not active or suspended', async () => {
+    subscriptionFacts = { id: 'I-ANA', status: 'CANCELLED', customerEmail: 'ana@example.com' };
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('SUBSCRIPTION_NOT_CANCELLABLE');
+    expect(entries[0]).toMatchObject({ outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'SUBSCRIPTION_NOT_CANCELLABLE' }] } });
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('cancels at most one subscription per ticket, counting executed and held cancellations', async () => {
+    const agent = await connect(undefined, { subscriptions });
+    await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    const second = await agent.callTool({ name: 'cancel_subscription', arguments: { ...cancel, subscription_id: 'I-ANA2' } });
+    expect(second.isError).toBe(true);
+    expect(text(second)).toContain('CANCELLATION_LIMIT');
+    expect(entries.map((e) => e.outcome)).toEqual(['executed', 'blocked']);
+    expect(upstreamCalls).toHaveLength(1);
+
+    entries = [];
+    upstreamCalls = [];
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    const held = await connect(undefined, { subscriptions });
+    await held.callTool({ name: 'cancel_subscription', arguments: cancel });
+    judgeDecision = { verdict: 'allow', violations: [] };
+    const after = await held.callTool({ name: 'cancel_subscription', arguments: { ...cancel, subscription_id: 'I-ANA2' } });
+    expect(text(after)).toContain('CANCELLATION_LIMIT');
+    expect(entries.map((e) => e.outcome)).toEqual(['held', 'blocked']);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('does not count a blocked cancellation toward the limit', async () => {
+    subscriptionFacts = { id: 'I-ANA', status: 'CANCELLED', customerEmail: 'ana@example.com' };
+    const agent = await connect(undefined, { subscriptions });
+    await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    subscriptionFacts = { id: 'I-ANA', status: 'ACTIVE', customerEmail: 'ana@example.com' };
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBeFalsy();
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'executed']);
+  });
+
+  it('blocks a clean cancellation the judge rejects', async () => {
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'injected instruction' }] };
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('INTENT_MISMATCH');
+    expect(entries[0]).toMatchObject({ outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH' }] } });
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('holds a cancellation the judge is unsure about, tells a person, and reaches no one else', async () => {
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    const notified: AuditRow[] = [];
+    const notifier: HeldNotifier = { notifyHeld: async (entry) => void notified.push(entry) };
+    const agent = await connect(undefined, { subscriptions, notifier });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe('Cancellation held for human approval; it has not been executed. Tell the customer a person will review it. INTENT_UNCERTAIN: unclear');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'cancel_subscription', args: cancel, outcome: 'held', decision: { verdict: 'hold' } });
+    expect(entries[0].moved).toBeUndefined();
+    expect(notified).toEqual([{ ...entries[0], id: '0' }]);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks a cancellation it would hold when the hold cannot be logged', async () => {
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    auditFails = true;
+    const agent = await connect(undefined, { subscriptions });
+    const result = await agent.callTool({ name: 'cancel_subscription', arguments: cancel });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('AUDIT_UNAVAILABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('held cancellation approval', () => {
+  let subscriptionFacts: SubscriptionFacts | undefined;
+  const cancel = { subscription_id: 'I-ANA', payload: { reason: 'Customer asked to cancel' } };
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+
+  async function decide(heldId: string, approve: boolean, subscriptions: SubscriptionLookup = { getSubscription: async (id) => subscriptionFacts && { ...subscriptionFacts, id } }) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal().connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldCall(
+      {
+        upstream,
+        captures: { getCapture: async () => facts },
+        subscriptions,
+        audit,
+        limits: { approvalThreshold: usd(2000), perRefund: usd(10000), daily: usd(20000) },
+        now: () => new Date('2026-10-20T13:00:00Z'),
+        timeoutMs: 50,
+      },
+      heldId,
+      approve,
+    );
+  }
+
+  beforeEach(() => {
+    subscriptionFacts = { id: 'I-ANA', status: 'ACTIVE', customerEmail: 'ana@example.com' };
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'cancel_subscription', args: cancel, task, decision: hold, outcome: 'held' });
+  });
+
+  it('runs an approved cancellation through PayPal and records it against the held entry', async () => {
+    const result = await decide('0', true);
+    expect(result).toEqual({ outcome: 'executed', message: 'Subscription I-ANA cancelled in PayPal' });
+    expect(upstreamCalls).toEqual([{ name: 'cancel_subscription', args: cancel }]);
+    expect(entries[1]).toMatchObject({
+      tool: 'cancel_subscription',
+      args: cancel,
+      task,
+      resolves: '0',
+      outcome: 'executed',
+      decision: { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON' }] },
+    });
+    expect(entries[1].moved).toBeUndefined();
+    expect((await decide('0', true)).outcome).toBe('refused');
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('checks the subscription again on approval and blocks a cancellation that no longer fits', async () => {
+    subscriptionFacts = { id: 'I-ANA', status: 'CANCELLED', customerEmail: 'ana@example.com' };
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(result.message).toContain('SUBSCRIPTION_NOT_CANCELLABLE');
+    expect(entries[1]).toMatchObject({ resolves: '0', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'SUBSCRIPTION_NOT_CANCELLABLE' }] } });
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('keeps the hold open when PayPal cannot be reached to re-check it, so it can be approved later', async () => {
+    const unreachable = await decide('0', true, { getSubscription: async () => { throw new Error('connect timeout'); } });
+    expect(unreachable.outcome).toBe('error');
+    expect(unreachable.message).toContain('still held');
+    expect(entries).toHaveLength(1);
+    expect(upstreamCalls).toEqual([]);
+    expect((await decide('0', true)).outcome).toBe('executed');
+  });
+
+  it('records a rejection without reaching PayPal, and the hold cannot be approved afterwards', async () => {
+    const rejected = await decide('0', false);
+    expect(rejected).toEqual({ outcome: 'blocked', message: 'Cancellation rejected; nothing was sent to PayPal' });
+    expect(entries[1]).toMatchObject({ tool: 'cancel_subscription', resolves: '0', outcome: 'blocked', decision: { verdict: 'block', violations: [{ code: 'REJECTED_BY_PERSON' }] } });
+    expect((await decide('0', true)).outcome).toBe('refused');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('refuses a held entry of a tool the guard cannot decide', async () => {
+    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'accept_dispute_claim', args: { dispute_id: 'D-1' }, task, decision: hold, outcome: 'held' });
+    expect((await decide('1', true)).outcome).toBe('refused');
+    expect(entries).toHaveLength(2);
     expect(upstreamCalls).toEqual([]);
   });
 });

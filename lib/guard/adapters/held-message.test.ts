@@ -27,3 +27,23 @@ describe('heldMessage', () => {
     expect(heldMessage(held([]))).toContain('Reasons: none given.');
   });
 });
+
+describe('heldMessage by tool', () => {
+  it('describes a held refund by its amount, as before', () => {
+    expect(heldMessage(held(['APPROVAL_REQUIRED'])).split('\n')[0]).toBe('Payment guard: a refund of 120.00 USD is waiting for approval.');
+  });
+
+  it('describes a held cancellation by its subscription id', () => {
+    const entry: AuditRow = { ...held(['INTENT_UNCERTAIN']), tool: 'cancel_subscription', args: { subscription_id: 'I-SUB1', payload: { reason: 'Too expensive' } } };
+    const lines = heldMessage(entry).split('\n');
+    expect(lines[0]).toBe('Payment guard: a subscription cancellation (I-SUB1) is waiting for approval.');
+    expect(lines[2]).toBe('Reasons: INTENT_UNCERTAIN.');
+    expect(heldMessage(entry)).not.toContain('Too expensive');
+  });
+
+  it('quotes only a plain subscription id, so nothing in it can become a link or mention', () => {
+    const entry: AuditRow = { ...held([]), tool: 'cancel_subscription', args: { subscription_id: '<@everyone> https://evil.example/x' } };
+    expect(heldMessage(entry).split('\n')[0]).toBe('Payment guard: a subscription cancellation (unreadable id) is waiting for approval.');
+    expect(heldMessage(entry)).not.toContain('everyone');
+  });
+});

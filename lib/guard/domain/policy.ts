@@ -18,7 +18,9 @@ export type ViolationCode =
   | 'DAILY_LIMIT'
   | 'INTENT_MISMATCH'
   | 'APPROVAL_REQUIRED'
-  | 'INTENT_UNCERTAIN';
+  | 'INTENT_UNCERTAIN'
+  | 'SUBSCRIPTION_NOT_CANCELLABLE'
+  | 'CANCELLATION_LIMIT';
 
 export type Violation = { code: ViolationCode | string; message: string };
 

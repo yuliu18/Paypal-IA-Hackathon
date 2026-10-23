@@ -1,6 +1,7 @@
-// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order.
-// An allowlist of the fields a refund needs; anything else, wherever PayPal adds it, is withheld:
-// card details, payer and payee, names, addresses, the shop's custom_id, notes and links.
+// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order or
+// subscription. An allowlist of the fields a refund or cancellation needs; anything else, wherever
+// PayPal adds it, is withheld: card details, payer, payee and subscriber, names, addresses, the
+// shop's custom_id, notes and links.
 
 import { maskPersonalData } from './redact';
 
@@ -19,6 +20,15 @@ const ORDER: Shape = {
   purchase_units: [
     { reference_id: 'scalar', amount: MONEY, description: 'text', payments: { captures: [CAPTURE], refunds: [REFUND] } },
   ],
+};
+const SUBSCRIPTION: Shape = {
+  id: 'scalar',
+  status: 'scalar',
+  plan_id: 'scalar',
+  start_time: 'scalar',
+  create_time: 'scalar',
+  update_time: 'scalar',
+  billing_info: { next_billing_time: 'scalar', last_payment: { amount: MONEY, time: 'scalar' } },
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -50,6 +60,12 @@ export function minimizeOrder(order: unknown): { order: Record<string, unknown>;
   const withheld: string[] = [];
   const kept = keep(order, ORDER, '', withheld);
   return { order: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeSubscription(subscription: unknown): { subscription: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(subscription, SUBSCRIPTION, '', withheld);
+  return { subscription: isRecord(kept) ? kept : {}, withheld };
 }
 
 // How a read's black box entry records what was withheld, and how the dashboard counts it back.

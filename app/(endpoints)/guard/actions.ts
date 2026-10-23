@@ -2,11 +2,11 @@
 
 import { refresh } from 'next/cache';
 import { decideHeld } from '@/lib/agent/handle-ticket';
-import type { HeldRefundDecision } from '@/lib/guard/guard';
+import type { HeldDecision } from '@/lib/guard/guard';
 
-export type DecideState = HeldRefundDecision | null;
+export type DecideState = HeldDecision | null;
 
-// Approve or reject one held refund from the /guard page. The proxy's demo password already
+// Approve or reject one held refund or cancellation from the /guard page. The proxy's demo password already
 // covers this action, since Server Actions post to the page's own route.
 export async function decideHeldAction(_previous: DecideState, form: FormData): Promise<DecideState> {
   const id = form.get('id');
@@ -20,7 +20,7 @@ export async function decideHeldAction(_previous: DecideState, form: FormData): 
     return result;
   } catch (error) {
     // Details stay in the server log, as in the tickets API.
-    console.error('Held refund decision failed', error);
+    console.error('Held call decision failed', error);
     return { outcome: 'error', message: 'The decision could not be processed; nothing was recorded.' };
   }
 }

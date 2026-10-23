@@ -10,8 +10,9 @@ import { emailNotifier } from '@/lib/guard/adapters/email-channel';
 import { createTelegramNotifier } from '@/lib/guard/adapters/telegram-notifier';
 import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
+import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
-import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
+import { createPaymentGuard, decideHeldCall, type HeldDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { clientHeaders } from '@/lib/llm/openai-compatible';
 import { withoutDailyCap } from '@/lib/evaluation/evaluation';
@@ -104,11 +105,11 @@ export async function handleTicket(
   return { reply: answer.reply, steps, redacted: { ticket: ticketRemoved, reply: answer.removed } };
 }
 
-// A person's decision on a refund the guard held. Approval re-checks the policy before PayPal runs it.
-export async function decideHeld(heldId: string, approve: boolean): Promise<HeldRefundDecision> {
+// A person's decision on a refund or cancellation the guard held. Approval re-checks the policy before PayPal runs it.
+export async function decideHeld(heldId: string, approve: boolean): Promise<HeldDecision> {
   const { limits } = await loadSettings();
   const paypal = await payPalToolkit();
   return withClient(paypal, 'payment-guard-approval', (upstream) =>
-    decideHeldRefund({ upstream, captures: payPalCaptureLookup, audit: auditLog(), limits }, heldId, approve),
+    decideHeldCall({ upstream, captures: payPalCaptureLookup, subscriptions: payPalSubscriptionLookup, audit: auditLog(), limits }, heldId, approve),
   );
 }

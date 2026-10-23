@@ -1,7 +1,8 @@
-// The message every held-refund channel sends (webhook, email, Telegram), and the scrubbing of
+// The message every held-action channel sends (webhook, email, Telegram), and the scrubbing of
 // secrets from the errors they log. The message never quotes the ticket or any other text an
 // outsider wrote: chat apps and mail clients turn it into links and mentions.
 
+import { SUBSCRIPTION_ID } from '../domain/cancellation';
 import { maskEmail } from '../domain/redact';
 import type { AuditRow } from '../ports';
 
@@ -15,6 +16,15 @@ function amountOf(args: Record<string, unknown>): string {
   const amount = args.amount as { currency_code?: unknown; value?: unknown };
   const ok = typeof amount?.value === 'string' && MONEY_VALUE.test(amount.value) && typeof amount.currency_code === 'string' && CURRENCY.test(amount.currency_code);
   return ok ? `${amount.value} ${amount.currency_code}` : 'an unreadable amount';
+}
+
+// What a person is asked to approve, by tool; the refund wording is unchanged from before cancellations.
+function heldAction(entry: AuditRow): string {
+  if (entry.tool === 'cancel_subscription') {
+    const id = entry.args.subscription_id;
+    return `a subscription cancellation (${typeof id === 'string' && SUBSCRIPTION_ID.test(id) ? id : 'unreadable id'})`;
+  }
+  return `a refund of ${amountOf(entry.args)}`;
 }
 
 // A security filter, not formatting: the ticket's email is typed by the customer, so after masking
@@ -37,7 +47,7 @@ function guardLink(appUrl: string | undefined): string {
 
 export function heldMessage(entry: AuditRow, appUrl?: string): string {
   return [
-    `Payment guard: a refund of ${amountOf(entry.args)} is waiting for approval.`,
+    `Payment guard: ${heldAction(entry)} is waiting for approval.`,
     `Customer: ${sanitized(maskEmail(entry.task.mandate.customerEmail))}.`,
     `Reasons: ${reasonsOf(entry.decision.violations.map((v) => v.code))}.`,
     `Audit entry #${sanitized(entry.id)}.`,

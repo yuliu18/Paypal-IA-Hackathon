@@ -23,9 +23,10 @@ function withheldFields(step: AgentStep): number {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// Held refunds (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
+// Held refunds and cancellations (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
+const HELD_PREFIXES = ['Refund held for human approval', 'Cancellation held for human approval'];
 const stepStyle = (step: AgentStep) =>
-  step.isError ? 'border-pp-danger text-pp-danger' : step.result.startsWith('Refund held for human approval') ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
+  step.isError ? 'border-pp-danger text-pp-danger' : HELD_PREFIXES.some((prefix) => step.result.startsWith(prefix)) ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
 
 // Sends one ticket to the support agent (app/api/support/tickets) and shows each tool call it
 // made through the payment guard, blocked ones in red and held ones in amber.

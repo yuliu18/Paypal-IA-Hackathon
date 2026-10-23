@@ -4,7 +4,7 @@ import type { ChainCheck } from '@/lib/guard/adapters/sqlite-audit-log';
 import { maskEmail, maskPersonalData } from '@/lib/guard/domain/redact';
 import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
-import { HeldQueue, type HeldRefund } from './held-queue';
+import { HeldQueue, type HeldCall } from './held-queue';
 
 const FULL_CHECK_MS = 60_000;
 
@@ -58,19 +58,26 @@ export default async function GuardLogPage() {
   const entries = log.list(500);
   const chain = log.verifyChain(FULL_CHECK_MS);
   const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
-  const held: HeldRefund[] = entries
+  const held: HeldCall[] = entries
     .filter((e) => e.outcome === 'held' && !decided.has(e.id))
     .map((e) => {
-      const amount = e.args.amount as { value?: string; currency_code?: string } | undefined;
-      return {
+      const common = {
         id: e.id,
         at: e.at,
         customer: maskEmail(e.task.mandate.customerEmail),
-        amount: amount?.value ? `${amount.value} ${amount.currency_code ?? ''}`.trim() : 'Full remaining amount',
-        captureId: String(e.args.capture_id ?? ''),
         codes: e.decision.violations.map((v) => v.code),
         // One sentence per reason.
         reasons: maskPersonalData(e.decision.violations.map((v) => (/[.!?]$/.test(v.message) ? v.message : `${v.message}.`)).join(' ')),
+      };
+      if (e.tool === 'cancel_subscription') {
+        return { ...common, kind: 'cancellation' as const, subscriptionId: maskPersonalData(String(e.args.subscription_id ?? '')) };
+      }
+      const amount = e.args.amount as { value?: string; currency_code?: string } | undefined;
+      return {
+        ...common,
+        kind: 'refund' as const,
+        amount: amount?.value ? `${amount.value} ${amount.currency_code ?? ''}`.trim() : 'Full remaining amount',
+        captureId: String(e.args.capture_id ?? ''),
       };
     });
 
@@ -115,7 +122,7 @@ export default async function GuardLogPage() {
       ]}
     >
       {!chain.intact && <ChainStatus check={chain} />}
-      <HeldQueue refunds={held} />
+      <HeldQueue calls={held} />
     </EndpointPage>
   );
 }

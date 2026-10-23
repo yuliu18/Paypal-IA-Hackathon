@@ -1,6 +1,7 @@
 // Ports of the payment guard: what the core needs from the outside world. Adapters for
 // PayPal, the LLM provider and storage implement these, so each can be swapped freely.
 
+import type { SubscriptionFacts } from './domain/cancellation';
 import type { CaptureFacts, Decision, Money, TaskMandate } from './domain/policy';
 
 // The task the agent is working on, as the business framed it. `untrustedInput` is what an
@@ -19,6 +20,11 @@ export interface IntentJudge {
 
 export interface CaptureLookup {
   getCapture(captureId: string): Promise<CaptureFacts>;
+}
+
+// Undefined when PayPal knows no such subscription.
+export interface SubscriptionLookup {
+  getSubscription(subscriptionId: string): Promise<SubscriptionFacts | undefined>;
 }
 
 export type AuditEntry = {
