@@ -75,6 +75,17 @@ describe('runSupportAgent', () => {
     expect((user as { content: string }).content).toContain(ticket.message);
   });
 
+  it('tells the model it may cancel the ticket customer\'s subscription only when they ask', async () => {
+    const { chat, seen } = scriptedChat([say('ok')]);
+
+    await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions });
+
+    const system = (seen[0].messages[0] as { content: string }).content;
+    expect(system).toMatch(/cancel/i);
+    expect(system).toContain('subscription');
+    expect(system).toMatch(/only when the customer asks/i);
+  });
+
   it('feeds each tool result back to the model under its call id', async () => {
     const { chat, seen } = scriptedChat([callTool('c1', 'get_order', { id: 'ORD-1' }), say('done')]);
 

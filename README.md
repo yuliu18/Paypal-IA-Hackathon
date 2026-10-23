@@ -115,12 +115,13 @@ An AI agent with refund tools can be talked into refunding the wrong order, the 
 
 1. Choose an AI provider, key and models on `/settings` (provider and key may also come from `LLM_BASE_URL` and `LLM_API_KEY` in `.env.local`); any OpenAI-compatible endpoint works. Without a chosen model, the provider's newest model that can call tools in the catalog runs.
 2. `npm run seed`, or **Create sample payments** / **New sample payments** on `/support`, charges three sandbox payments (ana 49.99, ben 120.00, carla 35.50 USD) and writes their capture ids to `data/seed.json`. Do it again before each demo: a refunded order can't be refunded twice. On a deployed app use the button: `data/` isn't in git, so a local seed never reaches the host.
-3. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
-4. Open `/guard` to see every decision, approve or reject held refunds, and check the black box.
+3. Optional, for the cancellation tickets: **Create sample subscription** on `/support` creates (or reuses by name) a sandbox product and a 9.99 USD monthly plan, subscribes to it and shows the subscription's approval link; its id goes to `data/seed.json` next to the payments. A subscription only becomes cancellable once a buyer approves it: open the link and approve with your sandbox personal account (developer.paypal.com > Sandbox accounts, the account of type Personal; its email and password are in the account's details), then come back. The link stays on `/support` until it's approved. That buyer's PayPal email is now the subscription's owner, so the **Cancel subscription** ticket comes from it, and **Cancel someone else's subscription** comes from carla with the vulnerable agent. Both only appear while the subscription is active or suspended.
+4. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
+5. Open `/guard` to see every decision, approve or reject held refunds and cancellations, and check the black box.
 
 ### What it decides
 
-Reads pass through only for single records that belong to the ticket customer (`get_order`). Any tool not listed is blocked by default. A refund (`create_refund`) is checked against the shop's policy in [`lib/guard/domain/policy.ts`](lib/guard/domain/policy.ts), using the capture as PayPal reports it, and against an LLM intent judge that compares the call with the ticket and the shop's instructions. The stricter answer wins: block over hold over allow.
+Reads pass through only for single records that belong to the ticket customer (`get_order`, `show_subscription_details`). Any tool not listed is blocked by default. A refund (`create_refund`) is checked against the shop's policy in [`lib/guard/domain/policy.ts`](lib/guard/domain/policy.ts), using the capture as PayPal reports it, and against an LLM intent judge that compares the call with the ticket and the shop's instructions. The stricter answer wins: block over hold over allow.
 
 | Refund | Result |
 |---|---|
@@ -130,11 +131,23 @@ Reads pass through only for single records that belong to the ticket customer (`
 | The judge is unsure (answers `review`) | Held for a person |
 | Up to 100 USD, no rule broken, judge agrees | Runs |
 
+A cancellation (`cancel_subscription`) moves no money, but it ends a customer's service, so it gets its own checks before the judge, each of which blocks:
+
+| Cancellation check | Code when it fails |
+|---|---|
+| `subscription_id` and `payload.reason` are given | `INVALID_ARGUMENTS` |
+| PayPal answers the subscription lookup in time | `SUBSCRIPTION_LOOKUP_FAILED` |
+| The subscriber PayPal recorded is the ticket customer | `CUSTOMER_MISMATCH` |
+| The subscription is `ACTIVE` or `SUSPENDED` | `SUBSCRIPTION_NOT_CANCELLABLE` |
+| No other cancellation ran or is held in this ticket | `CANCELLATION_LIMIT` |
+
+A cancellation that passes all of them runs; the intent judge sees it under its real tool name and can only tighten it (hold or block), e.g. a cancellation the customer didn't ask for. A subscription read (`show_subscription_details`) is withheld unless its subscriber is the ticket customer, and the answer keeps only its id, status, plan id, start, create and update times, next billing time and last payment (no subscriber, `custom_id` or links).
+
 These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
 
 ### Approving a held refund
 
-A held refund moves no money; the agent is told a person will review it. On `/guard`, **Approve** checks the refund again against the policy as it is now (refundable amount, customer, the 250 USD ceiling, the daily limit, no other refund of that capture still unsettled) and only then calls PayPal. **Reject** records the rejection. Each held refund can be decided once, even if two people click at the same time (decisions are queued within the server process, so run one instance); if PayPal can't be reached during the check, nothing is recorded and the refund stays held. The page is behind `DEMO_PASSWORD`, so for this demo anyone with the password can approve.
+A held refund moves no money; the agent is told a person will review it. A cancellation the judge held waits on `/guard` the same way: **Approve** runs the cancellation checks above again and only then cancels it; **Reject** records `REJECTED_BY_PERSON`. On `/guard`, **Approve** checks the refund again against the policy as it is now (refundable amount, customer, the 250 USD ceiling, the daily limit, no other refund of that capture still unsettled) and only then calls PayPal. **Reject** records the rejection. Each held refund can be decided once, even if two people click at the same time (decisions are queued within the server process, so run one instance); if PayPal can't be reached during the check, nothing is recorded and the refund stays held. The page is behind `DEMO_PASSWORD`, so for this demo anyone with the password can approve.
 
 With a webhook URL on `/settings` (or `GUARD_WEBHOOK_URL`), each held refund also posts a message to it, as JSON `{"text": …, "content": …}`, so a Slack incoming webhook (`text`) or a Discord webhook (`content`) both work. The message says a refund is waiting for approval, its amount (or "the full remaining amount"), the customer's masked email, the rule codes, the audit entry id and where to act: `/guard`, or a full link when `APP_URL` is set (e.g. `APP_URL=https://your-app.example`). It never quotes the ticket, which an attacker may have written to plant links or mentions in the chat. Notifying never delays or changes the guard's decision: it runs after the hold is recorded, gives up after 5 seconds, and a failure is only logged on the server (without the URL).
 

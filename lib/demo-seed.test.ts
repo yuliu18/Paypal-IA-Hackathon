@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readSeed, seedSandbox } from './demo-seed';
+import { readSeed, readSeedSubscription, saveSeedSubscription, seedSandbox } from './demo-seed';
 
 let dir: string;
 let file: string;
@@ -53,5 +53,23 @@ describe('readSeed', () => {
     await seedSandbox(fakeCharge, file);
     await writeFile(file, 'not json');
     expect(await readSeed(file)).toEqual([]);
+  });
+});
+
+describe('seed subscription', () => {
+  it('keeps the sample subscription when new sample payments are charged', async () => {
+    next = 0;
+    await saveSeedSubscription({ id: 'I-SUB1', approveUrl: 'https://approve', createdAt: '2026-10-23T00:00:00.000Z' }, file);
+    const charges = await seedSandbox(fakeCharge, file);
+    expect(await readSeed(file)).toEqual(charges);
+    expect(await readSeedSubscription(file)).toEqual({ id: 'I-SUB1', approveUrl: 'https://approve', createdAt: '2026-10-23T00:00:00.000Z' });
+  });
+
+  it('reads no subscription from a seed that has none or an unreadable one', async () => {
+    expect(await readSeedSubscription(file)).toBeUndefined();
+    await seedSandbox(fakeCharge, file);
+    expect(await readSeedSubscription(file)).toBeUndefined();
+    await writeFile(file, JSON.stringify({ charges: [], subscription: { id: 42 } }));
+    expect(await readSeedSubscription(file)).toBeUndefined();
   });
 });

@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
+import type { Scenario } from './scenarios';
 import { SeedButton } from './seed-button';
+import { SubscriptionButton } from './subscription-button';
 
-type AgentMode = 'careful' | 'vulnerable';
-export type Scenario = { label: string; agent: AgentMode; customerEmail: string; message: string };
+type AgentMode = Scenario['agent'];
 
 type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
 
@@ -30,7 +31,8 @@ const stepStyle = (step: AgentStep) =>
 
 // Sends one ticket to the support agent (app/api/support/tickets) and shows each tool call it
 // made through the payment guard, blocked ones in red and held ones in amber.
-export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
+// `pendingApproveUrl`: the sample subscription's approval link while no buyer has approved it yet.
+export function SupportDesk({ scenarios, pendingApproveUrl }: { scenarios: Scenario[]; pendingApproveUrl?: string }) {
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
   const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
@@ -95,6 +97,9 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
           <SeedButton label="Create sample payments" />
         </div>
       )}
+      <div className="mt-2">
+        <SubscriptionButton pendingApproveUrl={pendingApproveUrl} />
+      </div>
 
       <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm font-semibold">

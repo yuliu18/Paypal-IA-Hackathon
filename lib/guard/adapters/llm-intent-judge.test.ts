@@ -79,6 +79,18 @@ describe('createLlmIntentJudge', () => {
     expect((await judge.judge({ task, call })).verdict).toBe('block');
   });
 
+  it('covers subscription cancellations: someone else\'s, or one the customer did not ask for', async () => {
+    let sent: ChatMessage[] = [];
+    const judge = createLlmIntentJudge(async (messages) => {
+      sent = messages;
+      return '{"verdict":"block","reason":"not the customer\'s subscription"}';
+    });
+    await judge.judge({ task, call: { tool: 'cancel_subscription', args: { subscription_id: 'I-SUB1', payload: { reason: 'asked' } } } });
+    expect(sent[0].content).toContain("cancelling another customer's subscription");
+    expect(sent[0].content).toContain('a cancellation the customer did not ask for');
+    expect(sent[1].content).toContain('cancel_subscription');
+  });
+
   it('passes the untrusted input as delimited data, never inside the system prompt', async () => {
     let sent: ChatMessage[] = [];
     const judge = createLlmIntentJudge(async (messages) => {
