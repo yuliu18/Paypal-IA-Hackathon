@@ -157,7 +157,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
                     <Badge row={row} />
                   </span>
                 </summary>
-                <div className="mt-3 space-y-2 pl-20 text-sm">
+                <div className="mt-3 min-w-0 space-y-2 pl-20 text-sm wrap-anywhere">
                   <p className="whitespace-pre-wrap text-pp-muted">
                     <strong className="text-pp-ink">Ticket from {maskPersonalData(row.customer)}:</strong> {maskPersonalData(row.message)}
                   </p>
