@@ -37,12 +37,13 @@ function Field({ label, error, hint, wide, children }: { label: string; error?: 
   );
 }
 
-function keyHint(status: KeyStatus, variable: string) {
+// `thing`: what the field holds, e.g. the webhook URL, which is kept as secret as a key.
+function keyHint(status: KeyStatus, variable: string, thing = 'key') {
   return {
-    saved: `Saved key ${status.hint}. Leave blank to keep it.`,
+    saved: `Saved ${thing} ${status.hint}. Leave blank to keep it.`,
     env: `Using ${variable} from the server environment (${status.hint}). Leave blank to keep it.`,
-    unreadable: 'The saved key cannot be read any more (its encryption key changed). Enter it again.',
-    none: 'No key yet.',
+    unreadable: `The saved ${thing} cannot be read any more (its encryption key changed). Enter it again.`,
+    none: `No ${thing} yet.`,
   }[status.source];
 }
 
@@ -60,8 +61,8 @@ function CheckResult({ check }: { check: Check }) {
   return check && <span className={`text-sm ${check.ok ? 'text-pp-success' : 'text-pp-danger'}`}>{check.message}</span>;
 }
 
-// The shop owner's settings: business, refund limits, AI provider and PayPal. Keys are write-only:
-// the page only ever receives their last 4 characters.
+// The shop owner's settings: business, refund limits, AI provider, PayPal and the held-refund
+// webhook. Keys and the webhook URL are write-only: the page only ever receives their last 4 characters.
 export function SettingsEditor({ view, providers, initialModels }: { view: SettingsView; providers: CatalogProvider[]; initialModels: CatalogModel[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, save, saving] = useActionState(saveSettingsAction, null);
@@ -243,6 +244,24 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
               </button>
               <CheckResult check={payPalCheck} />
             </div>
+          </Section>
+
+          <Section title="Notifications" detail="When the guard holds a refund for a person, it posts a message to this Slack or Discord webhook. The message names the amount, the masked customer email and the rules, never the ticket's text.">
+            <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
+              <input
+                name="webhookUrl"
+                type="password"
+                autoComplete="off"
+                disabled={!view.canStoreKeys}
+                placeholder={view.notifications.webhookUrl.hint || 'https://hooks.slack.com/services/…'}
+                className={input}
+              />
+            </Field>
+            {view.notifications.webhookUrl.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
+              </label>
+            )}
           </Section>
 
           <div className="flex items-center gap-4">

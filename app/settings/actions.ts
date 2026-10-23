@@ -27,6 +27,8 @@ function settingsForm(form: FormData): SettingsForm {
     paypalClientId: text(form, 'paypalClientId'),
     paypalSecret: text(form, 'paypalSecret'),
     clearPaypalSecret: form.get('clearPaypalSecret') === 'on',
+    webhookUrl: text(form, 'webhookUrl'),
+    clearWebhookUrl: form.get('clearWebhookUrl') === 'on',
   };
 }
 

@@ -5,6 +5,7 @@
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
 import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
+import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldRefund, type HeldRefundDecision } from '@/lib/guard/guard';
@@ -70,6 +71,8 @@ export async function handleTicket(
       captures: payPalCaptureLookup,
       audit: auditLog(),
       limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
+      // A no-op without a webhook URL; APP_URL turns /guard in the message into a link.
+      notifier: createWebhookNotifier({ url: shop.notifications.webhookUrl, appUrl: process.env.APP_URL }),
     });
     return withClient(guard, 'support-agent', (tools) =>
       runSupportAgent({

@@ -10,7 +10,7 @@ import { toMinor } from './adapters/paypal-capture-lookup';
 import { minimizeOrder, withheldDetail } from './domain/privacy';
 import { maskPersonalData } from './domain/redact';
 import { evaluateRefund, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
-import type { AgentTask, AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
+import type { AgentTask, AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge } from './ports';
 
 // Single-record reads a support agent needs, each returned only when it belongs to the ticket
 // customer. Bulk reads such as list_transactions would expose every customer's data, and
@@ -28,6 +28,8 @@ export type GuardDeps = {
   now?: () => Date;
   // Bound on each PayPal lookup and call, so one hung request can't stall the write queue.
   timeoutMs?: number;
+  // Tells a person a refund waits for them. Optional: without it, holds wait silently on /guard.
+  notifier?: HeldNotifier;
 };
 
 function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
@@ -46,6 +48,17 @@ function serialized<T>(work: () => Promise<T>): Promise<T> {
   const run = writeQueue.then(work, work);
   writeQueue = run.catch(() => undefined);
   return run;
+}
+
+// Fire and forget: the agent's answer never waits for the notification, and a notifier that
+// throws or rejects can't change the hold, which is already recorded.
+function notifyHeld(notifier: HeldNotifier | undefined, entry: AuditRow) {
+  if (!notifier) return;
+  try {
+    notifier.notifyHeld(entry).catch(() => undefined);
+  } catch {
+    // A notifier that throws before returning a promise is ignored the same way.
+  }
 }
 
 const block = (code: string, message: string): Decision => ({ verdict: 'block', violations: [{ code, message }] });
@@ -236,6 +249,7 @@ export function createPaymentGuard({
   limits,
   now = () => new Date(),
   timeoutMs = 20_000,
+  notifier,
 }: GuardDeps): Server {
   const server = new Server({ name: 'paypal-payment-guard', version: '0.1.0' }, { capabilities: { tools: {} } });
 
@@ -274,12 +288,15 @@ export function createPaymentGuard({
     }
     if (decision.verdict === 'hold') {
       // Nothing runs and nothing moves, so the amount stays out of the limits until a person approves.
+      const entry: AuditEntry = { at, tool: name, args, task, decision, outcome: 'held' };
+      let id: string;
       try {
-        await audit.record({ at, tool: name, args, task, decision, outcome: 'held' });
+        id = await audit.record(entry);
       } catch (error) {
         // A hold nobody can see would never be approved: refuse it instead.
         return blockedResult(block('AUDIT_UNAVAILABLE', message(error)));
       }
+      notifyHeld(notifier, { ...entry, id });
       return heldResult(decision);
     }
 

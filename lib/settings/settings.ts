@@ -1,7 +1,8 @@
 // The shop's own configuration, edited on /settings: who the business is, its refund policy and
-// limits, which AI provider and models run the agent and the judge, and its PayPal credentials.
-// Saved in data/settings.json with the keys encrypted (./secret-box). The AI provider, its key and
-// PayPal fall back to the environment, everything else to the demo defaults; the models are chosen
+// limits, which AI provider and models run the agent and the judge, its PayPal credentials and the
+// webhook that announces held refunds. Saved in data/settings.json with the keys (the webhook URL
+// included) encrypted (./secret-box). The AI provider, its key, PayPal and the webhook fall back to
+// the environment, everything else to the demo defaults; the models are chosen
 // here only.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
 
@@ -33,6 +34,8 @@ export type ShopSettings = {
   limits: Limits;
   ai: { provider: string; baseUrl: string; apiKey: string; agentModel: string; judgeModel: string };
   paypal: { clientId: string; secret: string };
+  // Empty: held refunds wait on /guard without telling anyone.
+  notifications: { webhookUrl: string };
 };
 
 // What the settings page submits: every field as typed. A blank key keeps the saved one.
@@ -53,6 +56,9 @@ export type SettingsForm = {
   paypalClientId: string;
   paypalSecret: string;
   clearPaypalSecret?: boolean;
+  // Optional: forms from before the webhook existed keep the saved one, as a blank field does.
+  webhookUrl?: string;
+  clearWebhookUrl?: boolean;
 };
 
 export type SaveResult = { ok: true } | { ok: false; errors: Partial<Record<keyof SettingsForm | 'form', string>> };
@@ -66,6 +72,7 @@ export type SettingsView = {
   form: SettingsForm;
   ai: { apiKey: KeyStatus };
   paypal: { secret: KeyStatus };
+  notifications: { webhookUrl: KeyStatus };
 };
 
 type Stored = {
@@ -73,6 +80,7 @@ type Stored = {
   limits?: typeof DEFAULT_LIMITS;
   ai?: { provider: string; baseUrl: string; agentModel: string; judgeModel: string; apiKey?: string };
   paypal?: { clientId: string; secret?: string };
+  notifications?: { webhookUrl?: string };
 };
 
 const isLocked = (env: Env) => env.SETTINGS_LOCKED === 'true';
@@ -139,6 +147,7 @@ const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) =>
   limits: (l) => isText(l.currency) && isMinor(l.autoRefundUpTo) && isMinor(l.approvalUpTo) && isMinor(l.dailyCap),
   ai: (a) => isText(a.provider) && isText(a.baseUrl) && isText(a.agentModel) && isText(a.judgeModel) && (a.apiKey === undefined || isText(a.apiKey)),
   paypal: (p) => isText(p.clientId) && (p.secret === undefined || isText(p.secret)),
+  notifications: (n) => n.webhookUrl === undefined || isText(n.webhookUrl),
 };
 
 // What was saved; nothing when the file doesn't exist. A file that can't be read or parsed, or a
@@ -189,6 +198,9 @@ function resolve(stored: Stored, env: Env) {
   const clientId = stored.paypal?.clientId || env.PAYPAL_CLIENT_ID || '';
   const payPalSecret = savedKey(stored.paypal?.clientId ? stored.paypal.secret : undefined, env) ?? envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID);
 
+  // Its token is the only secret in a webhook URL, and it goes nowhere but that URL.
+  const webhookUrl = savedKey(stored.notifications?.webhookUrl, env) ?? envKey(env.GUARD_WEBHOOK_URL, true);
+
   const settings: ShopSettings = {
     business: stored.business ?? {
       name: 'Demo shop',
@@ -204,8 +216,9 @@ function resolve(stored: Stored, env: Env) {
       judgeModel: stored.ai?.judgeModel || agentModel,
     },
     paypal: { clientId, secret: payPalSecret.value },
+    notifications: { webhookUrl: webhookUrl.value },
   };
-  return { settings, limits, keys: { ai: aiKey.status, paypal: payPalSecret.status } };
+  return { settings, limits, keys: { ai: aiKey.status, paypal: payPalSecret.status, webhook: webhookUrl.status } };
 }
 
 // AGENT_MODEL and JUDGE_MODEL were read before the models moved to /settings: say once (per value)
@@ -248,9 +261,11 @@ export async function settingsView({ env = process.env, file = env.SETTINGS_FILE
       apiKey: '',
       paypalClientId: settings.paypal.clientId,
       paypalSecret: '',
+      webhookUrl: '',
     },
     ai: { apiKey: keys.ai },
     paypal: { secret: keys.paypal },
+    notifications: { webhookUrl: keys.webhook },
   };
 }
 
@@ -311,17 +326,23 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (/[\s\p{Cc}]/u.test(apiKey)) errors.apiKey = badKey;
   if (paypalSecret && !paypalClientId) errors.paypalClientId = 'Enter the client ID that goes with this secret.';
   if (/[\s\p{Cc}]/u.test(paypalSecret)) errors.paypalSecret = badKey;
+  const webhookUrl = (form.webhookUrl ?? '').trim();
+  if (webhookUrl && (!/^https:\/\/[^\s/]+/i.test(webhookUrl) || /[\s\p{Cc}]/u.test(webhookUrl) || !URL.canParse(webhookUrl))) {
+    errors.webhookUrl = 'Enter the https:// webhook URL from Slack or Discord.';
+  }
   if (Object.keys(errors).length) return { ok: false, errors };
 
-  const secret = apiKey || paypalSecret ? settingsSecret(await withSecret(env, file, true)) : undefined;
+  const sealing = Boolean(apiKey || paypalSecret || webhookUrl);
+  const secret = sealing ? settingsSecret(await withSecret(env, file, true)) : undefined;
   // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
-  if ((apiKey || paypalSecret) && !secret) {
+  if (sealing && !secret) {
     return { ok: false, errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' } };
   }
   const previous = await readStored(file);
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
   const keepPaypalSecret = !form.clearPaypalSecret && previous.paypal?.clientId === paypalClientId ? previous.paypal.secret : undefined;
+  const keepWebhookUrl = form.clearWebhookUrl ? undefined : previous.notifications?.webhookUrl;
   const stored: Stored = {
     business: { name, contactEmails, refundPolicy },
     limits: { currency, autoRefundUpTo: autoRefundUpTo!, approvalUpTo: approvalUpTo!, dailyCap: dailyCap! },
@@ -333,6 +354,7 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
       apiKey: apiKey ? sealSecret(apiKey, secret!) : keepApiKey,
     },
     paypal: { clientId: paypalClientId, secret: paypalSecret ? sealSecret(paypalSecret, secret!) : keepPaypalSecret },
+    notifications: { webhookUrl: webhookUrl ? sealSecret(webhookUrl, secret!) : keepWebhookUrl },
   };
 
   await mkdir(dirname(file), { recursive: true });

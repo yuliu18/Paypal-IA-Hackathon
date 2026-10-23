@@ -38,6 +38,7 @@ const form = (changes: Partial<SettingsForm> = {}): SettingsForm => ({
   apiKey: 'sk-deepseek-abcd1234',
   paypalClientId: 'shop-client',
   paypalSecret: 'shop-paypal-secret-5678',
+  webhookUrl: '',
   ...changes,
 });
 
@@ -285,5 +286,68 @@ describe('retired model variables', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('AGENT_MODEL and JUDGE_MODEL are no longer read: choose the models on /settings (until then the provider default runs).');
     warn.mockRestore();
+  });
+});
+
+describe('held-refund webhook', () => {
+  const WEBHOOK = 'https://hooks.slack.example/services/T000/B000/token-wxyz';
+
+  it('stores the webhook URL encrypted and gives it back to the server', async () => {
+    expect(await saveSettings(form({ webhookUrl: `  ${WEBHOOK} ` }), { file, env: ENV })).toEqual({ ok: true });
+    const raw = await readFile(file, 'utf8');
+    expect(raw).not.toContain('hooks.slack.example');
+    expect(raw).not.toContain('token-wxyz');
+    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({ webhookUrl: WEBHOOK });
+  });
+
+  it('keeps the saved URL when the field is left blank, and removes it when asked', async () => {
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env: ENV });
+    await saveSettings(form({ webhookUrl: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
+    await saveSettings(form({ webhookUrl: '', clearWebhookUrl: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
+  });
+
+  it('takes only an https URL without spaces or control characters', async () => {
+    const error = { ok: false, errors: { webhookUrl: 'Enter the https:// webhook URL from Slack or Discord.' } };
+    for (const webhookUrl of ['http://hooks.slack.example/x', 'hooks.slack.example/x', 'https://hooks.slack.example/a b', 'https://hooks.slack.example/a\u0000b', 'https://']) {
+      expect(await saveSettings(form({ webhookUrl }), { file, env: ENV })).toEqual(error);
+    }
+    await expect(stat(file)).rejects.toThrow();
+  });
+
+  it('falls back to GUARD_WEBHOOK_URL, and a saved URL wins over it', async () => {
+    const env = { ...ENV, GUARD_WEBHOOK_URL: 'https://discord.example/api/webhooks/1/env-hook-7777' };
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(env.GUARD_WEBHOOK_URL);
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env });
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(WEBHOOK);
+  });
+
+  it('shows the page only the last 4 characters of the URL and where it comes from', async () => {
+    const env = { ...ENV, GUARD_WEBHOOK_URL: 'https://discord.example/api/webhooks/1/env-hook-7777' };
+    expect((await settingsView({ file, env: ENV })).notifications.webhookUrl).toEqual({ source: 'none', hint: '' });
+    expect((await settingsView({ file, env })).notifications.webhookUrl).toEqual({ source: 'env', hint: '••••7777' });
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env });
+    const view = await settingsView({ file, env });
+    expect(view.notifications.webhookUrl).toEqual({ source: 'saved', hint: '••••wxyz' });
+    expect(view.form.webhookUrl).toBe('');
+    expect(JSON.stringify(view)).not.toContain('hooks.slack.example');
+  });
+
+  it('stores the URL without SETTINGS_SECRET using the generated key file', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form({ apiKey: '', paypalSecret: '', webhookUrl: WEBHOOK }), { file, env })).toEqual({ ok: true });
+    expect((await stat(join(dir, 'data', 'settings.key'))).mode & 0o777).toBe(0o600);
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(WEBHOOK);
+  });
+
+  it('leaves the AI key and PayPal secret keep-and-clear as before', async () => {
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env: ENV });
+    await saveSettings(form({ apiKey: '', paypalSecret: '', clearWebhookUrl: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('shop-paypal-secret-5678');
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('sk-deepseek-abcd1234');
+    await saveSettings(form({ apiKey: '', paypalSecret: '', clearPaypalSecret: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
   });
 });
