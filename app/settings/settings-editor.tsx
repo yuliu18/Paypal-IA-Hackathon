@@ -37,6 +37,26 @@ function Field({ label, error, hint, wide, children }: { label: string; error?: 
   );
 }
 
+const link = 'font-semibold text-pp-blue underline';
+
+// Step-by-step setup for one notification channel, folded behind a button-like summary.
+function SetupGuide({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="text-sm sm:col-span-2">
+      <summary className={`${button} inline-block cursor-pointer select-none`}>{title}</summary>
+      <ol className="mt-3 list-decimal space-y-1.5 rounded border border-pp-border bg-pp-canvas p-4 pl-8 text-pp-ink">{children}</ol>
+    </details>
+  );
+}
+
+function ExternalLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={link}>
+      {children}
+    </a>
+  );
+}
+
 // `thing`: what the field holds, e.g. the webhook URL, which is kept as secret as a key.
 function keyHint(status: KeyStatus, variable: string, thing = 'key') {
   return {
@@ -262,6 +282,17 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
                 <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
               </label>
             )}
+            <SetupGuide title="How to get a Slack or Discord webhook">
+              <li>
+                <strong>Slack:</strong> on <ExternalLink href="https://api.slack.com/apps">api.slack.com/apps</ExternalLink>, create an app from scratch in your workspace, open{' '}
+                <em>Incoming Webhooks</em>, turn them on, click <em>Add New Webhook to Workspace</em>, pick the channel and copy the URL.
+              </li>
+              <li>
+                <strong>Discord:</strong> in your server, open the channel&apos;s <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, then{' '}
+                <em>Copy Webhook URL</em>.
+              </li>
+              <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
+            </SetupGuide>
             <p className="text-sm text-pp-muted sm:col-span-2">Email is sent through Resend to the contact emails above.</p>
             <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
               <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
@@ -278,6 +309,21 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
                 <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
               </label>
             )}
+            <SetupGuide title="How to set up email">
+              <li>
+                Sign up on <ExternalLink href="https://resend.com">resend.com</ExternalLink> (the free plan is enough), open <em>API Keys</em>, create a key with sending
+                access and paste it above.
+              </li>
+              <li>
+                <strong>To try it:</strong> use <code>onboarding@resend.dev</code> as the from address and put your Resend account&apos;s email in Contact emails under
+                Business. Resend&apos;s test sender only delivers to that address, and may land in spam.
+              </li>
+              <li>
+                <strong>For real:</strong> in Resend, open <em>Domains</em>, add your domain, add the DNS records it shows, and once it is verified use an address on it,
+                like <code>guard@your-domain.com</code>.
+              </li>
+              <li>Every contact email under Business gets the message.</li>
+            </SetupGuide>
             <Field label="Telegram bot token" error={errors.telegramBotToken} hint={keyHint(view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
               <input
                 name="telegramBotToken"
@@ -296,6 +342,26 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
                 <input type="checkbox" name="clearTelegramBotToken" /> Remove the saved bot token
               </label>
             )}
+            <SetupGuide title="How to set up Telegram">
+              <li>
+                In Telegram, open <ExternalLink href="https://t.me/BotFather">@BotFather</ExternalLink>, send <code>/newbot</code>, choose a name and a username ending in{' '}
+                <code>bot</code>, and paste the token it gives you (<code>123456789:AA…</code>) above.
+              </li>
+              <li>
+                Open a chat with your new bot, press <em>Start</em> and send it any message. For a group, add the bot to the group and send a message there.
+              </li>
+              <li>
+                In a browser, open <code>https://api.telegram.org/bot&lt;token&gt;/getUpdates</code>, with your token right after <code>bot</code> and no spaces or{' '}
+                <code>&lt; &gt;</code>. Copy the number in <code>&quot;chat&quot;: {'{'} &quot;id&quot;: … {'}'}</code> into Telegram chat id. A group&apos;s id starts with{' '}
+                <code>-100</code>.
+              </li>
+              <li>
+                If it shows <code>&quot;result&quot;: []</code>, the bot has no message yet: send it one and reload.
+              </li>
+              <li>
+                Set <code>APP_URL</code> on the server so the message links to the guard page; without it, Telegram shows <code>/guard</code> as a bot command.
+              </li>
+            </SetupGuide>
           </Section>
 
           <div className="flex items-center gap-4">
