@@ -28,10 +28,10 @@ function Section({ title, detail, children }: { title: string; detail: string; c
 
 function Field({ label, error, hint, wide, children }: { label: string; error?: string; hint?: React.ReactNode; wide?: boolean; children: React.ReactNode }) {
   return (
-    <label className={`block text-sm ${wide ? 'sm:col-span-2' : ''}`}>
+    <label className={`block min-w-0 text-sm ${wide ? 'sm:col-span-2' : ''}`}>
       <span className="mb-1 block font-semibold text-pp-ink">{label}</span>
       {children}
-      {hint && !error && <span className="mt-1 block text-xs text-pp-muted">{hint}</span>}
+      {hint && !error && <span className="mt-1 block text-xs text-pp-muted wrap-anywhere">{hint}</span>}
       {error && <span className="mt-1 block text-xs text-pp-danger">{error}</span>}
     </label>
   );
@@ -42,9 +42,9 @@ const link = 'font-semibold text-pp-blue underline';
 // Step-by-step setup for one notification channel, folded behind a button-like summary.
 function SetupGuide({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details className="text-sm sm:col-span-2">
+    <details className="min-w-0 text-sm sm:col-span-2">
       <summary className={`${button} inline-block cursor-pointer select-none`}>{title}</summary>
-      <ol className="mt-3 list-decimal space-y-1.5 rounded border border-pp-border bg-pp-canvas p-4 pl-8 text-pp-ink">{children}</ol>
+      <ol className="mt-3 list-decimal space-y-1.5 rounded border border-pp-border bg-pp-canvas p-4 pl-8 text-pp-ink wrap-anywhere">{children}</ol>
     </details>
   );
 }
