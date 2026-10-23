@@ -38,6 +38,20 @@ function ChainStatus({ check }: { check: ChainCheck }) {
   );
 }
 
+// The whole log as a file (app/api/guard/export), not only the latest rows shown here.
+function DownloadLink({ format }: { format: 'csv' | 'json' }) {
+  return (
+    <a
+      href={`/api/guard/export?format=${format}`}
+      download
+      title="Every decision of the guard, with who decided it. Emails and cards are masked."
+      className="rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight"
+    >
+      Download {format.toUpperCase()}
+    </a>
+  );
+}
+
 export default async function GuardLogPage() {
   await connection();
   const log = auditLog();
@@ -64,7 +78,13 @@ export default async function GuardLogPage() {
     <EndpointPage
       title="Payment guard log"
       summary={`The latest ${entries.length} decisions of the payment guard, newest first. Blocked and held calls never reached PayPal.`}
-      aside={chain.intact ? <ChainStatus check={chain} /> : undefined}
+      aside={
+        <div className="flex flex-wrap items-center gap-2">
+          {chain.intact && <ChainStatus check={chain} />}
+          <DownloadLink format="csv" />
+          <DownloadLink format="json" />
+        </div>
+      }
       rows={entries.map((e) => ({
         id: e.id,
         at: e.at,
