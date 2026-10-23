@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
 import { createPaymentGuard, decideHeldRefund } from './guard';
-import type { AuditEntry, AuditLog, CaptureLookup, IntentJudge } from './ports';
+import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -95,7 +95,13 @@ function fakePayPal() {
 
 async function connect(
   captures: CaptureLookup = { getCapture: async (captureId) => ({ ...facts, captureId }) },
-  { upstreamThrows = false, upstreamHangs = false, upstreamLate = undefined as 'ok' | 'rejected' | undefined, throwMessage = 'socket hang up' } = {},
+  {
+    upstreamThrows = false,
+    upstreamHangs = false,
+    upstreamLate = undefined as 'ok' | 'rejected' | undefined,
+    throwMessage = 'socket hang up',
+    notifier = undefined as HeldNotifier | undefined,
+  } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
   await fakePayPal().connect(upServer);
@@ -135,6 +141,7 @@ async function connect(
     limits: { approvalThreshold, perRefund: usd(10000), daily: usd(20000) },
     now: () => new Date('2026-10-20T12:00:00Z'),
     timeoutMs: 50,
+    notifier,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -582,6 +589,65 @@ describe('held refund approval', () => {
     entries.push({ at: '2026-10-20T12:30:00Z', tool: 'create_refund', args: heldArgs, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(2500) });
     expect((await decide('1', true)).outcome).toBe('refused');
     expect((await decide('99', true)).outcome).toBe('refused');
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('held refund notification', () => {
+  const capture = (behaviour: () => Promise<void> = async () => undefined) => {
+    const notified: AuditRow[] = [];
+    const notifier: HeldNotifier = {
+      notifyHeld(entry) {
+        notified.push(entry);
+        return behaviour();
+      },
+    };
+    return { notifier, notified };
+  };
+  const refund = { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '25.00' } };
+
+  it('tells a person once about a held refund, with the entry it recorded', async () => {
+    approvalThreshold = usd(2000);
+    const { notifier, notified } = capture();
+    const agent = await connect(undefined, { notifier });
+    await agent.callTool({ name: 'create_refund', arguments: refund });
+    expect(notified).toHaveLength(1);
+    expect(notified[0]).toEqual({ ...entries[0], id: '0' });
+    expect(notified[0]).toMatchObject({ tool: 'create_refund', args: refund, outcome: 'held' });
+  });
+
+  it('says nothing about refunds it runs or blocks', async () => {
+    const { notifier, notified } = capture();
+    const agent = await connect(undefined, { notifier });
+    await agent.callTool({ name: 'create_refund', arguments: refund });
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'injected instruction' }] };
+    await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-2' } });
+    expect(entries.map((e) => e.outcome)).toEqual(['executed', 'blocked']);
+    expect(notified).toEqual([]);
+  });
+
+  it('holds the refund the same way when the notification throws, rejects or never answers', async () => {
+    approvalThreshold = usd(2000);
+    const failures: (() => Promise<void>)[] = [
+      () => {
+        throw new Error('webhook down');
+      },
+      async () => {
+        throw new Error('webhook down');
+      },
+      () => new Promise(() => undefined),
+    ];
+    for (const behaviour of failures) {
+      entries = [];
+      const { notifier, notified } = capture(behaviour);
+      const agent = await connect(undefined, { notifier });
+      const result = await agent.callTool({ name: 'create_refund', arguments: refund });
+      expect(result.isError).toBeFalsy();
+      expect(text(result)).toContain('held for human approval');
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({ outcome: 'held' });
+      expect(notified).toHaveLength(1);
+    }
     expect(upstreamCalls).toEqual([]);
   });
 });

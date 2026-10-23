@@ -51,3 +51,9 @@ export interface AuditLog {
   // Whether a later entry already decides this held entry.
   isResolved(id: string): Promise<boolean>;
 }
+
+// Tells a person that a held entry waits for their decision. The guard doesn't wait for it, and a
+// failure to notify never changes what the guard decided.
+export interface HeldNotifier {
+  notifyHeld(entry: AuditRow): Promise<void>;
+}

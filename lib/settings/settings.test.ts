@@ -38,6 +38,7 @@ const form = (changes: Partial<SettingsForm> = {}): SettingsForm => ({
   apiKey: 'sk-deepseek-abcd1234',
   paypalClientId: 'shop-client',
   paypalSecret: 'shop-paypal-secret-5678',
+  webhookUrl: '',
   ...changes,
 });
 
@@ -285,5 +286,246 @@ describe('retired model variables', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('AGENT_MODEL and JUDGE_MODEL are no longer read: choose the models on /settings (until then the provider default runs).');
     warn.mockRestore();
+  });
+});
+
+describe('held-refund webhook', () => {
+  const WEBHOOK = 'https://hooks.slack.example/services/T000/B000/token-wxyz';
+
+  it('stores the webhook URL encrypted and gives it back to the server', async () => {
+    expect(await saveSettings(form({ webhookUrl: `  ${WEBHOOK} ` }), { file, env: ENV })).toEqual({ ok: true });
+    const raw = await readFile(file, 'utf8');
+    expect(raw).not.toContain('hooks.slack.example');
+    expect(raw).not.toContain('token-wxyz');
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
+  });
+
+  it('keeps the saved URL when the field is left blank, and removes it when asked', async () => {
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env: ENV });
+    await saveSettings(form({ webhookUrl: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
+    await saveSettings(form({ webhookUrl: '', clearWebhookUrl: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
+  });
+
+  it('takes only an https URL without spaces or control characters', async () => {
+    const error = { ok: false, errors: { webhookUrl: 'Enter the https:// webhook URL from Slack or Discord.' } };
+    for (const webhookUrl of ['http://hooks.slack.example/x', 'hooks.slack.example/x', 'https://hooks.slack.example/a b', 'https://hooks.slack.example/a\u0000b', 'https://']) {
+      expect(await saveSettings(form({ webhookUrl }), { file, env: ENV })).toEqual(error);
+    }
+    await expect(stat(file)).rejects.toThrow();
+  });
+
+  it('falls back to GUARD_WEBHOOK_URL, and a saved URL wins over it', async () => {
+    const env = { ...ENV, GUARD_WEBHOOK_URL: 'https://discord.example/api/webhooks/1/env-hook-7777' };
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(env.GUARD_WEBHOOK_URL);
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env });
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(WEBHOOK);
+  });
+
+  it('shows the page only the last 4 characters of the URL and where it comes from', async () => {
+    const env = { ...ENV, GUARD_WEBHOOK_URL: 'https://discord.example/api/webhooks/1/env-hook-7777' };
+    expect((await settingsView({ file, env: ENV })).notifications.webhookUrl).toEqual({ source: 'none', hint: '' });
+    expect((await settingsView({ file, env })).notifications.webhookUrl).toEqual({ source: 'env', hint: '••••7777' });
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env });
+    const view = await settingsView({ file, env });
+    expect(view.notifications.webhookUrl).toEqual({ source: 'saved', hint: '••••wxyz' });
+    expect(view.form.webhookUrl).toBe('');
+    expect(JSON.stringify(view)).not.toContain('hooks.slack.example');
+  });
+
+  it('stores the URL without SETTINGS_SECRET using the generated key file', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form({ apiKey: '', paypalSecret: '', webhookUrl: WEBHOOK }), { file, env })).toEqual({ ok: true });
+    expect((await stat(join(dir, 'data', 'settings.key'))).mode & 0o777).toBe(0o600);
+    expect((await loadSettings({ file, env })).notifications.webhookUrl).toBe(WEBHOOK);
+  });
+
+  it('leaves the AI key and PayPal secret keep-and-clear as before', async () => {
+    await saveSettings(form({ webhookUrl: WEBHOOK }), { file, env: ENV });
+    await saveSettings(form({ apiKey: '', paypalSecret: '', clearWebhookUrl: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('shop-paypal-secret-5678');
+    expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('sk-deepseek-abcd1234');
+    await saveSettings(form({ apiKey: '', paypalSecret: '', clearPaypalSecret: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
+  });
+});
+
+describe('held-refund email and Telegram', () => {
+  const RESEND = 're_resend_key_for_tests_qrst';
+  const TOKEN = '123456789:AAH-telegram_token_for_tests_uvwx';
+  const channels = { resendApiKey: RESEND, emailFrom: 'guard@casamugs.example', telegramBotToken: TOKEN, telegramChatId: '-1001234567890' };
+
+  it('stores the Resend key and bot token encrypted and gives them back to the server', async () => {
+    expect(await saveSettings(form({ ...channels, resendApiKey: ` ${RESEND} ` }), { file, env: ENV })).toEqual({ ok: true });
+    const raw = await readFile(file, 'utf8');
+    expect(raw).not.toContain('re_resend_key');
+    expect(raw).not.toContain('telegram_token');
+    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      smtp: { host: '', port: 587, user: '', password: '' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+  });
+
+  it('keeps the saved key and token when left blank or missing, and removes each when asked', async () => {
+    await saveSettings(form(channels), { file, env: ENV });
+    await saveSettings(form({ resendApiKey: '', telegramBotToken: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications).toMatchObject({
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+    await saveSettings(form({ clearResendApiKey: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications).toMatchObject({ email: { resendApiKey: '' }, telegram: { botToken: TOKEN } });
+    await saveSettings(form({ clearTelegramBotToken: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.telegram.botToken).toBe('');
+  });
+
+  it('rejects an invalid sender, chat id or bot token field by field and saves nothing', async () => {
+    const result = await saveSettings(form({ emailFrom: 'not an email', telegramChatId: 'my chat', telegramBotToken: 'abc/../x' }), { file, env: ENV });
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        emailFrom: 'Enter the sender address, e.g. guard@your-domain.com.',
+        telegramChatId: 'Enter a chat id like 123456789 or -1001234567890, or @channelname.',
+        telegramBotToken: 'Paste the token from @BotFather, like 123456789:AA…',
+      },
+    });
+    for (const telegramChatId of ['12a', '--1', '@', '@a b']) {
+      expect(await saveSettings(form({ telegramChatId }), { file, env: ENV })).toMatchObject({ ok: false, errors: { telegramChatId: expect.any(String) } });
+    }
+    await expect(stat(file)).rejects.toThrow();
+    for (const telegramChatId of ['123456789', '-1001234567890', '@casa_mugs']) {
+      expect(await saveSettings(form({ telegramChatId }), { file, env: ENV })).toEqual({ ok: true });
+    }
+  });
+
+  it('falls back to RESEND_API_KEY, NOTIFY_EMAIL_FROM, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, and saved values win', async () => {
+    const env = { ...ENV, RESEND_API_KEY: 're_env_key_1111', NOTIFY_EMAIL_FROM: 'env@shop.example', TELEGRAM_BOT_TOKEN: '42:env_token_2222', TELEGRAM_CHAT_ID: '777' };
+    expect((await loadSettings({ file, env })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: 're_env_key_1111', from: 'env@shop.example' },
+      smtp: { host: '', port: 587, user: '', password: '' },
+      telegram: { botToken: '42:env_token_2222', chatId: '777' },
+    });
+    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: '', from: '' },
+      smtp: { host: '', port: 587, user: '', password: '' },
+      telegram: { botToken: '', chatId: '' },
+    });
+    await saveSettings(form(channels), { file, env });
+    expect((await loadSettings({ file, env })).notifications).toMatchObject({
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+  });
+
+  it('shows the page only the last 4 characters of the key and token, and the plain fields as saved', async () => {
+    const env = { ...ENV, RESEND_API_KEY: 're_env_key_1111' };
+    const before = await settingsView({ file, env });
+    expect(before.notifications.resendApiKey).toEqual({ source: 'env', hint: '••••1111' });
+    expect(before.notifications.telegramBotToken).toEqual({ source: 'none', hint: '' });
+    await saveSettings(form(channels), { file, env });
+    const view = await settingsView({ file, env });
+    expect(view.notifications.resendApiKey).toEqual({ source: 'saved', hint: '••••qrst' });
+    expect(view.notifications.telegramBotToken).toEqual({ source: 'saved', hint: '••••uvwx' });
+    expect(view.form).toMatchObject({ resendApiKey: '', telegramBotToken: '', emailFrom: 'guard@casamugs.example', telegramChatId: '-1001234567890' });
+    expect(JSON.stringify(view)).not.toContain('re_resend_key');
+    expect(JSON.stringify(view)).not.toContain('telegram_token');
+  });
+
+  it('stores them without SETTINGS_SECRET using the generated key file, and not at all when locked', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form({ apiKey: '', paypalSecret: '', ...channels }), { file, env })).toEqual({ ok: true });
+    expect((await stat(join(dir, 'data', 'settings.key'))).mode & 0o777).toBe(0o600);
+    expect((await loadSettings({ file, env })).notifications.telegram.botToken).toBe(TOKEN);
+    const locked = { ...ENV, SETTINGS_LOCKED: 'true' };
+    expect(await saveSettings(form({ ...channels, resendApiKey: 're_other' }), { file, env: locked })).toMatchObject({ ok: false });
+    expect((await loadSettings({ file, env })).notifications.email.resendApiKey).toBe(RESEND);
+  });
+
+  it('leaves the webhook URL and PayPal secret keep-and-clear as before', async () => {
+    const WEBHOOK = 'https://hooks.slack.example/services/T000/B000/token-wxyz';
+    await saveSettings(form({ webhookUrl: WEBHOOK, ...channels }), { file, env: ENV });
+    await saveSettings(form({ paypalSecret: '', clearResendApiKey: true, clearTelegramBotToken: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('shop-paypal-secret-5678');
+    await saveSettings(form({ paypalSecret: '', clearWebhookUrl: true, clearPaypalSecret: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
+  });
+});
+
+describe('held-refund email over SMTP', () => {
+  const PASSWORD = 'smtp-app-password-yzab';
+  const smtp = { smtpHost: 'smtp.gmail.com', smtpPort: '465', smtpUser: 'guard@casamugs.example', smtpPassword: PASSWORD };
+
+  it('stores the password encrypted and gives the server, port and login back to the server', async () => {
+    expect(await saveSettings(form(smtp), { file, env: ENV })).toEqual({ ok: true });
+    expect(await readFile(file, 'utf8')).not.toContain('smtp-app-password');
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: 'smtp.gmail.com', port: 465, user: 'guard@casamugs.example', password: PASSWORD });
+  });
+
+  it('uses port 587 when the port is left blank', async () => {
+    await saveSettings(form({ ...smtp, smtpPort: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.port).toBe(587);
+  });
+
+  it('keeps the saved password only for the server and login it was saved for, so it is never sent to another server', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe(PASSWORD);
+    await saveSettings(form({ ...smtp, smtpPassword: '', smtpHost: 'smtp.attacker.example' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toMatchObject({ host: 'smtp.attacker.example', password: '' });
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '', smtpUser: 'someone@else.example' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe('');
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '', clearSmtpPassword: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe('');
+  });
+
+  it('keeps everything saved when the form has no SMTP fields', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form(), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: 'smtp.gmail.com', port: 465, user: 'guard@casamugs.example', password: PASSWORD });
+  });
+
+  it('rejects an invalid server, port or login, and a password without its server and login, and saves nothing', async () => {
+    expect(await saveSettings(form({ smtpHost: 'smtp.gmail.com/x', smtpPort: '99999', smtpUser: 'a b' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: {
+        smtpHost: "Enter the mail server's name, e.g. smtp.gmail.com.",
+        smtpPort: 'Enter a port number, e.g. 587 or 465.',
+        smtpUser: 'Enter the login without spaces, usually your email address.',
+      },
+    });
+    expect(await saveSettings(form({ smtpPassword: PASSWORD }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { smtpHost: 'Enter the server and login this password is for.' },
+    });
+    for (const smtpPort of ['0', 'abc', '587.5']) {
+      expect(await saveSettings(form({ ...smtp, smtpPort }), { file, env: ENV })).toMatchObject({ ok: false, errors: { smtpPort: expect.any(String) } });
+    }
+    await expect(stat(file)).rejects.toThrow();
+  });
+
+  it('falls back to SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD, but sends that password only to that server and login', async () => {
+    const env = { ...ENV, SMTP_HOST: 'smtp.env.example', SMTP_PORT: '2525', SMTP_USER: 'env@shop.example', SMTP_PASSWORD: 'env-smtp-pass-3333' };
+    expect((await loadSettings({ file, env })).notifications.smtp).toEqual({ host: 'smtp.env.example', port: 2525, user: 'env@shop.example', password: 'env-smtp-pass-3333' });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: '', port: 587, user: '', password: '' });
+    await saveSettings(form({ smtpHost: 'smtp.other.example', smtpUser: 'env@shop.example' }), { file, env });
+    expect((await loadSettings({ file, env })).notifications.smtp).toMatchObject({ host: 'smtp.other.example', password: '' });
+  });
+
+  it('shows the page only the last 4 characters of the password, and the other fields as saved', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    const view = await settingsView({ file, env: ENV });
+    expect(view.notifications.smtpPassword).toEqual({ source: 'saved', hint: '••••yzab' });
+    expect(view.form).toMatchObject({ smtpHost: 'smtp.gmail.com', smtpPort: '465', smtpUser: 'guard@casamugs.example', smtpPassword: '' });
+    expect(JSON.stringify(view)).not.toContain('smtp-app-password');
   });
 });

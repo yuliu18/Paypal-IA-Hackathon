@@ -19,6 +19,7 @@
     "ag-studio": "3.0.0",
     "ag-studio-react": "3.0.0",
     "next": "16.4.2",
+    "nodemailer": "10.0.16",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
