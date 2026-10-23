@@ -5,8 +5,10 @@ vi.mock('@/lib/agent/handle-ticket', () => ({ handleTicket: (...args: unknown[])
 
 const { POST } = await import('./route');
 
-const post = (body: unknown) =>
-  POST(new Request('http://test/api/support/tickets', { method: 'POST', body: JSON.stringify(body) }));
+const post = (body: unknown, client = '10.0.0.1') =>
+  POST(new Request('http://test/api/support/tickets', { method: 'POST', body: JSON.stringify(body), headers: { 'x-forwarded-for': client } }));
+
+const ticket = { customerEmail: 'ana@example.com', message: 'Broken mug.' };
 
 describe('POST /api/support/tickets', () => {
   afterEach(() => handleTicket.mockReset());
@@ -38,6 +40,46 @@ describe('POST /api/support/tickets', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: { message: 'customerEmail must be an email address.' } });
+  });
+
+  it('turns away an address after 20 tickets with 429 and Retry-After, without running the agent', async () => {
+    handleTicket.mockResolvedValue({ reply: 'Done', steps: [] });
+    for (let i = 0; i < 20; i++) expect((await post(ticket, '10.0.0.20')).status).toBe(200);
+
+    const res = await post(ticket, '10.0.0.20');
+
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await res.json()).error.message).toMatch(/^Too many tickets from this address\. Try again in \d+ seconds\.$/);
+    expect(handleTicket).toHaveBeenCalledTimes(20);
+    expect((await post(ticket, '10.0.0.21')).status).toBe(200);
+  });
+
+  it('turns away a third ticket from one address while two are still running', async () => {
+    const finish: (() => void)[] = [];
+    handleTicket.mockImplementation(() => new Promise((resolve) => finish.push(() => resolve({ reply: 'Done', steps: [] }))));
+    const running = [post(ticket, '10.0.0.30'), post(ticket, '10.0.0.30')];
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+
+    const res = await post(ticket, '10.0.0.30');
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: { message: 'The support agent is busy with other tickets. Try again in a few seconds.' } });
+    finish.forEach((done) => done());
+    await Promise.all(running);
+  });
+
+  it('frees the slot when the agent fails, so failures do not lock a client out', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    handleTicket.mockRejectedValue(new Error('down'));
+    for (let i = 0; i < 3; i++) expect((await post(ticket, '10.0.0.40')).status).toBe(502);
+    vi.restoreAllMocks();
+  });
+
+  it('does not count invalid tickets against the quota', async () => {
+    for (let i = 0; i < 25; i++) expect((await post({ customerEmail: 'nope', message: 'x' }, '10.0.0.50')).status).toBe(400);
+    handleTicket.mockResolvedValue({ reply: 'Done', steps: [] });
+    expect((await post(ticket, '10.0.0.50')).status).toBe(200);
   });
 
   it('refuses a JSON body that is not an object', async () => {
