@@ -35,7 +35,7 @@ export type ShopSettings = {
   ai: { provider: string; baseUrl: string; apiKey: string; agentModel: string; judgeModel: string };
   paypal: { clientId: string; secret: string };
   // Each channel left empty is skipped; all empty: held refunds wait on /guard without telling
-  // anyone. Email goes to business.contactEmails, through SMTP when a server is set, else Resend.
+  // anyone. Email goes to business.contactEmails, through SMTP when it is fully set, else Resend.
   notifications: {
     webhookUrl: string;
     email: { resendApiKey: string; from: string };

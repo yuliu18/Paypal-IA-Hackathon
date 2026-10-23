@@ -6,8 +6,7 @@ import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
 import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
 import { allNotifiers } from '@/lib/guard/adapters/all-notifiers';
-import { createEmailNotifier } from '@/lib/guard/adapters/email-notifier';
-import { createSmtpNotifier } from '@/lib/guard/adapters/smtp-notifier';
+import { emailNotifier } from '@/lib/guard/adapters/email-channel';
 import { createTelegramNotifier } from '@/lib/guard/adapters/telegram-notifier';
 import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
@@ -53,14 +52,14 @@ async function payPalToolkit() {
 }
 
 // Every held-refund channel the shop set up; each one left empty is a no-op. APP_URL turns /guard
-// in the message into a link. Email goes through SMTP when a server is set, else Resend, never both.
+// in the message into a link.
 function heldNotifier(shop: ShopSettings) {
   const { webhookUrl, email, smtp, telegram } = shop.notifications;
   const appUrl = process.env.APP_URL;
   const to = shop.business.contactEmails;
   return allNotifiers([
     createWebhookNotifier({ url: webhookUrl, appUrl }),
-    smtp.host ? createSmtpNotifier({ ...smtp, from: email.from, to, appUrl }) : createEmailNotifier({ apiKey: email.resendApiKey, from: email.from, to, appUrl }),
+    emailNotifier({ smtp, resendApiKey: email.resendApiKey, from: email.from, to, appUrl }),
     createTelegramNotifier({ botToken: telegram.botToken, chatId: telegram.chatId, appUrl }),
   ]);
 }

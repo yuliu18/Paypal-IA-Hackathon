@@ -294,7 +294,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
               <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
             </SetupGuide>
             <p className="text-sm text-pp-muted sm:col-span-2">
-              Email goes to the contact emails above, through your own mail server (SMTP) when one is set, otherwise through Resend.
+              Email goes to the contact emails above, through your own mail server (SMTP) when its server, login and password are set, otherwise through Resend.
             </p>
             <Field
               label="From address"
