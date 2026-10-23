@@ -365,6 +365,7 @@ describe('held-refund email and Telegram', () => {
     expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
       webhookUrl: '',
       email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      smtp: { host: '', port: 587, user: '', password: '' },
       telegram: { botToken: TOKEN, chatId: '-1001234567890' },
     });
   });
@@ -406,11 +407,13 @@ describe('held-refund email and Telegram', () => {
     expect((await loadSettings({ file, env })).notifications).toEqual({
       webhookUrl: '',
       email: { resendApiKey: 're_env_key_1111', from: 'env@shop.example' },
+      smtp: { host: '', port: 587, user: '', password: '' },
       telegram: { botToken: '42:env_token_2222', chatId: '777' },
     });
     expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
       webhookUrl: '',
       email: { resendApiKey: '', from: '' },
+      smtp: { host: '', port: 587, user: '', password: '' },
       telegram: { botToken: '', chatId: '' },
     });
     await saveSettings(form(channels), { file, env });
@@ -453,5 +456,76 @@ describe('held-refund email and Telegram', () => {
     await saveSettings(form({ paypalSecret: '', clearWebhookUrl: true, clearPaypalSecret: true }), { file, env: ENV });
     expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
     expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
+  });
+});
+
+describe('held-refund email over SMTP', () => {
+  const PASSWORD = 'smtp-app-password-yzab';
+  const smtp = { smtpHost: 'smtp.gmail.com', smtpPort: '465', smtpUser: 'guard@casamugs.example', smtpPassword: PASSWORD };
+
+  it('stores the password encrypted and gives the server, port and login back to the server', async () => {
+    expect(await saveSettings(form(smtp), { file, env: ENV })).toEqual({ ok: true });
+    expect(await readFile(file, 'utf8')).not.toContain('smtp-app-password');
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: 'smtp.gmail.com', port: 465, user: 'guard@casamugs.example', password: PASSWORD });
+  });
+
+  it('uses port 587 when the port is left blank', async () => {
+    await saveSettings(form({ ...smtp, smtpPort: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.port).toBe(587);
+  });
+
+  it('keeps the saved password only for the server and login it was saved for, so it is never sent to another server', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe(PASSWORD);
+    await saveSettings(form({ ...smtp, smtpPassword: '', smtpHost: 'smtp.attacker.example' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toMatchObject({ host: 'smtp.attacker.example', password: '' });
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '', smtpUser: 'someone@else.example' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe('');
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form({ ...smtp, smtpPassword: '', clearSmtpPassword: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp.password).toBe('');
+  });
+
+  it('keeps everything saved when the form has no SMTP fields', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    await saveSettings(form(), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: 'smtp.gmail.com', port: 465, user: 'guard@casamugs.example', password: PASSWORD });
+  });
+
+  it('rejects an invalid server, port or login, and a password without its server and login, and saves nothing', async () => {
+    expect(await saveSettings(form({ smtpHost: 'smtp.gmail.com/x', smtpPort: '99999', smtpUser: 'a b' }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: {
+        smtpHost: "Enter the mail server's name, e.g. smtp.gmail.com.",
+        smtpPort: 'Enter a port number, e.g. 587 or 465.',
+        smtpUser: 'Enter the login without spaces, usually your email address.',
+      },
+    });
+    expect(await saveSettings(form({ smtpPassword: PASSWORD }), { file, env: ENV })).toEqual({
+      ok: false,
+      errors: { smtpHost: 'Enter the server and login this password is for.' },
+    });
+    for (const smtpPort of ['0', 'abc', '587.5']) {
+      expect(await saveSettings(form({ ...smtp, smtpPort }), { file, env: ENV })).toMatchObject({ ok: false, errors: { smtpPort: expect.any(String) } });
+    }
+    await expect(stat(file)).rejects.toThrow();
+  });
+
+  it('falls back to SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD, but sends that password only to that server and login', async () => {
+    const env = { ...ENV, SMTP_HOST: 'smtp.env.example', SMTP_PORT: '2525', SMTP_USER: 'env@shop.example', SMTP_PASSWORD: 'env-smtp-pass-3333' };
+    expect((await loadSettings({ file, env })).notifications.smtp).toEqual({ host: 'smtp.env.example', port: 2525, user: 'env@shop.example', password: 'env-smtp-pass-3333' });
+    expect((await loadSettings({ file, env: ENV })).notifications.smtp).toEqual({ host: '', port: 587, user: '', password: '' });
+    await saveSettings(form({ smtpHost: 'smtp.other.example', smtpUser: 'env@shop.example' }), { file, env });
+    expect((await loadSettings({ file, env })).notifications.smtp).toMatchObject({ host: 'smtp.other.example', password: '' });
+  });
+
+  it('shows the page only the last 4 characters of the password, and the other fields as saved', async () => {
+    await saveSettings(form(smtp), { file, env: ENV });
+    const view = await settingsView({ file, env: ENV });
+    expect(view.notifications.smtpPassword).toEqual({ source: 'saved', hint: '••••yzab' });
+    expect(view.form).toMatchObject({ smtpHost: 'smtp.gmail.com', smtpPort: '465', smtpUser: 'guard@casamugs.example', smtpPassword: '' });
+    expect(JSON.stringify(view)).not.toContain('smtp-app-password');
   });
 });

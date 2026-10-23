@@ -35,6 +35,11 @@ function settingsForm(form: FormData): SettingsForm {
     telegramBotToken: text(form, 'telegramBotToken'),
     clearTelegramBotToken: form.get('clearTelegramBotToken') === 'on',
     telegramChatId: text(form, 'telegramChatId'),
+    smtpHost: text(form, 'smtpHost'),
+    smtpPort: text(form, 'smtpPort'),
+    smtpUser: text(form, 'smtpUser'),
+    smtpPassword: text(form, 'smtpPassword'),
+    clearSmtpPassword: form.get('clearSmtpPassword') === 'on',
   };
 }
 

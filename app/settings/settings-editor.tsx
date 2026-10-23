@@ -293,23 +293,71 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
               </li>
               <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
             </SetupGuide>
-            <p className="text-sm text-pp-muted sm:col-span-2">Email is sent through Resend to the contact emails above.</p>
-            <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
-              <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
-            </Field>
+            <p className="text-sm text-pp-muted sm:col-span-2">
+              Email goes to the contact emails above, through your own mail server (SMTP) when one is set, otherwise through Resend.
+            </p>
             <Field
               label="From address"
               error={errors.emailFrom}
-              hint="A sender on a domain verified in Resend. Its test sender, onboarding@resend.dev, only delivers to your own Resend account address."
+              hint="With SMTP, leave blank to send from the login. With Resend, a sender on a domain verified there, or onboarding@resend.dev to try it."
+              wide
             >
               <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
+            </Field>
+            <Field label="SMTP server" error={errors.smtpHost}>
+              <input name="smtpHost" defaultValue={defaults.smtpHost} autoComplete="off" placeholder="smtp.gmail.com" className={input} />
+            </Field>
+            <Field label="SMTP port" error={errors.smtpPort} hint="587 (STARTTLS) or 465 (TLS). Blank means 587.">
+              <input name="smtpPort" inputMode="numeric" defaultValue={defaults.smtpPort} autoComplete="off" placeholder="587" className={input} />
+            </Field>
+            <Field label="SMTP login" error={errors.smtpUser}>
+              <input name="smtpUser" defaultValue={defaults.smtpUser} autoComplete="off" placeholder="you@gmail.com" className={input} />
+            </Field>
+            <Field
+              label="SMTP password"
+              error={errors.smtpPassword}
+              hint={`${keyHint(view.notifications.smtpPassword, 'SMTP_PASSWORD', 'password')} Changing the server or login forgets it.`}
+            >
+              <input
+                name="smtpPassword"
+                type="password"
+                autoComplete="off"
+                disabled={!view.canStoreKeys}
+                placeholder={view.notifications.smtpPassword.hint || 'App password'}
+                className={input}
+              />
+            </Field>
+            {view.notifications.smtpPassword.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearSmtpPassword" /> Remove the saved SMTP password
+              </label>
+            )}
+            <SetupGuide title="How to set up email with your own mail (SMTP)">
+              <li>
+                <strong>Gmail:</strong> turn on 2-Step Verification for the account, then create an app password on{' '}
+                <ExternalLink href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</ExternalLink>. Use server <code>smtp.gmail.com</code>,
+                port <code>587</code>, your Gmail address as login and the 16-letter app password, without spaces. Your normal password does not work.
+              </li>
+              <li>
+                <strong>Outlook or Microsoft 365:</strong> server <code>smtp.office365.com</code>, port <code>587</code>, your address and password (an app password if
+                the account uses two-step sign-in). Your administrator may need to allow SMTP for the mailbox.
+              </li>
+              <li>
+                <strong>Your hosting&apos;s mail:</strong> the server, port and login are in your hosting panel&apos;s email settings, often <code>mail.your-domain.com</code>{' '}
+                with your full address as login.
+              </li>
+              <li>Leave the from address blank: most mail servers only send from the account you log in with.</li>
+              <li>The password only travels encrypted (TLS), and is only ever sent to the server and login it was saved with.</li>
+            </SetupGuide>
+            <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
+              <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
             </Field>
             {view.notifications.resendApiKey.source === 'saved' && (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
               </label>
             )}
-            <SetupGuide title="How to set up email">
+            <SetupGuide title="How to set up email with Resend">
               <li>
                 Sign up on <ExternalLink href="https://resend.com">resend.com</ExternalLink> (the free plan is enough), open <em>API Keys</em>, create a key with sending
                 access and paste it above.
