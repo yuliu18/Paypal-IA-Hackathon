@@ -5,6 +5,9 @@
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
 import { accessToken } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
+import { allNotifiers } from '@/lib/guard/adapters/all-notifiers';
+import { createEmailNotifier } from '@/lib/guard/adapters/email-notifier';
+import { createTelegramNotifier } from '@/lib/guard/adapters/telegram-notifier';
 import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
@@ -48,6 +51,18 @@ async function payPalToolkit() {
   });
 }
 
+// Every held-refund channel the shop set up; each one left empty is a no-op. APP_URL turns /guard
+// in the message into a link.
+function heldNotifier(shop: ShopSettings) {
+  const { webhookUrl, email, telegram } = shop.notifications;
+  const appUrl = process.env.APP_URL;
+  return allNotifiers([
+    createWebhookNotifier({ url: webhookUrl, appUrl }),
+    createEmailNotifier({ apiKey: email.resendApiKey, from: email.from, to: shop.business.contactEmails, appUrl }),
+    createTelegramNotifier({ botToken: telegram.botToken, chatId: telegram.chatId, appUrl }),
+  ]);
+}
+
 // How many card numbers or other people's emails were masked on the way in and out.
 export type Redactions = { ticket: number; reply: number };
 
@@ -71,8 +86,7 @@ export async function handleTicket(
       captures: payPalCaptureLookup,
       audit: auditLog(),
       limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
-      // A no-op without a webhook URL; APP_URL turns /guard in the message into a link.
-      notifier: createWebhookNotifier({ url: shop.notifications.webhookUrl, appUrl: process.env.APP_URL }),
+      notifier: heldNotifier(shop),
     });
     return withClient(guard, 'support-agent', (tools) =>
       runSupportAgent({

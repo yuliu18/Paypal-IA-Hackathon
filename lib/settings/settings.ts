@@ -1,9 +1,9 @@
 // The shop's own configuration, edited on /settings: who the business is, its refund policy and
 // limits, which AI provider and models run the agent and the judge, its PayPal credentials and the
-// webhook that announces held refunds. Saved in data/settings.json with the keys (the webhook URL
-// included) encrypted (./secret-box). The AI provider, its key, PayPal and the webhook fall back to
-// the environment, everything else to the demo defaults; the models are chosen
-// here only.
+// channels that announce held refunds (webhook, email, Telegram). Saved in data/settings.json with
+// the keys (the webhook URL included) encrypted (./secret-box). The AI provider, its key, PayPal and
+// the notification channels fall back to the environment, everything else to the demo defaults; the
+// models are chosen here only.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
 
 import { link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
@@ -34,8 +34,13 @@ export type ShopSettings = {
   limits: Limits;
   ai: { provider: string; baseUrl: string; apiKey: string; agentModel: string; judgeModel: string };
   paypal: { clientId: string; secret: string };
-  // Empty: held refunds wait on /guard without telling anyone.
-  notifications: { webhookUrl: string };
+  // Each channel left empty is skipped; all empty: held refunds wait on /guard without telling
+  // anyone. Email goes to business.contactEmails.
+  notifications: {
+    webhookUrl: string;
+    email: { resendApiKey: string; from: string };
+    telegram: { botToken: string; chatId: string };
+  };
 };
 
 // What the settings page submits: every field as typed. A blank key keeps the saved one.
@@ -59,6 +64,13 @@ export type SettingsForm = {
   // Optional: forms from before the webhook existed keep the saved one, as a blank field does.
   webhookUrl?: string;
   clearWebhookUrl?: boolean;
+  // Optional too: a missing field keeps what was saved.
+  resendApiKey?: string;
+  clearResendApiKey?: boolean;
+  emailFrom?: string;
+  telegramBotToken?: string;
+  clearTelegramBotToken?: boolean;
+  telegramChatId?: string;
 };
 
 export type SaveResult = { ok: true } | { ok: false; errors: Partial<Record<keyof SettingsForm | 'form', string>> };
@@ -72,7 +84,7 @@ export type SettingsView = {
   form: SettingsForm;
   ai: { apiKey: KeyStatus };
   paypal: { secret: KeyStatus };
-  notifications: { webhookUrl: KeyStatus };
+  notifications: { webhookUrl: KeyStatus; resendApiKey: KeyStatus; telegramBotToken: KeyStatus };
 };
 
 type Stored = {
@@ -80,7 +92,7 @@ type Stored = {
   limits?: typeof DEFAULT_LIMITS;
   ai?: { provider: string; baseUrl: string; agentModel: string; judgeModel: string; apiKey?: string };
   paypal?: { clientId: string; secret?: string };
-  notifications?: { webhookUrl?: string };
+  notifications?: { webhookUrl?: string; resendApiKey?: string; emailFrom?: string; telegramBotToken?: string; telegramChatId?: string };
 };
 
 const isLocked = (env: Env) => env.SETTINGS_LOCKED === 'true';
@@ -147,7 +159,7 @@ const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) =>
   limits: (l) => isText(l.currency) && isMinor(l.autoRefundUpTo) && isMinor(l.approvalUpTo) && isMinor(l.dailyCap),
   ai: (a) => isText(a.provider) && isText(a.baseUrl) && isText(a.agentModel) && isText(a.judgeModel) && (a.apiKey === undefined || isText(a.apiKey)),
   paypal: (p) => isText(p.clientId) && (p.secret === undefined || isText(p.secret)),
-  notifications: (n) => n.webhookUrl === undefined || isText(n.webhookUrl),
+  notifications: (n) => ['webhookUrl', 'resendApiKey', 'emailFrom', 'telegramBotToken', 'telegramChatId'].every((name) => n[name] === undefined || isText(n[name])),
 };
 
 // What was saved; nothing when the file doesn't exist. A file that can't be read or parsed, or a
@@ -200,6 +212,9 @@ function resolve(stored: Stored, env: Env) {
 
   // Its token is the only secret in a webhook URL, and it goes nowhere but that URL.
   const webhookUrl = savedKey(stored.notifications?.webhookUrl, env) ?? envKey(env.GUARD_WEBHOOK_URL, true);
+  // Both only ever go to their own fixed API (Resend, Telegram), whatever sender or chat is typed.
+  const resendApiKey = savedKey(stored.notifications?.resendApiKey, env) ?? envKey(env.RESEND_API_KEY, true);
+  const botToken = savedKey(stored.notifications?.telegramBotToken, env) ?? envKey(env.TELEGRAM_BOT_TOKEN, true);
 
   const settings: ShopSettings = {
     business: stored.business ?? {
@@ -216,9 +231,14 @@ function resolve(stored: Stored, env: Env) {
       judgeModel: stored.ai?.judgeModel || agentModel,
     },
     paypal: { clientId, secret: payPalSecret.value },
-    notifications: { webhookUrl: webhookUrl.value },
+    notifications: {
+      webhookUrl: webhookUrl.value,
+      email: { resendApiKey: resendApiKey.value, from: stored.notifications?.emailFrom || env.NOTIFY_EMAIL_FROM || '' },
+      telegram: { botToken: botToken.value, chatId: stored.notifications?.telegramChatId || env.TELEGRAM_CHAT_ID || '' },
+    },
   };
-  return { settings, limits, keys: { ai: aiKey.status, paypal: payPalSecret.status, webhook: webhookUrl.status } };
+  const keys = { ai: aiKey.status, paypal: payPalSecret.status, webhook: webhookUrl.status, resend: resendApiKey.status, telegram: botToken.status };
+  return { settings, limits, keys };
 }
 
 // AGENT_MODEL and JUDGE_MODEL were read before the models moved to /settings: say once (per value)
@@ -262,10 +282,14 @@ export async function settingsView({ env = process.env, file = env.SETTINGS_FILE
       paypalClientId: settings.paypal.clientId,
       paypalSecret: '',
       webhookUrl: '',
+      resendApiKey: '',
+      emailFrom: settings.notifications.email.from,
+      telegramBotToken: '',
+      telegramChatId: settings.notifications.telegram.chatId,
     },
     ai: { apiKey: keys.ai },
     paypal: { secret: keys.paypal },
-    notifications: { webhookUrl: keys.webhook },
+    notifications: { webhookUrl: keys.webhook, resendApiKey: keys.resend, telegramBotToken: keys.telegram },
   };
 }
 
@@ -279,6 +303,10 @@ function toMinor(text: string): number | undefined {
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MODEL = /^\S{1,200}$/;
+// A numeric user, group or channel id (groups and channels are negative), or @channelname.
+const CHAT_ID = /^(-?\d{1,20}|@\w{1,64})$/;
+// BotFather's shape, 123456789:AA…: it becomes part of the API URL, so nothing else may get in.
+const BOT_TOKEN = /^\d{1,20}:[\w-]{1,200}$/;
 
 export async function saveSettings(form: SettingsForm, { env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SaveResult> {
   if (isLocked(env)) return { ok: false, errors: { form: 'Settings are read-only on this server (SETTINGS_LOCKED).' } };
@@ -330,9 +358,17 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (webhookUrl && (!/^https:\/\/[^\s/]+/i.test(webhookUrl) || /[\s\p{Cc}]/u.test(webhookUrl) || !URL.canParse(webhookUrl))) {
     errors.webhookUrl = 'Enter the https:// webhook URL from Slack or Discord.';
   }
+  const resendApiKey = (form.resendApiKey ?? '').trim();
+  if (/[\s\p{Cc}]/u.test(resendApiKey)) errors.resendApiKey = badKey;
+  const emailFrom = form.emailFrom?.trim();
+  if (emailFrom && (emailFrom.length > 200 || !EMAIL.test(emailFrom))) errors.emailFrom = 'Enter the sender address, e.g. guard@your-domain.com.';
+  const telegramBotToken = (form.telegramBotToken ?? '').trim();
+  if (telegramBotToken && !BOT_TOKEN.test(telegramBotToken)) errors.telegramBotToken = 'Paste the token from @BotFather, like 123456789:AA…';
+  const telegramChatId = form.telegramChatId?.trim();
+  if (telegramChatId && !CHAT_ID.test(telegramChatId)) errors.telegramChatId = 'Enter a chat id like 123456789 or -1001234567890, or @channelname.';
   if (Object.keys(errors).length) return { ok: false, errors };
 
-  const sealing = Boolean(apiKey || paypalSecret || webhookUrl);
+  const sealing = Boolean(apiKey || paypalSecret || webhookUrl || resendApiKey || telegramBotToken);
   const secret = sealing ? settingsSecret(await withSecret(env, file, true)) : undefined;
   // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
   if (sealing && !secret) {
@@ -343,6 +379,8 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
   const keepPaypalSecret = !form.clearPaypalSecret && previous.paypal?.clientId === paypalClientId ? previous.paypal.secret : undefined;
   const keepWebhookUrl = form.clearWebhookUrl ? undefined : previous.notifications?.webhookUrl;
+  const keepResendApiKey = form.clearResendApiKey ? undefined : previous.notifications?.resendApiKey;
+  const keepBotToken = form.clearTelegramBotToken ? undefined : previous.notifications?.telegramBotToken;
   const stored: Stored = {
     business: { name, contactEmails, refundPolicy },
     limits: { currency, autoRefundUpTo: autoRefundUpTo!, approvalUpTo: approvalUpTo!, dailyCap: dailyCap! },
@@ -354,7 +392,14 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
       apiKey: apiKey ? sealSecret(apiKey, secret!) : keepApiKey,
     },
     paypal: { clientId: paypalClientId, secret: paypalSecret ? sealSecret(paypalSecret, secret!) : keepPaypalSecret },
-    notifications: { webhookUrl: webhookUrl ? sealSecret(webhookUrl, secret!) : keepWebhookUrl },
+    notifications: {
+      webhookUrl: webhookUrl ? sealSecret(webhookUrl, secret!) : keepWebhookUrl,
+      resendApiKey: resendApiKey ? sealSecret(resendApiKey, secret!) : keepResendApiKey,
+      // Plain fields: blank clears them, a form without them keeps what was saved.
+      emailFrom: emailFrom ?? previous.notifications?.emailFrom,
+      telegramBotToken: telegramBotToken ? sealSecret(telegramBotToken, secret!) : keepBotToken,
+      telegramChatId: telegramChatId ?? previous.notifications?.telegramChatId,
+    },
   };
 
   await mkdir(dirname(file), { recursive: true });

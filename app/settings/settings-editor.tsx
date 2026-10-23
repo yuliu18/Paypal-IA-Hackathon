@@ -62,7 +62,7 @@ function CheckResult({ check }: { check: Check }) {
 }
 
 // The shop owner's settings: business, refund limits, AI provider, PayPal and the held-refund
-// webhook. Keys and the webhook URL are write-only: the page only ever receives their last 4 characters.
+// channels (webhook, email, Telegram). Keys and the webhook URL are write-only: the page only ever receives their last 4 characters.
 export function SettingsEditor({ view, providers, initialModels }: { view: SettingsView; providers: CatalogProvider[]; initialModels: CatalogModel[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, save, saving] = useActionState(saveSettingsAction, null);
@@ -246,7 +246,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </div>
           </Section>
 
-          <Section title="Notifications" detail="When the guard holds a refund for a person, it posts a message to this Slack or Discord webhook. The message names the amount, the masked customer email and the rules, never the ticket's text.">
+          <Section title="Notifications" detail="When the guard holds a refund for a person, it tells every channel set here: a Slack or Discord webhook, an email, a Telegram chat. The message names the amount, the masked customer email and the rules, never the ticket's text.">
             <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
               <input
                 name="webhookUrl"
@@ -260,6 +260,40 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             {view.notifications.webhookUrl.source === 'saved' && (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
+              </label>
+            )}
+            <p className="text-sm text-pp-muted sm:col-span-2">Email is sent through Resend to the contact emails above.</p>
+            <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
+              <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
+            </Field>
+            <Field
+              label="From address"
+              error={errors.emailFrom}
+              hint="A sender on a domain verified in Resend. Its test sender, onboarding@resend.dev, only delivers to your own Resend account address."
+            >
+              <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
+            </Field>
+            {view.notifications.resendApiKey.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
+              </label>
+            )}
+            <Field label="Telegram bot token" error={errors.telegramBotToken} hint={keyHint(view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
+              <input
+                name="telegramBotToken"
+                type="password"
+                autoComplete="off"
+                disabled={!view.canStoreKeys}
+                placeholder={view.notifications.telegramBotToken.hint || '123456789:AA…'}
+                className={input}
+              />
+            </Field>
+            <Field label="Telegram chat id" error={errors.telegramChatId} hint="Message your bot, then open api.telegram.org/bot<token>/getUpdates and copy chat.id, or use @channelname.">
+              <input name="telegramChatId" defaultValue={defaults.telegramChatId} autoComplete="off" placeholder="-1001234567890" className={input} />
+            </Field>
+            {view.notifications.telegramBotToken.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearTelegramBotToken" /> Remove the saved bot token
               </label>
             )}
           </Section>

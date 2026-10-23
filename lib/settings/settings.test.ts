@@ -297,7 +297,7 @@ describe('held-refund webhook', () => {
     const raw = await readFile(file, 'utf8');
     expect(raw).not.toContain('hooks.slack.example');
     expect(raw).not.toContain('token-wxyz');
-    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({ webhookUrl: WEBHOOK });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
   });
 
   it('keeps the saved URL when the field is left blank, and removes it when asked', async () => {
@@ -348,6 +348,110 @@ describe('held-refund webhook', () => {
     expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('shop-paypal-secret-5678');
     expect((await loadSettings({ file, env: ENV })).ai.apiKey).toBe('sk-deepseek-abcd1234');
     await saveSettings(form({ apiKey: '', paypalSecret: '', clearPaypalSecret: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
+  });
+});
+
+describe('held-refund email and Telegram', () => {
+  const RESEND = 're_resend_key_for_tests_qrst';
+  const TOKEN = '123456789:AAH-telegram_token_for_tests_uvwx';
+  const channels = { resendApiKey: RESEND, emailFrom: 'guard@casamugs.example', telegramBotToken: TOKEN, telegramChatId: '-1001234567890' };
+
+  it('stores the Resend key and bot token encrypted and gives them back to the server', async () => {
+    expect(await saveSettings(form({ ...channels, resendApiKey: ` ${RESEND} ` }), { file, env: ENV })).toEqual({ ok: true });
+    const raw = await readFile(file, 'utf8');
+    expect(raw).not.toContain('re_resend_key');
+    expect(raw).not.toContain('telegram_token');
+    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+  });
+
+  it('keeps the saved key and token when left blank or missing, and removes each when asked', async () => {
+    await saveSettings(form(channels), { file, env: ENV });
+    await saveSettings(form({ resendApiKey: '', telegramBotToken: '' }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications).toMatchObject({
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+    await saveSettings(form({ clearResendApiKey: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications).toMatchObject({ email: { resendApiKey: '' }, telegram: { botToken: TOKEN } });
+    await saveSettings(form({ clearTelegramBotToken: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.telegram.botToken).toBe('');
+  });
+
+  it('rejects an invalid sender, chat id or bot token field by field and saves nothing', async () => {
+    const result = await saveSettings(form({ emailFrom: 'not an email', telegramChatId: 'my chat', telegramBotToken: 'abc/../x' }), { file, env: ENV });
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        emailFrom: 'Enter the sender address, e.g. guard@your-domain.com.',
+        telegramChatId: 'Enter a chat id like 123456789 or -1001234567890, or @channelname.',
+        telegramBotToken: 'Paste the token from @BotFather, like 123456789:AA…',
+      },
+    });
+    for (const telegramChatId of ['12a', '--1', '@', '@a b']) {
+      expect(await saveSettings(form({ telegramChatId }), { file, env: ENV })).toMatchObject({ ok: false, errors: { telegramChatId: expect.any(String) } });
+    }
+    await expect(stat(file)).rejects.toThrow();
+    for (const telegramChatId of ['123456789', '-1001234567890', '@casa_mugs']) {
+      expect(await saveSettings(form({ telegramChatId }), { file, env: ENV })).toEqual({ ok: true });
+    }
+  });
+
+  it('falls back to RESEND_API_KEY, NOTIFY_EMAIL_FROM, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, and saved values win', async () => {
+    const env = { ...ENV, RESEND_API_KEY: 're_env_key_1111', NOTIFY_EMAIL_FROM: 'env@shop.example', TELEGRAM_BOT_TOKEN: '42:env_token_2222', TELEGRAM_CHAT_ID: '777' };
+    expect((await loadSettings({ file, env })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: 're_env_key_1111', from: 'env@shop.example' },
+      telegram: { botToken: '42:env_token_2222', chatId: '777' },
+    });
+    expect((await loadSettings({ file, env: ENV })).notifications).toEqual({
+      webhookUrl: '',
+      email: { resendApiKey: '', from: '' },
+      telegram: { botToken: '', chatId: '' },
+    });
+    await saveSettings(form(channels), { file, env });
+    expect((await loadSettings({ file, env })).notifications).toMatchObject({
+      email: { resendApiKey: RESEND, from: 'guard@casamugs.example' },
+      telegram: { botToken: TOKEN, chatId: '-1001234567890' },
+    });
+  });
+
+  it('shows the page only the last 4 characters of the key and token, and the plain fields as saved', async () => {
+    const env = { ...ENV, RESEND_API_KEY: 're_env_key_1111' };
+    const before = await settingsView({ file, env });
+    expect(before.notifications.resendApiKey).toEqual({ source: 'env', hint: '••••1111' });
+    expect(before.notifications.telegramBotToken).toEqual({ source: 'none', hint: '' });
+    await saveSettings(form(channels), { file, env });
+    const view = await settingsView({ file, env });
+    expect(view.notifications.resendApiKey).toEqual({ source: 'saved', hint: '••••qrst' });
+    expect(view.notifications.telegramBotToken).toEqual({ source: 'saved', hint: '••••uvwx' });
+    expect(view.form).toMatchObject({ resendApiKey: '', telegramBotToken: '', emailFrom: 'guard@casamugs.example', telegramChatId: '-1001234567890' });
+    expect(JSON.stringify(view)).not.toContain('re_resend_key');
+    expect(JSON.stringify(view)).not.toContain('telegram_token');
+  });
+
+  it('stores them without SETTINGS_SECRET using the generated key file, and not at all when locked', async () => {
+    const env = { ...ENV, SETTINGS_SECRET: undefined };
+    expect(await saveSettings(form({ apiKey: '', paypalSecret: '', ...channels }), { file, env })).toEqual({ ok: true });
+    expect((await stat(join(dir, 'data', 'settings.key'))).mode & 0o777).toBe(0o600);
+    expect((await loadSettings({ file, env })).notifications.telegram.botToken).toBe(TOKEN);
+    const locked = { ...ENV, SETTINGS_LOCKED: 'true' };
+    expect(await saveSettings(form({ ...channels, resendApiKey: 're_other' }), { file, env: locked })).toMatchObject({ ok: false });
+    expect((await loadSettings({ file, env })).notifications.email.resendApiKey).toBe(RESEND);
+  });
+
+  it('leaves the webhook URL and PayPal secret keep-and-clear as before', async () => {
+    const WEBHOOK = 'https://hooks.slack.example/services/T000/B000/token-wxyz';
+    await saveSettings(form({ webhookUrl: WEBHOOK, ...channels }), { file, env: ENV });
+    await saveSettings(form({ paypalSecret: '', clearResendApiKey: true, clearTelegramBotToken: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe(WEBHOOK);
+    expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('shop-paypal-secret-5678');
+    await saveSettings(form({ paypalSecret: '', clearWebhookUrl: true, clearPaypalSecret: true }), { file, env: ENV });
+    expect((await loadSettings({ file, env: ENV })).notifications.webhookUrl).toBe('');
     expect((await loadSettings({ file, env: ENV })).paypal.secret).toBe('');
   });
 });

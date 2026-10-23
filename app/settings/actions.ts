@@ -29,6 +29,12 @@ function settingsForm(form: FormData): SettingsForm {
     clearPaypalSecret: form.get('clearPaypalSecret') === 'on',
     webhookUrl: text(form, 'webhookUrl'),
     clearWebhookUrl: form.get('clearWebhookUrl') === 'on',
+    resendApiKey: text(form, 'resendApiKey'),
+    clearResendApiKey: form.get('clearResendApiKey') === 'on',
+    emailFrom: text(form, 'emailFrom'),
+    telegramBotToken: text(form, 'telegramBotToken'),
+    clearTelegramBotToken: form.get('clearTelegramBotToken') === 'on',
+    telegramChatId: text(form, 'telegramChatId'),
   };
 }
 
