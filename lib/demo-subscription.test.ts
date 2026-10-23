@@ -83,6 +83,17 @@ describe('createSampleSubscription', () => {
     expect(sent.find((r) => r.path.startsWith('/v1/billing/plans?'))?.path).toContain('product_id=PROD-1');
   });
 
+  it('sends the buyer back to /support after approving, without which PayPal loops back to its login', async () => {
+    const { fetch, sent } = fakePayPal({
+      'GET /v1/catalogs/products': () => ({ json: { products: [{ id: 'PROD-1', name: 'Guard demo membership' }], total_pages: 1 } }),
+      'GET /v1/billing/plans': () => ({ json: { plans: [{ id: 'P-1', name: 'Guard demo monthly', status: 'ACTIVE' }], total_pages: 1 } }),
+      'POST /v1/billing/subscriptions': subscriptionCreated,
+    });
+    await createSampleSubscription({ fetch, token, file, appUrl: 'https://shop.example/' });
+    const context = (sent.find((r) => r.path === '/v1/billing/subscriptions')?.body as { application_context: Record<string, string> }).application_context;
+    expect(context).toMatchObject({ return_url: 'https://shop.example/support', cancel_url: 'https://shop.example/support' });
+  });
+
   it('reuses the demo product and its active plan by name', async () => {
     const { fetch, sent } = fakePayPal({
       'GET /v1/catalogs/products': () => ({ json: { products: [{ id: 'PROD-9', name: 'Guard demo membership' }], total_pages: 1 } }),

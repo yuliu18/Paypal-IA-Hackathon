@@ -11,7 +11,9 @@ const PLAN_NAME = 'Guard demo monthly';
 
 export type SampleSubscription = { subscriptionId: string; approveUrl: string };
 
-type Deps = { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; file?: string };
+// `appUrl`: where PayPal sends the buyer back after approving; without a return URL its checkout
+// loops back to the login instead of activating the subscription.
+type Deps = { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; file?: string; appUrl?: string };
 
 function client({ fetch = globalThis.fetch, token = accessToken }: Deps) {
   async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
@@ -78,9 +80,10 @@ export async function createSampleSubscription(deps: Deps = {}): Promise<SampleS
       payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 1 },
     }));
 
+  const back = `${(deps.appUrl || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '')}/support`;
   const subscription = await call<{ id: string; links?: { rel: string; href: string }[] }>('POST', '/v1/billing/subscriptions', {
     plan_id: plan.id,
-    application_context: { brand_name: 'Guard demo shop', shipping_preference: 'NO_SHIPPING', user_action: 'SUBSCRIBE_NOW' },
+    application_context: { brand_name: 'Guard demo shop', shipping_preference: 'NO_SHIPPING', user_action: 'SUBSCRIBE_NOW', return_url: back, cancel_url: back },
   });
   const approveUrl = subscription.links?.find((link) => link.rel === 'approve')?.href;
   if (!approveUrl) throw new Error(`Subscription ${subscription.id} came back without an approval link`);

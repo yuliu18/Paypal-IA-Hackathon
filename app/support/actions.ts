@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { refresh } from 'next/cache';
 import { seedSandbox } from '@/lib/demo-seed';
 import { createSampleSubscription } from '@/lib/demo-subscription';
@@ -26,7 +27,9 @@ export type SubscriptionState = { ok: true; approveUrl: string; subscriptionId: 
 // to approve it. Covered by the demo password like the action above.
 export async function createSampleSubscriptionAction(): Promise<SubscriptionState> {
   try {
-    const { subscriptionId, approveUrl } = await createSampleSubscription();
+    // The buyer comes back to the app they started from (this request's origin), else APP_URL.
+    const origin = (await headers()).get('origin') ?? undefined;
+    const { subscriptionId, approveUrl } = await createSampleSubscription({ appUrl: origin });
     refresh();
     return { ok: true, subscriptionId, approveUrl };
   } catch (error) {
