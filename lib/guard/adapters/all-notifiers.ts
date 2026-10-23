@@ -3,6 +3,8 @@
 
 import type { HeldNotifier } from '../ports';
 
+// Each channel already gives up after 5 seconds; this backstop, twice that, covers a channel whose
+// own timeout fails to fire, so the guard's notification can never hang.
 export function allNotifiers(notifiers: HeldNotifier[], { timeoutMs = 10_000 }: { timeoutMs?: number } = {}): HeldNotifier {
   return {
     async notifyHeld(entry) {

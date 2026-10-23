@@ -17,8 +17,18 @@ function amountOf(args: Record<string, unknown>): string {
   return ok ? `${amount.value} ${amount.currency_code}` : 'an unreadable amount';
 }
 
-// The ticket's email is typed by the customer: masked, and stripped of anything chat markup uses.
-const plain = (text: string) => text.replace(/[^\p{L}\p{N}@.*_+-]/gu, '').slice(0, 120);
+// A security filter, not formatting: the ticket's email is typed by the customer, so after masking
+// only letters, digits and @.*_+- survive. Anything else could become a link or mention in chat.
+const sanitized = (text: string) => text.replace(/[^\p{L}\p{N}@.*_+-]/gu, '').slice(0, 120);
+
+// Only well-formed codes are quoted; the rest are counted, so a hold never reads as having no reason.
+function reasonsOf(codes: string[]): string {
+  if (codes.length === 0) return 'none given';
+  const shown = codes.filter((code) => CODE.test(code));
+  const hidden = codes.length - shown.length;
+  if (hidden === 0) return shown.join(', ');
+  return shown.length ? `${shown.join(', ')} and ${hidden} more not shown` : `${hidden} not shown`;
+}
 
 function guardLink(appUrl: string | undefined): string {
   const base = appUrl?.trim().replace(/\/+$/, '');
@@ -26,12 +36,11 @@ function guardLink(appUrl: string | undefined): string {
 }
 
 export function heldMessage(entry: AuditRow, appUrl?: string): string {
-  const codes = entry.decision.violations.map((v) => v.code).filter((code) => CODE.test(code));
   return [
     `Payment guard: a refund of ${amountOf(entry.args)} is waiting for approval.`,
-    `Customer: ${plain(maskEmail(entry.task.mandate.customerEmail))}.`,
-    `Reasons: ${codes.join(', ') || 'none given'}.`,
-    `Audit entry #${plain(entry.id)}.`,
+    `Customer: ${sanitized(maskEmail(entry.task.mandate.customerEmail))}.`,
+    `Reasons: ${reasonsOf(entry.decision.violations.map((v) => v.code))}.`,
+    `Audit entry #${sanitized(entry.id)}.`,
     `Approve or reject it on ${guardLink(appUrl)}`,
   ].join('\n');
 }
