@@ -1,6 +1,7 @@
 // The payment guard: an MCP server that sits between an AI agent and PayPal's MCP toolkit.
-// It exposes the same tools, passes allowlisted reads through, evaluates refunds and subscription
-// cancellations against the policy and the intent judge, and blocks everything else by default.
+// It exposes the same tools, passes allowlisted reads through, evaluates refunds, subscription
+// cancellations and dispute acceptances against the policy and the intent judge, and blocks
+// everything else by default.
 // Blocked and held calls never reach PayPal; a held call waits for a person to approve it.
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -8,16 +9,30 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { toMinor } from './adapters/paypal-capture-lookup';
 import { evaluateCancellation, SUBSCRIPTION_ID } from './domain/cancellation';
-import { minimizeOrder, minimizeSubscription, withheldDetail } from './domain/privacy';
+import { DISPUTE_ID, evaluateDisputeAcceptance } from './domain/dispute';
+import { toDisputeFacts } from './adapters/paypal-dispute-lookup';
+import { minimizeDispute, minimizeOrder, minimizeSubscription, withheldDetail } from './domain/privacy';
 import { maskPersonalData } from './domain/redact';
 import { evaluateRefund, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
-import type { AgentTask, AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge, SubscriptionLookup } from './ports';
+import type { AgentTask, AuditEntry, AuditLog, AuditRow, CaptureLookup, DisputeLookup, HeldNotifier, IntentJudge, SubscriptionLookup } from './ports';
 
 // Single-record reads a support agent needs, each returned only when it belongs to the ticket
 // customer. Bulk reads such as list_transactions would expose every customer's data, and
 // get_refund's answer doesn't say whose refund it is, so they stay blocked like any tool not listed.
-const READ_TOOLS = new Set(['get_order', 'show_subscription_details']);
+const READ_TOOLS = new Set(['get_order', 'show_subscription_details', 'get_dispute']);
 const isRead = (tool: string) => READ_TOOLS.has(tool);
+
+// The toolkit pastes these ids into the request path, so only a plain id may reach it.
+const PLAIN_ID_ARGS: Record<string, { arg: string; pattern: RegExp; noun: string }> = {
+  show_subscription_details: { arg: 'subscription_id', pattern: SUBSCRIPTION_ID, noun: 'subscription id' },
+  get_dispute: { arg: 'dispute_id', pattern: DISPUTE_ID, noun: 'dispute id' },
+};
+function plainIdViolation(tool: string, args: Record<string, unknown>): Decision | undefined {
+  const rule = PLAIN_ID_ARGS[tool];
+  if (!rule) return undefined;
+  const value = args[rule.arg];
+  return typeof value === 'string' && rule.pattern.test(value) ? undefined : block('INVALID_ARGUMENTS', `${rule.arg} must be a plain ${rule.noun}`);
+}
 
 export type GuardDeps = {
   upstream: Client;
@@ -26,6 +41,8 @@ export type GuardDeps = {
   captures: CaptureLookup;
   // Without it, every cancel_subscription is blocked (SUBSCRIPTION_LOOKUP_FAILED).
   subscriptions?: SubscriptionLookup;
+  // Without it, every accept_dispute_claim is blocked (DISPUTE_LOOKUP_FAILED).
+  disputes?: DisputeLookup;
   audit: AuditLog;
   limits: Limits;
   now?: () => Date;
@@ -76,6 +93,7 @@ function blockedResult(decision: Decision): CallToolResult {
 const WRITES: Record<string, { held: string; noun: string; looksUp: string; lookupFailed: string }> = {
   create_refund: { held: 'Refund held for human approval', noun: 'refund', looksUp: 'capture', lookupFailed: 'CAPTURE_LOOKUP_FAILED' },
   cancel_subscription: { held: 'Cancellation held for human approval', noun: 'cancellation', looksUp: 'subscription', lookupFailed: 'SUBSCRIPTION_LOOKUP_FAILED' },
+  accept_dispute_claim: { held: 'Dispute acceptance held for human approval', noun: 'dispute acceptance', looksUp: 'dispute', lookupFailed: 'DISPUTE_LOOKUP_FAILED' },
 };
 const isDecidedWrite = (tool: string) => Object.hasOwn(WRITES, tool);
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -92,10 +110,22 @@ const answerOf = (result: CallToolResult): unknown => {
 };
 
 // Whether a read's answer belongs to the ticket customer. get_order: every purchase unit's
-// custom_id (the customer the shop charged); show_subscription_details: the subscriber's email.
-// An answer that can't be read is withheld too.
-function readBelongsTo(tool: string, result: CallToolResult, mandate: AgentTask['mandate']): boolean {
+// custom_id (the customer the shop charged); show_subscription_details: the subscriber's email;
+// get_dispute: the customer the shop charged for the disputed capture, since PayPal hides the
+// customer's email from the shop. An answer that can't be read, or checked, is withheld too.
+async function readBelongsTo(
+  tool: string,
+  result: CallToolResult,
+  mandate: AgentTask['mandate'],
+  { captures, timeoutMs }: Pick<WriteDeps, 'captures' | 'timeoutMs'>,
+): Promise<boolean> {
   try {
+    if (tool === 'get_dispute') {
+      const { captureId } = toDisputeFacts(answerOf(result));
+      if (!captureId) return false;
+      const capture = await withTimeout(captures.getCapture(captureId), timeoutMs, 'Capture lookup');
+      return isMandateCustomer(capture.customerEmail, mandate);
+    }
     if (tool === 'show_subscription_details') {
       const subscription = answerOf(result) as { subscriber?: { email_address?: string } } | null;
       return isMandateCustomer(subscription?.subscriber?.email_address, mandate);
@@ -123,6 +153,7 @@ type WriteDeps = {
   upstream: Client;
   captures: CaptureLookup;
   subscriptions?: SubscriptionLookup;
+  disputes?: DisputeLookup;
   audit: AuditLog;
   limits: Limits;
   now: () => Date;
@@ -197,6 +228,57 @@ async function checkCancellation(
   return evaluateCancellation({ subscription, mandate: task.mandate, cancellationsThisTicket });
 }
 
+// The toolkit checks the note against its dispute id pattern, so a note with spaces never reaches
+// PayPal; the guard says so up front instead of letting the agent read a validation error.
+const DISPUTE_NOTE = /^[A-Za-z0-9_-]{1,255}$/;
+
+function parseAcceptance(args: Record<string, unknown>): { disputeId: string } | undefined {
+  if (typeof args.dispute_id !== 'string' || !DISPUTE_ID.test(args.dispute_id)) return undefined;
+  if (typeof args.note !== 'string' || !DISPUTE_NOTE.test(args.note)) return undefined;
+  return { disputeId: args.dispute_id };
+}
+
+// The deterministic checks of accepting a dispute claim, which refunds the disputed amount. Like a
+// refund, a person's approval lifts the approval threshold and nothing else.
+async function checkDisputeAcceptance(
+  { disputes, captures, audit, limits, now, timeoutMs }: WriteDeps,
+  task: AgentTask,
+  args: Record<string, unknown>,
+  approvedByPerson: boolean,
+): Promise<{ decision: Decision; moved?: Money }> {
+  const request = parseAcceptance(args);
+  if (!request) {
+    return { decision: block('INVALID_ARGUMENTS', 'accept_dispute_claim needs a plain dispute_id and a note of letters, digits, _ or - (the toolkit accepts no spaces)') };
+  }
+  let dispute;
+  try {
+    if (!disputes) throw new Error('No dispute lookup is configured');
+    dispute = await withTimeout(disputes.getDispute(request.disputeId), timeoutMs, 'Dispute lookup');
+  } catch (error) {
+    return { decision: block('DISPUTE_LOOKUP_FAILED', maskPersonalData(message(error))) };
+  }
+  if (!dispute) return { decision: block('DISPUTE_LOOKUP_FAILED', `Dispute ${request.disputeId} was not found in PayPal`) };
+  // Without the disputed capture there is no owner and no refundable amount to check against.
+  if (!dispute.captureId) return { decision: block('CAPTURE_MISMATCH', `Dispute ${dispute.id} names no single capture of the shop`) };
+  if (await audit.hasUnsettledRefund(dispute.captureId)) {
+    return { decision: block('REFUND_UNCONFIRMED', `An earlier refund of capture ${dispute.captureId} is not confirmed yet; a person must check it in PayPal first`) };
+  }
+
+  let capture;
+  try {
+    capture = await withTimeout(captures.getCapture(dispute.captureId), timeoutMs, 'Capture lookup');
+  } catch (error) {
+    // PayPal unreachable, as for the dispute itself: a held acceptance stays open to try again.
+    return { decision: block('DISPUTE_LOOKUP_FAILED', `Capture lookup: ${maskPersonalData(message(error))}`) };
+  }
+
+  const startOfDay = new Date(now());
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const refundedToday = await audit.movedSince(startOfDay, dispute.amount.currency);
+  const applied = approvedByPerson ? { ...limits, approvalThreshold: limits.perRefund } : limits;
+  return { decision: evaluateDisputeAcceptance({ dispute, capture, mandate: task.mandate, limits: applied, refundedToday }), moved: dispute.amount };
+}
+
 // The deterministic checks of any write the guard decides. A cancellation moves no money.
 async function checkWrite(
   deps: WriteDeps,
@@ -205,6 +287,7 @@ async function checkWrite(
   { approvedByPerson, cancellationsThisTicket }: { approvedByPerson: boolean; cancellationsThisTicket: number },
 ): Promise<{ decision: Decision; moved?: Money }> {
   if (call.tool === 'cancel_subscription') return { decision: await checkCancellation(deps, task, call.args, cancellationsThisTicket) };
+  if (call.tool === 'accept_dispute_claim') return checkDisputeAcceptance(deps, task, call.args, approvedByPerson);
   return checkRefund(deps, task, call.args, approvedByPerson);
 }
 
@@ -248,13 +331,14 @@ async function executeWrite(
   }
 }
 
-// The order or subscription the agent sees: only what a refund or cancellation needs, plus the
+// The order, subscription or dispute the agent sees: only what its write needs, plus the
 // paths the guard withheld. Its owner was already checked, and readBelongsTo refuses an answer that isn't JSON.
 function withoutPersonalData(tool: string, result: CallToolResult): { result: CallToolResult; withheld: string[] } {
   const answer = answerOf(result);
   let kept: Record<string, unknown>;
   let withheld: string[];
   if (tool === 'show_subscription_details') ({ subscription: kept, withheld } = minimizeSubscription(answer));
+  else if (tool === 'get_dispute') ({ dispute: kept, withheld } = minimizeDispute(answer));
   else ({ order: kept, withheld } = minimizeOrder(answer));
   return { result: { content: [{ type: 'text', text: JSON.stringify({ ...kept, withheld_by_guard: withheld }) }] }, withheld };
 }
@@ -274,7 +358,7 @@ export type HeldRefundDecision = HeldDecision;
 
 const textOf = (result: CallToolResult) => result.content.map((part) => (part.type === 'text' ? part.text : '')).join(' ');
 
-// A person approves or rejects a held refund or cancellation. It runs in the same queue as the
+// A person approves or rejects a held refund, cancellation or dispute acceptance. It runs in the same queue as the
 // agents' writes, so two approvals of one hold can't both pass the "already decided" check, and
 // the daily total read here includes every refund made since the hold.
 export function decideHeldCall(
@@ -285,7 +369,7 @@ export function decideHeldCall(
   const full: WriteDeps = { ...deps, now, timeoutMs };
   return serialized(async () => {
     const held = await full.audit.get(heldId);
-    if (!held || held.outcome !== 'held' || !isDecidedWrite(held.tool)) return { outcome: 'refused', message: `Entry ${heldId} is not a held refund or cancellation` };
+    if (!held || held.outcome !== 'held' || !isDecidedWrite(held.tool)) return { outcome: 'refused', message: `Entry ${heldId} is not a held refund, cancellation or dispute acceptance` };
     const { noun, looksUp, lookupFailed } = WRITES[held.tool];
     if (await full.audit.isResolved(heldId)) return { outcome: 'refused', message: `Held ${noun} ${heldId} was already decided` };
 
@@ -309,6 +393,9 @@ export function decideHeldCall(
     const result = await executeWrite(full, { ...base, decision: approved, moved });
     if (result.isError) return { outcome: 'error', message: textOf(result) };
     if (!moved) return { outcome: 'executed', message: `Subscription ${String(held.args.subscription_id)} cancelled in PayPal` };
+    if (held.tool === 'accept_dispute_claim') {
+      return { outcome: 'executed', message: `Dispute ${String(held.args.dispute_id)} accepted in PayPal; it refunds ${(moved.minor / 100).toFixed(2)} ${moved.currency}` };
+    }
     return { outcome: 'executed', message: `Refund of ${(moved.minor / 100).toFixed(2)} ${moved.currency} executed in PayPal` };
   });
 }
@@ -322,6 +409,7 @@ export function createPaymentGuard({
   judge,
   captures,
   subscriptions,
+  disputes,
   audit,
   limits,
   now = () => new Date(),
@@ -332,7 +420,7 @@ export function createPaymentGuard({
 
   server.setRequestHandler(ListToolsRequestSchema, (request) => upstream.listTools(request.params));
 
-  const deps: WriteDeps = { upstream, captures, subscriptions, audit, limits, now, timeoutMs };
+  const deps: WriteDeps = { upstream, captures, subscriptions, disputes, audit, limits, now, timeoutMs };
   // Cancellations this ticket ran or held; writes are serialized, so the count can't race.
   let cancellations = 0;
   const callPayPal = (name: string, args: Record<string, unknown>) =>
@@ -356,10 +444,9 @@ export function createPaymentGuard({
 
     let decision: Decision;
     let moved: Money | undefined;
-    // The toolkit pastes the subscription id into the URL, so only a plain id may reach it.
-    if (name === 'show_subscription_details' && (typeof args.subscription_id !== 'string' || !SUBSCRIPTION_ID.test(args.subscription_id))) {
-      decision = block('INVALID_ARGUMENTS', 'subscription_id must be a plain subscription id');
-    } else if (isRead(name)) decision = { verdict: 'allow', violations: [] };
+    const badId = plainIdViolation(name, args);
+    if (badId) decision = badId;
+    else if (isRead(name)) decision = { verdict: 'allow', violations: [] };
     else if (isDecidedWrite(name)) ({ decision, moved } = await decideWrite(name, args));
     else decision = block('TOOL_NOT_ALLOWED', `${name} is not covered by the guard policy`);
 
@@ -387,8 +474,8 @@ export function createPaymentGuard({
     if (isRead(name)) {
       try {
         const result = await callPayPal(name, args);
-        if (!result.isError && !readBelongsTo(name, result, task.mandate)) {
-          const what = name === 'show_subscription_details' ? 'Subscription' : 'Order';
+        if (!result.isError && !(await readBelongsTo(name, result, task.mandate, deps))) {
+          const what = { show_subscription_details: 'Subscription', get_dispute: 'Dispute' }[name] ?? 'Order';
           const withheld = block('CUSTOMER_MISMATCH', `${what} is not one of the ticket customer ${task.mandate.customerEmail}`);
           await audit.record({ at, tool: name, args, task, decision: withheld, outcome: 'blocked' }).catch(() => undefined);
           return blockedResult(withheld);

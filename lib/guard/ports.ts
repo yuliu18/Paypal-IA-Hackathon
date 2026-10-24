@@ -2,6 +2,7 @@
 // PayPal, the LLM provider and storage implement these, so each can be swapped freely.
 
 import type { SubscriptionFacts } from './domain/cancellation';
+import type { DisputeFacts } from './domain/dispute';
 import type { CaptureFacts, Decision, Money, TaskMandate } from './domain/policy';
 
 // The task the agent is working on, as the business framed it. `untrustedInput` is what an
@@ -25,6 +26,11 @@ export interface CaptureLookup {
 // Undefined when PayPal knows no such subscription.
 export interface SubscriptionLookup {
   getSubscription(subscriptionId: string): Promise<SubscriptionFacts | undefined>;
+}
+
+// Undefined when PayPal knows no such dispute.
+export interface DisputeLookup {
+  getDispute(disputeId: string): Promise<DisputeFacts | undefined>;
 }
 
 export type AuditEntry = {

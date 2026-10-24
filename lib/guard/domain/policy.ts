@@ -20,7 +20,8 @@ export type ViolationCode =
   | 'APPROVAL_REQUIRED'
   | 'INTENT_UNCERTAIN'
   | 'SUBSCRIPTION_NOT_CANCELLABLE'
-  | 'CANCELLATION_LIMIT';
+  | 'CANCELLATION_LIMIT'
+  | 'DISPUTE_NOT_ACCEPTABLE';
 
 export type Violation = { code: ViolationCode | string; message: string };
 

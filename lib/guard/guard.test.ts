@@ -4,9 +4,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { SubscriptionFacts } from './domain/cancellation';
+import type { DisputeFacts } from './domain/dispute';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
 import { createPaymentGuard, decideHeldCall, decideHeldRefund } from './guard';
-import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, HeldNotifier, IntentJudge, SubscriptionLookup, ToolCall } from './ports';
+import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, DisputeLookup, HeldNotifier, IntentJudge, SubscriptionLookup, ToolCall } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -88,6 +89,32 @@ const SUBSCRIPTIONS: Record<string, string> = {
   'I-GARBLED': 'not json',
 };
 
+// Disputes as PayPal's get_dispute returns them: the customer's email is hidden from the shop, so
+// the disputed capture (seller_transaction_id) is what says whose payment it was.
+const disputeAnswer = (id: string, captureIds: string[]) =>
+  JSON.stringify({
+    dispute_id: id,
+    status: 'WAITING_FOR_SELLER_RESPONSE',
+    reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
+    dispute_amount: { currency_code: 'USD', value: '20.00' },
+    seller_response_due_date: '2026-11-03T10:00:00Z',
+    disputed_transactions: captureIds.map((captureId) => ({
+      seller_transaction_id: captureId,
+      buyer_transaction_id: 'B-1',
+      custom: 'ana@example.com',
+      buyer: { name: 'Ana Buyer' },
+      gross_amount: { currency_code: 'USD', value: '20.00' },
+    })),
+    messages: [{ posted_by: 'BUYER', content: 'Call me at ana@example.com' }],
+    links: [{ href: 'https://api.sandbox.paypal.com/v1/customer/disputes/x', rel: 'self' }],
+  });
+const DISPUTES: Record<string, string> = {
+  'PP-D-ANA': disputeAnswer('PP-D-ANA', ['CAP-ANA']),
+  'PP-D-BEN': disputeAnswer('PP-D-BEN', ['CAP-BEN']),
+  'PP-D-NONE': disputeAnswer('PP-D-NONE', []),
+  'PP-D-GARBLED': 'not json',
+};
+
 function fakePayPal() {
   const server = new McpServer({ name: 'fake-paypal', version: '0.0.0' });
   const ok = (name: string) => async (args: unknown) => {
@@ -119,7 +146,12 @@ function fakePayPal() {
     { description: 'cancel', inputSchema: { subscription_id: z.string(), payload: z.object({ reason: z.string() }) } },
     ok('cancel_subscription'),
   );
-  server.registerTool('accept_dispute_claim', { description: 'accept', inputSchema: { dispute_id: z.string() } }, ok('accept_dispute_claim'));
+  server.registerTool('get_dispute', { description: 'dispute', inputSchema: { dispute_id: z.string() } }, async (args) => {
+    upstreamCalls.push({ name: 'get_dispute', args });
+    return { content: [{ type: 'text' as const, text: DISPUTES[args.dispute_id] ?? 'not found' }] };
+  });
+  server.registerTool('accept_dispute_claim', { description: 'accept', inputSchema: { dispute_id: z.string(), note: z.string() } }, ok('accept_dispute_claim'));
+  server.registerTool('update_shipment_tracking', { description: 'tracking', inputSchema: { id: z.string() } }, ok('update_shipment_tracking'));
   return server;
 }
 
@@ -132,6 +164,7 @@ async function connect(
     throwMessage = 'socket hang up',
     notifier = undefined as HeldNotifier | undefined,
     subscriptions = undefined as SubscriptionLookup | undefined,
+    disputes = undefined as DisputeLookup | undefined,
   } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
@@ -174,6 +207,7 @@ async function connect(
     timeoutMs: 50,
     notifier,
     subscriptions,
+    disputes,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -204,10 +238,12 @@ describe('payment guard', () => {
       'accept_dispute_claim',
       'cancel_subscription',
       'create_refund',
+      'get_dispute',
       'get_order',
       'get_refund',
       'list_transactions',
       'show_subscription_details',
+      'update_shipment_tracking',
     ]);
   });
 
@@ -499,11 +535,11 @@ describe('payment guard', () => {
 
   it('blocks any other write tool by default', async () => {
     const agent = await connect();
-    const result = await agent.callTool({ name: 'accept_dispute_claim', arguments: { dispute_id: 'PP-D-1' } });
+    const result = await agent.callTool({ name: 'update_shipment_tracking', arguments: { id: 'T-1' } });
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('TOOL_NOT_ALLOWED');
     expect(upstreamCalls).toEqual([]);
-    expect(entries[0]).toMatchObject({ tool: 'accept_dispute_claim', outcome: 'blocked', decision: { verdict: 'block' } });
+    expect(entries[0]).toMatchObject({ tool: 'update_shipment_tracking', outcome: 'blocked', decision: { verdict: 'block' } });
   });
 
   it('fails closed when the capture cannot be looked up', async () => {
@@ -1010,9 +1046,230 @@ describe('held cancellation approval', () => {
   });
 
   it('refuses a held entry of a tool the guard cannot decide', async () => {
-    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'accept_dispute_claim', args: { dispute_id: 'D-1' }, task, decision: hold, outcome: 'held' });
+    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'update_shipment_tracking', args: { id: 'T-1' }, task, decision: hold, outcome: 'held' });
     expect((await decide('1', true)).outcome).toBe('refused');
     expect(entries).toHaveLength(2);
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+// Captures by id, so a dispute can be about another customer's payment.
+const capturesById: CaptureLookup = {
+  async getCapture(captureId) {
+    return { ...facts, captureId, captured: usd(2000), customerEmail: captureId === 'CAP-BEN' ? 'ben@example.com' : 'ana@example.com' };
+  },
+};
+
+describe('dispute reads', () => {
+  it('returns a dispute of the ticket customer without the messages or the buyer, and logs the read', async () => {
+    const agent = await connect(capturesById);
+    const result = await agent.callTool({ name: 'get_dispute', arguments: { dispute_id: 'PP-D-ANA' } });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(text(result))).toEqual({
+      dispute_id: 'PP-D-ANA',
+      status: 'WAITING_FOR_SELLER_RESPONSE',
+      reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
+      dispute_amount: { currency_code: 'USD', value: '20.00' },
+      seller_response_due_date: '2026-11-03T10:00:00Z',
+      disputed_transactions: [{ seller_transaction_id: 'CAP-ANA', gross_amount: { currency_code: 'USD', value: '20.00' } }],
+      withheld_by_guard: [
+        'disputed_transactions[0].buyer_transaction_id',
+        'disputed_transactions[0].custom',
+        'disputed_transactions[0].buyer',
+        'messages',
+        'links',
+      ],
+    });
+    expect(text(result)).not.toContain('ana@example.com');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'get_dispute', outcome: 'executed', decision: { verdict: 'allow', violations: [] } });
+    expect(entries[0].moved).toBeUndefined();
+    expect(judgeCalls).toBe(0);
+  });
+
+  it("withholds a dispute about another customer's payment, or one whose payment can't be told", async () => {
+    const agent = await connect(capturesById);
+    for (const dispute_id of ['PP-D-BEN', 'PP-D-NONE', 'PP-D-GARBLED']) {
+      const result = await agent.callTool({ name: 'get_dispute', arguments: { dispute_id } });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('CUSTOMER_MISMATCH');
+      expect(text(result)).not.toContain('ben@example.com');
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'blocked', 'blocked']);
+  });
+
+  it('withholds a dispute when its capture cannot be looked up', async () => {
+    const agent = await connect({ getCapture: async () => { throw new Error('connect timeout'); } });
+    const result = await agent.callTool({ name: 'get_dispute', arguments: { dispute_id: 'PP-D-ANA' } });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+  });
+
+  it('refuses a dispute id that is not a plain id before PayPal is called', async () => {
+    const agent = await connect(capturesById);
+    for (const dispute_id of ['../../v2/checkout/orders/X', 'PP-D-1?x=1', '']) {
+      const result = await agent.callTool({ name: 'get_dispute', arguments: { dispute_id } });
+      expect(text(result)).toContain('INVALID_ARGUMENTS: dispute_id must be a plain dispute id');
+    }
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('dispute acceptance', () => {
+  let disputeFacts: DisputeFacts | undefined;
+  let lookups: string[];
+  const disputes: DisputeLookup = {
+    async getDispute(id) {
+      lookups.push(id);
+      return disputeFacts && { ...disputeFacts, id };
+    },
+  };
+  const accept = { dispute_id: 'PP-D-ANA', note: 'Item_never_shipped' };
+  const connectDisputes = (options: Parameters<typeof connect>[1] = {}) => connect(capturesById, { disputes, ...options });
+
+  beforeEach(() => {
+    disputeFacts = { id: 'PP-D-ANA', status: 'WAITING_FOR_SELLER_RESPONSE', amount: usd(2000), captureId: 'CAP-ANA' };
+    lookups = [];
+  });
+
+  it('forwards an acceptance that passes the checks and the judge, counting the disputed amount as money out', async () => {
+    const agent = await connectDisputes();
+    const result = await agent.callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe('accept_dispute_claim ok');
+    expect(lookups).toEqual(['PP-D-ANA']);
+    expect(judgedCalls).toEqual([{ tool: 'accept_dispute_claim', args: accept }]);
+    expect(upstreamCalls).toEqual([{ name: 'accept_dispute_claim', args: accept }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'accept_dispute_claim', args: accept, outcome: 'executed', moved: usd(2000), decision: { verdict: 'allow' } });
+  });
+
+  it('blocks malformed arguments, or a note the toolkit would refuse, without looking up, judging or reaching PayPal', async () => {
+    const agent = await connectDisputes();
+    for (const args of [{ note: 'ok' }, { dispute_id: '../x', note: 'ok' }, { dispute_id: 'PP-D-ANA' }, { dispute_id: 'PP-D-ANA', note: 'Item never shipped' }]) {
+      const result = await agent.callTool({ name: 'accept_dispute_claim', arguments: args });
+      expect(text(result)).toContain('INVALID_ARGUMENTS');
+    }
+    expect(lookups).toEqual([]);
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('fails closed when the dispute is unknown, cannot be looked up, or there is no dispute lookup', async () => {
+    disputeFacts = undefined;
+    let result = await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('DISPUTE_LOOKUP_FAILED');
+    const failing: DisputeLookup = { getDispute: async () => { throw new Error('PayPal 500 for ana@example.com'); } };
+    result = await (await connect(capturesById, { disputes: failing })).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('DISPUTE_LOOKUP_FAILED');
+    expect(text(result)).not.toContain('ana@example.com');
+    result = await (await connect(capturesById)).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('DISPUTE_LOOKUP_FAILED: No dispute lookup is configured');
+    expect(upstreamCalls).toEqual([]);
+    expect(judgeCalls).toBe(0);
+  });
+
+  it("blocks accepting a claim on another customer's payment without asking the judge", async () => {
+    disputeFacts = { ...disputeFacts!, captureId: 'CAP-BEN' };
+    const result = await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('CUSTOMER_MISMATCH');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ outcome: 'blocked' });
+    expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('blocks a dispute naming no single capture, and one the shop can no longer answer', async () => {
+    disputeFacts = { ...disputeFacts!, captureId: null };
+    expect(text(await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept }))).toContain('CAPTURE_MISMATCH');
+    disputeFacts = { ...disputeFacts, captureId: 'CAP-ANA', status: 'RESOLVED' };
+    expect(text(await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept }))).toContain('DISPUTE_NOT_ACCEPTABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks accepting a claim while a refund of the same capture is unconfirmed, which could pay twice', async () => {
+    entries.push({ at: '2026-10-20T11:00:00Z', tool: 'create_refund', args: { capture_id: 'CAP-ANA' }, task, decision: { verdict: 'allow', violations: [] }, outcome: 'pending', moved: usd(2000) });
+    const result = await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('REFUND_UNCONFIRMED');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('holds a clean acceptance over the approval threshold, without reaching PayPal or counting it', async () => {
+    approvalThreshold = usd(1000);
+    const notified: AuditRow[] = [];
+    const agent = await connectDisputes({ notifier: { notifyHeld: async (entry) => void notified.push(entry) } });
+    const result = await agent.callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain('Dispute acceptance held for human approval');
+    expect(text(result)).toContain('APPROVAL_REQUIRED');
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'accept_dispute_claim', outcome: 'held' });
+    expect(entries[0].moved).toBeUndefined();
+    expect(notified).toHaveLength(1);
+  });
+
+  it('blocks a clean acceptance the judge rejects', async () => {
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'The customer did not ask for this' }] };
+    const result = await (await connectDisputes()).callTool({ name: 'accept_dispute_claim', arguments: accept });
+    expect(text(result)).toContain('INTENT_MISMATCH');
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('held dispute acceptance approval', () => {
+  let disputeFacts: DisputeFacts | undefined;
+  const accept = { dispute_id: 'PP-D-ANA', note: 'Item_never_shipped' };
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over threshold' }] };
+
+  async function decide(heldId: string, approve: boolean, disputes: DisputeLookup = { getDispute: async (id) => disputeFacts && { ...disputeFacts, id } }) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal().connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldCall(
+      {
+        upstream,
+        captures: capturesById,
+        disputes,
+        audit,
+        limits: { approvalThreshold: usd(1000), perRefund: usd(10000), daily: usd(20000) },
+        now: () => new Date('2026-10-20T13:00:00Z'),
+        timeoutMs: 50,
+      },
+      heldId,
+      approve,
+    );
+  }
+
+  beforeEach(() => {
+    disputeFacts = { id: 'PP-D-ANA', status: 'WAITING_FOR_SELLER_RESPONSE', amount: usd(2000), captureId: 'CAP-ANA' };
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'accept_dispute_claim', args: accept, task, decision: hold, outcome: 'held' });
+  });
+
+  it('runs an approved acceptance through PayPal, lifting only the approval threshold, and records the amount', async () => {
+    const result = await decide('0', true);
+    expect(result).toEqual({ outcome: 'executed', message: 'Dispute PP-D-ANA accepted in PayPal; it refunds 20.00 USD' });
+    expect(upstreamCalls).toEqual([{ name: 'accept_dispute_claim', args: accept }]);
+    expect(entries[1]).toMatchObject({ resolves: '0', outcome: 'executed', moved: usd(2000), decision: { violations: [{ code: 'APPROVED_BY_PERSON' }] } });
+  });
+
+  it('checks the dispute again on approval and blocks one that no longer fits', async () => {
+    disputeFacts = { ...disputeFacts!, status: 'RESOLVED' };
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(result.message).toContain('DISPUTE_NOT_ACCEPTABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('keeps the hold open when PayPal cannot be reached to re-check it', async () => {
+    const unreachable = await decide('0', true, { getDispute: async () => { throw new Error('connect timeout'); } });
+    expect(unreachable).toEqual({ outcome: 'error', message: 'PayPal could not be reached to check the dispute; the dispute acceptance is still held, try again' });
+    expect(entries).toHaveLength(1);
+    expect((await decide('0', true)).outcome).toBe('executed');
+  });
+
+  it('records a rejection without reaching PayPal', async () => {
+    expect(await decide('0', false)).toEqual({ outcome: 'blocked', message: 'Dispute acceptance rejected; nothing was sent to PayPal' });
     expect(upstreamCalls).toEqual([]);
   });
 });

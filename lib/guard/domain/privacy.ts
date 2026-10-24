@@ -1,5 +1,5 @@
-// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order or
-// subscription. An allowlist of the fields a refund or cancellation needs; anything else, wherever
+// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order,
+// subscription or dispute. An allowlist of the fields its write needs; anything else, wherever
 // PayPal adds it, is withheld: card details, payer, payee and subscriber, names, addresses, the
 // shop's custom_id, notes and links.
 
@@ -29,6 +29,21 @@ const SUBSCRIPTION: Shape = {
   create_time: 'scalar',
   update_time: 'scalar',
   billing_info: { next_billing_time: 'scalar', last_payment: { amount: MONEY, time: 'scalar' } },
+};
+
+// A dispute without the customer's messages, evidence or the buyer and seller blocks: what the
+// shop is asked to accept, for how much, and by when.
+const DISPUTE: Shape = {
+  dispute_id: 'scalar',
+  status: 'scalar',
+  reason: 'scalar',
+  dispute_amount: MONEY,
+  dispute_life_cycle_stage: 'scalar',
+  dispute_channel: 'scalar',
+  create_time: 'scalar',
+  update_time: 'scalar',
+  seller_response_due_date: 'scalar',
+  disputed_transactions: [{ seller_transaction_id: 'scalar', transaction_status: 'scalar', gross_amount: MONEY, create_time: 'scalar' }],
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,6 +81,12 @@ export function minimizeSubscription(subscription: unknown): { subscription: Rec
   const withheld: string[] = [];
   const kept = keep(subscription, SUBSCRIPTION, '', withheld);
   return { subscription: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeDispute(dispute: unknown): { dispute: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(dispute, DISPUTE, '', withheld);
+  return { dispute: isRecord(kept) ? kept : {}, withheld };
 }
 
 // How a read's black box entry records what was withheld, and how the dashboard counts it back.
