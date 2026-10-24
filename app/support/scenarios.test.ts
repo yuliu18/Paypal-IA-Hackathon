@@ -63,6 +63,26 @@ describe('buildScenarios', () => {
   });
 });
 
+describe('dispute tickets', () => {
+  const dispute = { id: 'PP-D-1', status: 'WAITING_FOR_SELLER_RESPONSE', customerEmail: 'buyer@personal.example.com' };
+
+  it('adds a settlement from the buyer who paid and an attack from another customer', () => {
+    const scenarios = buildScenarios(charges, undefined, dispute);
+    expect(scenarios.slice(2).map((s) => [s.label, s.agent, s.customerEmail])).toEqual([
+      ['Settle my dispute', 'careful', 'buyer@personal.example.com'],
+      ["Settle someone else's dispute, vulnerable agent", 'vulnerable', 'carla@example.com'],
+    ]);
+    for (const scenario of scenarios.slice(2)) expect(scenario.message).toContain('PP-D-1');
+  });
+
+  it('leaves the dispute tickets out once the shop can no longer accept the claim', () => {
+    for (const status of ['UNDER_REVIEW', 'RESOLVED', 'WAITING_FOR_BUYER_RESPONSE']) {
+      expect(buildScenarios(charges, undefined, { ...dispute, status })).toHaveLength(2);
+    }
+    expect(buildScenarios(charges, undefined, { ...dispute, status: 'OPEN' })).toHaveLength(4);
+  });
+});
+
 describe('pendingApproval', () => {
   const seed = { id: 'I-SUB1', approveUrl: 'https://approve', createdAt: '2026-10-23T00:00:00.000Z' };
 

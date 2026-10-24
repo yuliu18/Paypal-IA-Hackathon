@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
-import { readSeed, readSeedSubscription } from '@/lib/demo-seed';
+import { findSampleDispute } from '@/lib/demo-dispute-payment';
+import { readSeed, readSeedDisputePayment, readSeedSubscription, type SeedDisputePayment } from '@/lib/demo-seed';
 import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
 import type { SubscriptionFacts } from '@/lib/guard/domain/cancellation';
-import { buildScenarios, pendingApproval } from './scenarios';
+import type { DisputePaymentStep } from './dispute-payment-button';
+import { buildScenarios, pendingApproval, type SampleDisputeTicket } from './scenarios';
 import { SupportDesk } from './support-desk';
 
 export const metadata: Metadata = { title: 'Support agent demo' };
@@ -20,9 +22,34 @@ async function sampleSubscription(id: string | undefined): Promise<SubscriptionF
   }
 }
 
+// The dispute the buyer opened on the sample PayPal payment, once it is paid. Undefined when there
+// is none yet or PayPal can't be reached, which leaves its tickets out.
+async function sampleDispute(payment: SeedDisputePayment | undefined): Promise<SampleDisputeTicket | undefined> {
+  if (!payment?.captureId || !payment.customerEmail) return undefined;
+  try {
+    const dispute = await findSampleDispute(payment.captureId);
+    return dispute && { ...dispute, customerEmail: payment.customerEmail };
+  } catch (error) {
+    console.error('Sample dispute could not be read', error);
+    return undefined;
+  }
+}
+
+function disputePaymentStep(payment: SeedDisputePayment | undefined, dispute: SampleDisputeTicket | undefined): DisputePaymentStep {
+  if (!payment) return { step: 'none' };
+  if (!payment.captureId) return { step: 'unpaid', approveUrl: payment.approveUrl };
+  return dispute ? { step: 'disputed', disputeId: dispute.id, status: dispute.status } : { step: 'paid' };
+}
+
 export default async function SupportPage() {
   await connection();
-  const [charges, seedSubscription] = await Promise.all([readSeed(), readSeedSubscription()]);
-  const subscription = await sampleSubscription(seedSubscription?.id);
-  return <SupportDesk scenarios={buildScenarios(charges, subscription)} pendingApproveUrl={pendingApproval(seedSubscription, subscription)} />;
+  const [charges, seedSubscription, disputePayment] = await Promise.all([readSeed(), readSeedSubscription(), readSeedDisputePayment()]);
+  const [subscription, dispute] = await Promise.all([sampleSubscription(seedSubscription?.id), sampleDispute(disputePayment)]);
+  return (
+    <SupportDesk
+      scenarios={buildScenarios(charges, subscription, dispute)}
+      pendingApproveUrl={pendingApproval(seedSubscription, subscription)}
+      disputePayment={disputePaymentStep(disputePayment, dispute)}
+    />
+  );
 }

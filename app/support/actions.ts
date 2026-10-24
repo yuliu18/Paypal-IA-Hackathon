@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { refresh } from 'next/cache';
 import { seedSandbox } from '@/lib/demo-seed';
+import { createSampleDisputePayment } from '@/lib/demo-dispute-payment';
 import { createSampleSubscription } from '@/lib/demo-subscription';
 
 export type SeedState = { ok: boolean; message: string } | null;
@@ -35,5 +36,21 @@ export async function createSampleSubscriptionAction(): Promise<SubscriptionStat
   } catch (error) {
     console.error('Sample subscription could not be created', error);
     return { ok: false, message: 'The sample subscription could not be created. Details are in the server log.' };
+  }
+}
+
+export type DisputePaymentState = { ok: true; approveUrl: string } | { ok: false; message: string } | null;
+
+// Creates the sample PayPal payment a sandbox buyer pays and can then dispute, and returns the link
+// to pay it. Covered by the demo password like the actions above.
+export async function createSampleDisputePaymentAction(): Promise<DisputePaymentState> {
+  try {
+    const origin = (await headers()).get('origin') ?? undefined;
+    const { approveUrl } = await createSampleDisputePayment({ appUrl: origin });
+    refresh();
+    return { ok: true, approveUrl };
+  } catch (error) {
+    console.error('Sample PayPal payment could not be created', error);
+    return { ok: false, message: 'The sample PayPal payment could not be created. Details are in the server log.' };
   }
 }

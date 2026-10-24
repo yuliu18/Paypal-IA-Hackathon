@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readSeed, readSeedSubscription, saveSeedSubscription, seedSandbox } from './demo-seed';
+import { readSeed, readSeedDisputePayment, readSeedSubscription, saveSeedDisputePayment, saveSeedSubscription, seedSandbox } from './demo-seed';
 
 let dir: string;
 let file: string;
@@ -71,5 +71,24 @@ describe('seed subscription', () => {
     expect(await readSeedSubscription(file)).toBeUndefined();
     await writeFile(file, JSON.stringify({ charges: [], subscription: { id: 42 } }));
     expect(await readSeedSubscription(file)).toBeUndefined();
+  });
+});
+
+describe('seed PayPal payment', () => {
+  it('keeps the sample PayPal payment next to the subscription when new sample payments are charged', async () => {
+    next = 0;
+    const payment = { orderId: 'O-1', approveUrl: 'https://approve', createdAt: '2026-10-24T00:00:00.000Z', captureId: 'CAP-9', customerEmail: 'buyer@example.com' };
+    await saveSeedSubscription({ id: 'I-SUB1', approveUrl: 'https://approve', createdAt: '2026-10-23T00:00:00.000Z' }, file);
+    await saveSeedDisputePayment(payment, file);
+    await seedSandbox(fakeCharge, file);
+    expect(await readSeedDisputePayment(file)).toEqual(payment);
+    expect((await readSeedSubscription(file))?.id).toBe('I-SUB1');
+  });
+
+  it('reads no PayPal payment from a seed that has none or an unreadable one', async () => {
+    expect(await readSeedDisputePayment(file)).toBeUndefined();
+    await saveSeedDisputePayment({ orderId: 'O-1', approveUrl: 'https://approve', createdAt: '' }, file);
+    await writeFile(file, JSON.stringify({ disputePayment: { orderId: 42 } }));
+    expect(await readSeedDisputePayment(file)).toBeUndefined();
   });
 });

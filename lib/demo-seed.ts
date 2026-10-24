@@ -1,5 +1,5 @@
 // The demo's sample payments: three captured sandbox card payments whose orders the support
-// tickets refer to, plus the sample subscription once one is created. Created by `npm run seed` or the button on /support; sandbox money is fictitious.
+// tickets refer to, plus the sample subscription and the sample PayPal payment once they are created. Created by `npm run seed` or the button on /support; sandbox money is fictitious.
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -20,7 +20,11 @@ export const SEED_FILE = 'data/seed.json';
 // approval link, and then owns it.
 export type SeedSubscription = { id: string; approveUrl: string; createdAt: string };
 
-type SeedFile = { createdAt?: string; charges?: SeedCharge[]; subscription?: SeedSubscription };
+// The sample PayPal-account payment (lib/demo-dispute-payment.ts) a sandbox buyer pays and can then
+// dispute. `captureId` and `customerEmail` are set once the buyer paid and the shop captured it.
+export type SeedDisputePayment = { orderId: string; approveUrl: string; createdAt: string; captureId?: string; customerEmail?: string };
+
+type SeedFile = { createdAt?: string; charges?: SeedCharge[]; subscription?: SeedSubscription; disputePayment?: SeedDisputePayment };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -43,18 +47,23 @@ async function writeSeedFile(file: string, seed: SeedFile): Promise<void> {
 }
 
 // Charges every purchase, then writes them all at once, so a failed charge keeps the previous
-// payments. The sample subscription, if any, is kept.
+// payments. The sample subscription and PayPal payment, if any, are kept.
 export async function seedSandbox(charge: (purchase: Purchase) => Promise<Charge> = chargeCard, file = SEED_FILE): Promise<SeedCharge[]> {
   const charges: SeedCharge[] = [];
   for (const purchase of PURCHASES) charges.push({ ...purchase, ...(await charge(purchase)) });
-  const { subscription } = await readSeedFile(file);
-  await writeSeedFile(file, { createdAt: new Date().toISOString(), charges, ...(subscription && { subscription }) });
+  const { subscription, disputePayment } = await readSeedFile(file);
+  await writeSeedFile(file, { createdAt: new Date().toISOString(), charges, ...(subscription && { subscription }), ...(disputePayment && { disputePayment }) });
   return charges;
 }
 
 // Records the sample subscription next to the sample payments, keeping them.
 export async function saveSeedSubscription(subscription: SeedSubscription, file = SEED_FILE): Promise<void> {
   await writeSeedFile(file, { ...(await readSeedFile(file)), subscription });
+}
+
+// Records the sample PayPal payment next to the other sample data, keeping it.
+export async function saveSeedDisputePayment(disputePayment: SeedDisputePayment, file = SEED_FILE): Promise<void> {
+  await writeSeedFile(file, { ...(await readSeedFile(file)), disputePayment });
 }
 
 // The current sample payments; none when they were never created or the file can't be read.
@@ -68,4 +77,17 @@ export async function readSeedSubscription(file = SEED_FILE): Promise<SeedSubscr
   const { subscription } = await readSeedFile(file);
   if (!isRecord(subscription) || typeof subscription.id !== 'string' || typeof subscription.approveUrl !== 'string') return undefined;
   return { id: subscription.id, approveUrl: subscription.approveUrl, createdAt: String(subscription.createdAt ?? '') };
+}
+
+// The sample PayPal payment; none when it was never created or the file can't be read.
+export async function readSeedDisputePayment(file = SEED_FILE): Promise<SeedDisputePayment | undefined> {
+  const { disputePayment: p } = await readSeedFile(file);
+  if (!isRecord(p) || typeof p.orderId !== 'string' || typeof p.approveUrl !== 'string') return undefined;
+  return {
+    orderId: p.orderId,
+    approveUrl: p.approveUrl,
+    createdAt: String(p.createdAt ?? ''),
+    ...(typeof p.captureId === 'string' && { captureId: p.captureId }),
+    ...(typeof p.customerEmail === 'string' && { customerEmail: p.customerEmail }),
+  };
 }
