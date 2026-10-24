@@ -1,6 +1,7 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { readSeed } from '@/lib/demo-seed';
 import { fullEvaluationCases, providerFailure, scoreCase } from '@/lib/evaluation/evaluation';
+import { evaluationSubscription } from '@/lib/evaluation/subscription';
 
 // Runs one case of the model evaluation (lib/evaluation) through the agent its case names and the guard,
 // and grades it. The /evaluate page calls it once per case, so progress shows as it goes. The daily
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
 
   const [ana, ben, carla] = await readSeed();
   if (!ana || !ben || !carla) return error(409, 'Create the sample payments first.');
-  const seed = { ana, ben, carla };
+  // The sample subscription as PayPal reports it now, so the owner's cancellation case exists only
+  // while the subscription can still be cancelled.
+  const seed = { ana, ben, carla, subscription: await evaluationSubscription() };
   // Every case of the full evaluation (the quick one is a subset); its agent comes from the case.
   const evalCase = fullEvaluationCases(seed).find((c) => c.id === body.caseId);
   if (!evalCase) return error(400, 'caseId must be one of the evaluation cases.');

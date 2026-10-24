@@ -24,7 +24,7 @@ function Score({ label, value, of, detail, tone }: { label: string; value: numbe
 }
 
 const stepStyle = (step: AgentStep) =>
-  step.result.startsWith('Blocked by payment guard') ? 'text-pp-danger' : step.result.startsWith('Refund held') ? 'text-pp-warning' : 'text-pp-ink';
+  step.result.startsWith('Blocked by payment guard') ? 'text-pp-danger' : /^(Refund|Cancellation) held/.test(step.result) ? 'text-pp-warning' : 'text-pp-ink';
 
 function Badge({ row }: { row: Row }) {
   if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
@@ -38,10 +38,12 @@ function Badge({ row }: { row: Row }) {
 }
 
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
-export function Evaluator({ model, provider }: { model: string; provider: string }) {
+// `subscription`: a sample subscription exists, so the run adds its cancellation attacks.
+export function Evaluator({ model, provider, subscription }: { model: string; provider: string; subscription: boolean }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [note, setNote] = useState<string>();
   const [full, setFull] = useState(false);
   const stop = useRef(false);
 
@@ -60,6 +62,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       return;
     }
     setRows(prepared.cases.map((c) => ({ ...c, status: 'waiting' })));
+    setNote(prepared.note);
     setMessage(undefined);
     for (const c of prepared.cases) {
       if (stop.current) break;
@@ -79,8 +82,9 @@ export function Evaluator({ model, provider }: { model: string; provider: string
   const done = rows.filter((r) => r.status === 'done');
   const score = summarize(rows);
   const finished = rows.length > 0 && done.length === rows.length;
-  // Before a run, the quick evaluation's sizes.
-  const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: full ? 54 : 9 }, refused: { of: full ? 27 : 9 } };
+  // Before a run, the evaluation's sizes without the owner's cancellation, which needs PayPal's word.
+  const attacks = subscription ? 11 : 9;
+  const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: attacks * (full ? 6 : 1) }, refused: { of: attacks * (full ? 3 : 1) } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
   const firstFailure = rows.find((r) => r.result?.failed)?.result?.reason;
@@ -90,7 +94,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
       <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
       <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends 5 tickets your shop expects to work and 9 attacks to the real support agent behind the payment guard,
+        Sends {sizes.business.of} tickets your shop expects to work and {attacks} attacks to the real support agent behind the payment guard,
         with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily cap is lifted for these tickets so
         repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
       </p>
@@ -111,7 +115,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
         )}
         <label className="flex items-center gap-2 text-sm text-pp-ink">
           <input type="checkbox" checked={full} disabled={running} onChange={(e) => setFull(e.target.checked)} />
-          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent (59 tickets, about 15 min)
+          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent ({5 + attacks * 6} tickets or more, about 15 min)
         </label>
         {message && <span className="text-sm text-pp-muted">{message}</span>}
         {rows.length > 0 && !message && (
@@ -120,6 +124,18 @@ export function Evaluator({ model, provider }: { model: string; provider: string
           </span>
         )}
       </div>
+
+      {note && rows.length > 0 && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          {note}
+        </p>
+      )}
+
+      {rows.some((r) => r.id === 'business-cancel') && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          The last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.
+        </p>
+      )}
 
       {score.failed > 0 && (
         <p className="mt-5 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
