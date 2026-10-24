@@ -3,6 +3,7 @@
 // outsider wrote: chat apps and mail clients turn it into links and mentions.
 
 import { SUBSCRIPTION_ID } from '../domain/cancellation';
+import { DISPUTE_ID } from '../domain/dispute';
 import { maskEmail } from '../domain/redact';
 import type { AuditRow } from '../ports';
 
@@ -23,6 +24,11 @@ function heldAction(entry: AuditRow): string {
   if (entry.tool === 'cancel_subscription') {
     const id = entry.args.subscription_id;
     return `a subscription cancellation (${typeof id === 'string' && SUBSCRIPTION_ID.test(id) ? id : 'unreadable id'})`;
+  }
+  if (entry.tool === 'accept_dispute_claim') {
+    // The disputed amount is PayPal's, not in the arguments; /guard shows it in the reasons.
+    const id = entry.args.dispute_id;
+    return `a dispute claim acceptance (${typeof id === 'string' && DISPUTE_ID.test(id) ? id : 'unreadable id'}), which refunds the disputed amount,`;
   }
   return `a refund of ${amountOf(entry.args)}`;
 }

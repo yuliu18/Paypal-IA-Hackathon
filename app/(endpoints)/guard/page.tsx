@@ -72,6 +72,9 @@ export default async function GuardLogPage() {
       if (e.tool === 'cancel_subscription') {
         return { ...common, kind: 'cancellation' as const, subscriptionId: maskPersonalData(String(e.args.subscription_id ?? '')) };
       }
+      if (e.tool === 'accept_dispute_claim') {
+        return { ...common, kind: 'dispute' as const, disputeId: maskPersonalData(String(e.args.dispute_id ?? '')) };
+      }
       const amount = e.args.amount as { value?: string; currency_code?: string } | undefined;
       return {
         ...common,

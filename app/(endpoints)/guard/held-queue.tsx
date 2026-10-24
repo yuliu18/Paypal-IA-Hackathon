@@ -1,6 +1,6 @@
 'use client';
 
-// Refunds and subscription cancellations the payment guard held for a person, each with Approve
+// Refunds, subscription cancellations and dispute acceptances the payment guard held for a person, each with Approve
 // and Reject. Approving runs the call through the guard's checks again before PayPal sees it.
 
 import { useActionState } from 'react';
@@ -9,7 +9,10 @@ import { decideHeldAction } from './actions';
 export type HeldCall = { id: string; at: string; customer: string; codes: string[]; reasons: string } & (
   | { kind: 'refund'; amount: string; captureId: string }
   | { kind: 'cancellation'; subscriptionId: string }
+  | { kind: 'dispute'; disputeId: string }
 );
+
+const TITLE = { cancellation: 'Cancel subscription', dispute: 'Accept dispute claim' };
 
 // A fixed locale and time zone, so the server's HTML and the browser's render show the same text.
 const atUtc = (iso: string) => `${new Date(iso).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`;
@@ -37,9 +40,9 @@ function HeldItem({ held, action, pending }: { held: HeldCall; action: (form: Fo
         <input type="hidden" name="id" value={held.id} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="text-lg font-semibold text-pp-navy">{held.kind === 'refund' ? held.amount : 'Cancel subscription'}</span>
+            <span className="text-lg font-semibold text-pp-navy">{held.kind === 'refund' ? held.amount : TITLE[held.kind]}</span>
             <span>{held.customer}</span>
-            <code className="text-xs text-pp-muted">{held.kind === 'refund' ? held.captureId : held.subscriptionId}</code>
+            <code className="text-xs text-pp-muted">{held.kind === 'refund' ? held.captureId : held.kind === 'dispute' ? held.disputeId : held.subscriptionId}</code>
             <span className="text-xs text-pp-muted">{atUtc(held.at)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">

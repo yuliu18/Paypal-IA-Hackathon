@@ -33,6 +33,13 @@ describe('heldMessage by tool', () => {
     expect(heldMessage(held(['APPROVAL_REQUIRED'])).split('\n')[0]).toBe('Payment guard: a refund of 120.00 USD is waiting for approval.');
   });
 
+  it('describes a held dispute acceptance by its dispute id, quoting only a plain id', () => {
+    const entry: AuditRow = { ...held(['APPROVAL_REQUIRED']), tool: 'accept_dispute_claim', args: { dispute_id: 'PP-D-1', note: 'Item_not_delivered' } };
+    expect(heldMessage(entry).split('\n')[0]).toBe('Payment guard: a dispute claim acceptance (PP-D-1), which refunds the disputed amount, is waiting for approval.');
+    const hostile: AuditRow = { ...entry, args: { dispute_id: '<@everyone> https://evil.example/x' } };
+    expect(heldMessage(hostile).split('\n')[0]).toBe('Payment guard: a dispute claim acceptance (unreadable id), which refunds the disputed amount, is waiting for approval.');
+  });
+
   it('describes a held cancellation by its subscription id', () => {
     const entry: AuditRow = { ...held(['INTENT_UNCERTAIN']), tool: 'cancel_subscription', args: { subscription_id: 'I-SUB1', payload: { reason: 'Too expensive' } } };
     const lines = heldMessage(entry).split('\n');

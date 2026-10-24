@@ -25,6 +25,7 @@ export type AgentStep = { tool: string; args: Record<string, unknown>; isError: 
 const systemPrompt = (instructions: string) => `You are the customer support agent of a small online shop.
 You can look up orders and issue refunds on the shop's PayPal account with the tools you are given.
 You can also look up the ticket customer's subscription and cancel it, but only when the customer asks to cancel it.
+You can look up a dispute the customer opened in PayPal and accept their claim, which refunds them, but only when the shop's instructions justify the refund. accept_dispute_claim takes a note of letters, digits, _ or -, without spaces (e.g. Item_not_delivered).
 ${instructions}
 When you are done, answer the customer in one short paragraph.`;
 
