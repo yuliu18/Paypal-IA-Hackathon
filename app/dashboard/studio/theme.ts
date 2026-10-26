@@ -8,10 +8,27 @@ import { studioTheme } from 'ag-studio';
 const token = (name: string) => `var(--pp-${name})`;
 const line = (color: string) => ({ width: 1, color: token(color) });
 
+// Studio colours series by position: the first measure (or legend value) of a chart takes colour 1,
+// the second colour 2 and so on, and a chart can't pick its own. So the palette starts with the
+// guard's verdicts, which the guard charts plot as measures in this order: allowed green, held
+// amber, blocked red. PayPal's blues follow for everything else.
+const SERIES = [
+  token('success'),
+  token('chart-4'),
+  token('danger'),
+  token('blue'),
+  token('navy'),
+  token('chart-3'),
+  token('chart-5'),
+  token('chart-7'),
+  token('chart-6'),
+  token('sky'),
+];
+
 const palette = Object.fromEntries(
-  Array.from({ length: 10 }, (_, i) => [
-    [`chartPaletteFills${i + 1}Color`, token(`chart-${i + 1}`)],
-    [`chartPaletteStrokes${i + 1}Color`, token(`chart-${i + 1}`)],
+  SERIES.map((color, i) => [
+    [`chartPaletteFills${i + 1}Color`, color],
+    [`chartPaletteStrokes${i + 1}Color`, color],
   ]).flat(),
 );
 
@@ -39,24 +56,24 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioCanvasShadow: false,
   studioCanvasBackgroundColor: token('canvas'),
   studioCanvasPadding: 20,
-  // Slightly taller rows than the default 16px make room for card padding.
-  studioCanvasRowHeight: 18,
+  // Taller rows than the default 16px make room for roomy cards.
+  studioCanvasRowHeight: 20,
   studioCanvasFontFamily: token('font'),
 
-  // Widgets are the shell's cards: white, 1px border, 8px radius.
+  // Widgets are the shell's cards: white, 1px border, 12px radius, generous padding.
   studioWidgetBackgroundColor: token('surface'),
   studioWidgetBorder: line('border'),
-  studioWidgetBorderRadius: 8,
-  studioWidgetPadding: 10,
+  studioWidgetBorderRadius: 12,
+  studioWidgetPadding: 18,
   studioWidgetTitleFontFamily: token('font'),
-  studioWidgetTitleFontSize: 16,
+  studioWidgetTitleFontSize: 15,
   studioWidgetTitleFontWeight: 600,
   studioWidgetTitleTextColor: token('navy'),
   studioWidgetSubtitleFontFamily: token('font'),
   studioWidgetSubtitleFontSize: 13,
   studioWidgetSubtitleTextColor: token('muted'),
   studioWidgetCaptionFontFamily: token('font'),
-  studioWidgetCaptionFontSize: 13,
+  studioWidgetCaptionFontSize: 12,
   studioWidgetCaptionTextColor: token('muted'),
   studioWidgetResizeBorderColor: token('blue'),
 

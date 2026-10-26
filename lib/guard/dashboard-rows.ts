@@ -31,9 +31,15 @@ export type GuardDecisionRow = {
   action: string;
   // An executed invoice's total: money billed to a customer, which has not been paid yet.
   billed: number;
+  // 1 under the decision's verdict and 0 under the others, so a chart can stack them as measures in a
+  // fixed order (and so in fixed colours: allowed green, held amber, blocked red).
+  allowed: number;
+  held: number;
+  blocked: number;
 };
 
-export type GuardViolationRow = { id: string; decisionId: string; code: string; message: string };
+// `reason` is the rule's code in words: 'CUSTOMER_MISMATCH' -> 'Customer mismatch'.
+export type GuardViolationRow = { id: string; decisionId: string; code: string; reason: string; message: string };
 
 export type GuardDashboardRows = { guardDecisions: GuardDecisionRow[]; guardViolations: GuardViolationRow[] };
 
@@ -51,6 +57,8 @@ const ACTIONS: Record<string, string> = {
   get_dispute: 'read',
   get_invoice: 'read',
 };
+
+const reasonOf = (code: string) => code.charAt(0) + code.slice(1).toLowerCase().replaceAll('_', ' ');
 
 const major = (entry: AuditRow) => (entry.moved ? entry.moved.minor / 100 : 0);
 
@@ -109,10 +117,13 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         agent: BILLING_TOOLS.has(e.tool) ? 'billing' : 'support',
         action: ACTIONS[e.tool] ?? 'other',
         billed: e.tool === 'create_invoice' && e.outcome === 'executed' ? major(e) : 0,
+        allowed: e.decision.verdict === 'allow' ? 1 : 0,
+        held: e.decision.verdict === 'hold' ? 1 : 0,
+        blocked: e.decision.verdict === 'block' ? 1 : 0,
       };
     }),
     guardViolations: entries.flatMap((e) =>
-      e.decision.violations.map((v, i) => ({ id: `${e.id}-${i}`, decisionId: e.id, code: v.code, message: maskPersonalData(v.message) })),
+      e.decision.violations.map((v, i) => ({ id: `${e.id}-${i}`, decisionId: e.id, code: v.code, reason: reasonOf(v.code), message: maskPersonalData(v.message) })),
     ),
   };
 }

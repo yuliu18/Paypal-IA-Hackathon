@@ -206,8 +206,18 @@ function planRows(plans: Plan[]) {
 
 // --- Ledger -------------------------------------------------------------------------
 
+// PayPal's transaction event codes, for the ones this shop's ledger holds.
 const EVENT_TYPES: Record<string, string> = {
   T0001: 'Payout',
+  T0002: 'Subscription payment',
+  T0005: 'Card payment',
+  T0006: 'Checkout payment',
+  T0200: 'Currency conversion',
+  T1106: 'Payment reversal',
+  T1107: 'Refund',
+  T1110: 'Dispute hold',
+  T1111: 'Dispute hold released',
+  T1900: 'Account correction',
   T1105: 'Hold released',
   T1503: 'Payout hold',
 };
@@ -247,6 +257,9 @@ export function transactionRows(transactions: Transaction[]) {
       fee,
       net: round2(amt + fee),
       sales: isSale(t.transaction_event_code, amt) ? amt : 0,
+      // The amount split by direction, both positive.
+      moneyIn: amt > 0 ? amt : 0,
+      moneyOut: amt < 0 ? -amt : 0,
       endingBalance: t.ending_balance ? amountOf(t.ending_balance) : null,
       counterparty: p?.email_address ?? null,
       note: t.transaction_note ?? null,

@@ -26,4 +26,39 @@ describe('transactionRows', () => {
       ['released', 0],
     ]);
   });
+
+  it('names the event types the sandbox ledger holds, and keeps the code of any other', () => {
+    const rows = transactionRows([
+      tx('sale', 'T0006', '40.00'),
+      tx('card', 'T0005', '35.50'),
+      tx('fx', 'T0200', '5.24'),
+      tx('refund', 'T1107', '-10.00'),
+      tx('dispute', 'T1106', '-70.00'),
+      tx('subscription', 'T0002', '9.99'),
+      tx('hold', 'T1110', '-20.00'),
+      tx('release', 'T1111', '20.00'),
+      tx('correction', 'T1900', '3.00'),
+      tx('odd', 'T9999', '1.00'),
+    ]);
+    expect(rows.map((r) => r.eventType)).toEqual([
+      'Checkout payment',
+      'Card payment',
+      'Currency conversion',
+      'Refund',
+      'Payment reversal',
+      'Subscription payment',
+      'Dispute hold',
+      'Dispute hold released',
+      'Account correction',
+      'T9999',
+    ]);
+  });
+
+  it('splits each amount into money in and money out, both positive, so a chart can show them side by side', () => {
+    const rows = transactionRows([tx('in', 'T0006', '40.00'), tx('out', 'T1107', '-10.50')]);
+    expect(rows.map((r) => [r.moneyIn, r.moneyOut])).toEqual([
+      [40, 0],
+      [0, 10.5],
+    ]);
+  });
 });

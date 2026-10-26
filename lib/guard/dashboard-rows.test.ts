@@ -37,6 +37,9 @@ describe('guardDashboardRows', () => {
         agent: 'support',
         action: 'refund',
         billed: 0,
+        allowed: 1,
+        held: 0,
+        blocked: 0,
       },
     ]);
   });
@@ -46,6 +49,17 @@ describe('guardDashboardRows', () => {
       (tool, i) => guardDashboardRows([row({ id: String(i), tool, moved: undefined })]).guardDecisions[0].agent,
     );
     expect(agents).toEqual(['billing', 'billing', 'billing', 'billing', 'support', 'support', 'support', 'support']);
+  });
+
+  it('counts each decision once under its verdict, so charts can stack allowed, held and blocked', () => {
+    const verdicts = (['allow', 'hold', 'block'] as const).map(
+      (verdict, i) => guardDashboardRows([row({ id: String(i), decision: { verdict, violations: [] }, moved: undefined })]).guardDecisions[0],
+    );
+    expect(verdicts.map(({ allowed, held, blocked }) => [allowed, held, blocked])).toEqual([
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ]);
   });
 
   it('names what kind of action each call was', () => {
@@ -157,8 +171,8 @@ describe('guardDashboardRows', () => {
       moved: undefined,
     });
     expect(guardDashboardRows([row({ id: '1' }), blocked]).guardViolations).toEqual([
-      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', message: 'Order is not one of the ticket customer a***@example.com' },
-      { id: '7-1', decisionId: '7', code: 'DAILY_LIMIT', message: 'over' },
+      { id: '7-0', decisionId: '7', code: 'CUSTOMER_MISMATCH', reason: 'Customer mismatch', message: 'Order is not one of the ticket customer a***@example.com' },
+      { id: '7-1', decisionId: '7', code: 'DAILY_LIMIT', reason: 'Daily limit', message: 'over' },
     ]);
   });
 });

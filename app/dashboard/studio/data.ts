@@ -15,11 +15,22 @@ import type { DashboardData } from '@/lib/dashboard-data';
 
 const CALENDAR_ID = 'calendar';
 
+// 'usd' is currencyFormat shown with a dollar sign: the guard's money is always USD, since the
+// shop's PayPal sandbox account and every amount the guard records are in USD.
+type FieldFormat = AgFormat | 'usd';
+
 // [id, name, format, hide?]
-type FieldSpec = [id: string, name: string, format: AgFormat, hide?: boolean];
+type FieldSpec = [id: string, name: string, format: FieldFormat, hide?: boolean];
+
+const USD = { format: '$#,##0.00' };
 
 const fields = (specs: FieldSpec[]): AgFieldDefinition[] =>
-  specs.map(([id, name, format, hide]) => ({ id, name, format, ...(hide && { hide }) }));
+  specs.map(([id, name, format, hide]) => ({
+    id,
+    name,
+    ...(format === 'usd' ? { format: 'currencyFormat', formatOptions: USD } : { format }),
+    ...(hide && { hide }),
+  }));
 
 // Foreign key 'table.field' -> primary key 'table.field'.
 const manyToOne = (id: string, source: string, target: string): AgRelationDefinition => {
@@ -42,13 +53,30 @@ const onCalendar = (tableId: string, fieldId: string, truncate?: 'day'): AgRelat
 
 const sumOf = (id: string) => ({ id, aggregation: 'sum' as const });
 
-const ratio = (id: string, name: string, description: string, numerator: string, denominator: string): AgExpressionFieldDefinition => ({
+const ratio = (
+  id: string,
+  name: string,
+  description: string,
+  numerator: string,
+  denominator: string,
+  denominatorAggregation: 'sum' | 'countd' = 'sum',
+): AgExpressionFieldDefinition => ({
   id,
   name,
   description,
   format: 'percentageFormat',
   isMeasure: true,
-  expression: { operator: 'divide', inputs: [sumOf(numerator), sumOf(denominator)] },
+  expression: { operator: 'divide', inputs: [sumOf(numerator), { id: denominator, aggregation: denominatorAggregation }] },
+});
+
+// A named total of one field, so chart legends read 'Blocked' rather than 'Blocked (sum)'.
+const total = (id: string, name: string, description: string, field: string, format: FieldFormat = 'integerFormat'): AgExpressionFieldDefinition => ({
+  id,
+  name,
+  description,
+  isMeasure: true,
+  expression: sumOf(field),
+  ...(format === 'usd' ? { format: 'currencyFormat', formatOptions: USD } : { format }),
 });
 
 // --- Data sources -----------------------------------------------------------------
@@ -181,7 +209,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
         id: 'transactions',
         description:
           'Account ledger from Transaction Search, last 31 days. Amounts are signed (debits negative); net is amount plus fee. ' +
-          'Sales is the amount of a payment a customer made to the shop, 0 for every other transaction.',
+          'Sales is the amount of a payment a customer made to the shop, 0 for every other transaction. Money in and money out split the amount by direction, both positive.',
         data: data.transactions,
         fields: fields([
           ['id', 'Transaction ID', 'textFormat'],
@@ -194,6 +222,8 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['fee', 'Transaction Fee', 'currencyFormat'],
           ['net', 'Transaction Net', 'currencyFormat'],
           ['sales', 'Sales', 'currencyFormat'],
+          ['moneyIn', 'Money In', 'currencyFormat'],
+          ['moneyOut', 'Money Out', 'currencyFormat'],
           ['endingBalance', 'Ending Balance', 'currencyFormat'],
           ['counterparty', 'Counterparty', 'textFormat'],
           ['note', 'Transaction Note', 'textFormat'],
@@ -233,24 +263,28 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           'Agent is support (refunds, dispute acceptances, cancellations, order reads) or billing (invoices). Verdict is allow, hold or block. ' +
           'Money protected is the requested amount of blocked refunds (empty when the agent asked for a full refund without stating it) ' +
           'and the recorded amount of blocked dispute acceptances. Money moved is what refunds and dispute acceptances may have taken out of the account. ' +
-          'Money billed is the total of invoices the billing agent created; it is billed, not yet paid. Awaiting approval is 1 for held actions no person has decided yet.',
+          'Money billed is the total of invoices the billing agent created; it is billed, not yet paid. Awaiting approval is 1 for held actions no person has decided yet. ' +
+          'Allowed, Held and Blocked are 1 under the decision\'s verdict and 0 otherwise; sum them to count decisions by verdict. All guard money is in USD.',
         data: data.guardDecisions,
         fields: fields([
           ['id', 'Guard Entry', 'textFormat'],
-          ['at', 'Decision Time', 'dateTimeFormat'],
+          ['at', 'Time', 'dateTimeFormat'],
           ['day', 'Decision Date', 'dateFormat'],
           ['tool', 'Tool', 'textFormat'],
           ['verdict', 'Verdict', 'textFormat'],
           ['outcome', 'Guard Outcome', 'textFormat'],
           ['customer', 'Ticket Customer', 'textFormat'],
           ['currency', 'Guard Currency', 'textFormat'],
-          ['requested', 'Requested Refund', 'currencyFormat'],
+          ['requested', 'Requested Refund', 'usd'],
           ['agent', 'Agent', 'textFormat'],
           ['action', 'Action', 'textFormat'],
-          ['moved', 'Money Moved', 'currencyFormat'],
-          ['protected', 'Money Protected', 'currencyFormat'],
-          ['billed', 'Money Billed', 'currencyFormat'],
+          ['moved', 'Money Moved', 'usd'],
+          ['protected', 'Money Protected', 'usd'],
+          ['billed', 'Money Billed', 'usd'],
           ['awaitingApproval', 'Awaiting Approval', 'integerFormat'],
+          ['allowed', 'Allowed', 'integerFormat'],
+          ['held', 'Held', 'integerFormat'],
+          ['blocked', 'Blocked', 'integerFormat'],
           ['withheld', 'Personal Data Withheld', 'integerFormat'],
           ['decidedBy', 'Decided By', 'textFormat'],
         ]),
@@ -258,12 +292,13 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       {
         id: 'guardViolations',
         name: 'Guard Violations',
-        description: 'Each rule a guard decision broke, one row per rule; a decision can break several.',
+        description: 'Each rule a guard decision broke, one row per rule; a decision can break several. Block Reason is the rule code in words.',
         data: data.guardViolations,
         fields: fields([
           ['id', 'Violation ID', 'textFormat', true],
           ['decisionId', 'Guard Entry ID', 'textFormat', true],
-          ['code', 'Violation', 'textFormat'],
+          ['code', 'Violation Code', 'textFormat'],
+          ['reason', 'Block Reason', 'textFormat'],
           ['message', 'Violation Detail', 'textFormat'],
         ]),
       },
@@ -295,6 +330,16 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       ratio('collectionRate', 'Collection Rate', 'Paid / invoiced. Filter to one currency first.', 'invoices.paidAmount', 'invoices.issuedAmount'),
       ratio('overdueShare', 'Overdue Share', 'Share of outstanding receivables that is past due.', 'invoices.overdueAmount', 'invoices.outstanding'),
       ratio('refundRate', 'Refund Rate', 'Refunded / paid.', 'invoices.refundedAmount', 'invoices.paidAmount'),
+      total('allowedCalls', 'Allowed', 'Calls the payment guard allowed.', 'guardDecisions.allowed'),
+      total('heldCalls', 'Held', 'Calls the payment guard held for a person.', 'guardDecisions.held'),
+      total('blockedCalls', 'Blocked', 'Calls the payment guard blocked.', 'guardDecisions.blocked'),
+      total('moneyMoved', 'Moved out', 'Money allowed refunds and dispute acceptances took out of the account (USD).', 'guardDecisions.moved', 'usd'),
+      total('moneyBilled', 'Billed', 'Invoices the billing agent created (USD), not yet paid.', 'guardDecisions.billed', 'usd'),
+      total('moneyProtected', 'Protected', 'Money blocked refunds and dispute acceptances kept in the account (USD).', 'guardDecisions.protected', 'usd'),
+      total('moneyInTotal', 'Money in', 'Credits on the PayPal ledger.', 'transactions.moneyIn', 'currencyFormat'),
+      total('moneyOutTotal', 'Money out', 'Debits on the PayPal ledger, as positive amounts.', 'transactions.moneyOut', 'currencyFormat'),
+      total('salesTotal', 'Sales', 'Payments customers made to the shop.', 'transactions.sales', 'currencyFormat'),
+      ratio('blockRate', 'Block Rate', 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
     ],
   };
 }

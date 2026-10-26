@@ -27,14 +27,15 @@ export const BUILT_IN_ID = 'paypal-overview';
 // Bump when initial-report.ts changes in a way a saved built-in copy must not hide. A copy saved
 // under another version is replaced by the code's report on load; reports people made are kept.
 // 2: the payment guard page comes first.
-const BUILT_IN_VERSION = 2;
+// 3: redesign: "AI operations" cover and "Agent activity"; cash folded into "Revenue & cash".
+const BUILT_IN_VERSION = 3;
 
 // Sidebar titles for the built-in report's pages, keyed by page id in initial-report.ts.
 const defaultPageTitles: Record<string, string> = {
-  guard: 'Payment guard',
-  revenue: 'Revenue',
+  guard: 'AI operations',
+  activity: 'Agent activity',
+  revenue: 'Revenue & cash',
   receivables: 'Receivables',
-  cash: 'Cash & payouts',
   catalogue: 'Catalogue',
 };
 
