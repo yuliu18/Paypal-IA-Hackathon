@@ -36,8 +36,12 @@ export type RefundRequest = {
 export type CaptureFacts = {
   captureId: string;
   status: string;
+  // Why PayPal holds a PENDING capture, e.g. BUYER_COMPLAINT while the buyer disputes it.
+  statusReason?: string | null;
   captured: Money;
   refunded: Money;
+  // The part of `refunded` still PENDING, which includes the hold PayPal places during a dispute.
+  pendingRefunded?: Money;
   customerEmail: string | null;
 };
 

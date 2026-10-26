@@ -29,6 +29,18 @@ export const DISPUTE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // The states in which the shop can still answer; in the others PayPal or the customer decides.
 const ACCEPTABLE = new Set(['OPEN', 'WAITING_FOR_SELLER_RESPONSE']);
 
+// While the buyer disputes a payment, PayPal puts its capture on PENDING for BUYER_COMPLAINT and
+// holds the shop's share back as a pending refund. Accepting the claim settles that hold rather
+// than refunding on top of it, so the capture counts as refundable and pending refunds up to the
+// disputed amount count as the hold. Completed refunds, and pending ones beyond it, still count.
+function withoutDisputeHold(capture: CaptureFacts, disputed: Money): CaptureFacts {
+  if (capture.status !== 'PENDING' || capture.statusReason !== 'BUYER_COMPLAINT') return capture;
+  const pending = capture.pendingRefunded;
+  const hold = pending && pending.currency === disputed.currency ? Math.min(pending.minor, disputed.minor) : 0;
+  const refunded = { ...capture.refunded, minor: capture.refunded.minor - hold };
+  return { ...capture, status: refunded.minor > 0 ? 'PARTIALLY_REFUNDED' : 'COMPLETED', refunded };
+}
+
 export function evaluateDisputeAcceptance({ dispute, capture, mandate, limits, refundedToday }: DisputeAcceptanceContext): Decision {
   const own: Violation[] = [];
   if (!ACCEPTABLE.has(dispute.status)) {
@@ -39,7 +51,13 @@ export function evaluateDisputeAcceptance({ dispute, capture, mandate, limits, r
   }
   // The refund rules see the disputed amount as the refund: its owner, what is still refundable
   // (a refund already made would be paid twice), and the per-refund, daily and approval limits.
-  const refund = evaluateRefund({ request: { captureId: capture.captureId, amount: dispute.amount }, capture, mandate, limits, refundedToday });
+  const refund = evaluateRefund({
+    request: { captureId: capture.captureId, amount: dispute.amount },
+    capture: withoutDisputeHold(capture, dispute.amount),
+    mandate,
+    limits,
+    refundedToday,
+  });
   if (refund.verdict === 'block') return { verdict: 'block', violations: [...own, ...refund.violations] };
   // A blocked acceptance never waits for a person, so the approval threshold isn't a reason here.
   if (own.length) return { verdict: 'block', violations: own };

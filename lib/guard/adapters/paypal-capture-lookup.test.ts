@@ -52,9 +52,16 @@ describe('toCaptureFacts', () => {
       captureId: 'CAP-1',
       status: 'PARTIALLY_REFUNDED',
       captured: { minor: 4999, currency: 'USD' },
+      statusReason: null,
       refunded: { minor: 1550, currency: 'USD' },
+      pendingRefunded: { minor: 550, currency: 'USD' },
       customerEmail: 'ana@example.com',
     });
+  });
+
+  it('keeps why PayPal holds a pending capture, as for a buyer complaint', () => {
+    const held: Capture = { ...capture, status: 'PENDING', status_details: { reason: 'BUYER_COMPLAINT' } };
+    expect(toCaptureFacts(held, order)).toMatchObject({ status: 'PENDING', statusReason: 'BUYER_COMPLAINT' });
   });
 
   it('reports a purchase unit without custom_id as an unknown customer so the policy blocks it', () => {

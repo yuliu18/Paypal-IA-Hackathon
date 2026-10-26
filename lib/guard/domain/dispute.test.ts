@@ -47,6 +47,25 @@ describe('evaluateDisputeAcceptance', () => {
     expect(codes(withCapture({ refunded: usd(500), status: 'PARTIALLY_REFUNDED' }))).toEqual(['AMOUNT_EXCEEDS_REFUNDABLE']);
   });
 
+  // What PayPal shows while the buyer disputes: the capture PENDING for BUYER_COMPLAINT and the
+  // shop's share (20.00 less a 0.98 fee) held back as a pending refund.
+  const disputed = (patch: Partial<DisputeAcceptanceContext['capture']> = {}) =>
+    withCapture({ status: 'PENDING', statusReason: 'BUYER_COMPLAINT', refunded: usd(1902), pendingRefunded: usd(1902), ...patch });
+
+  it('allows accepting a claim on a capture PayPal holds for that complaint: the hold is not a refund', () => {
+    expect(evaluateDisputeAcceptance(disputed())).toEqual({ verdict: 'allow', violations: [] });
+  });
+
+  it('still blocks a pending capture held for any other reason', () => {
+    expect(codes(disputed({ statusReason: 'PENDING_REVIEW' }))).toEqual(['CAPTURE_NOT_REFUNDABLE', 'AMOUNT_EXCEEDS_REFUNDABLE']);
+    expect(codes(disputed({ statusReason: null }))).toEqual(['CAPTURE_NOT_REFUNDABLE', 'AMOUNT_EXCEEDS_REFUNDABLE']);
+  });
+
+  it('counts completed refunds, and pending ones beyond the disputed amount, so nothing is paid twice', () => {
+    expect(codes(disputed({ refunded: usd(2402), pendingRefunded: usd(1902) }))).toEqual(['AMOUNT_EXCEEDS_REFUNDABLE']);
+    expect(codes(disputed({ refunded: usd(3902), pendingRefunded: usd(3902) }))).toEqual(['AMOUNT_EXCEEDS_REFUNDABLE']);
+  });
+
   it('applies the per-refund and daily limits to the disputed amount', () => {
     const big = context({
       dispute: { ...context().dispute, amount: usd(30000) },

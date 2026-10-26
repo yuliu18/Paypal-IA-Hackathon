@@ -22,15 +22,16 @@ export function toMinor(m: PayPalMoney): Money {
 export function toCaptureFacts(capture: Capture, order: Order): CaptureFacts {
   const captured = toMinor(capture.amount);
   const unit = order.purchase_units?.find((u) => u.payments?.captures?.some((c) => c.id === capture.id));
-  const refunded = (unit?.payments?.refunds ?? [])
-    .filter((r) => r.amount && !RELEASED_REFUND_STATUSES.has(r.status))
-    .reduce((sum, r) => sum + toMinor(r.amount!).minor, 0);
+  const holding = (unit?.payments?.refunds ?? []).filter((r) => r.amount && !RELEASED_REFUND_STATUSES.has(r.status));
+  const sum = (refunds: typeof holding) => refunds.reduce((total, r) => total + toMinor(r.amount!).minor, 0);
 
   return {
     captureId: capture.id,
     status: capture.status,
+    statusReason: capture.status_details?.reason ?? null,
     captured,
-    refunded: { minor: refunded, currency: captured.currency },
+    refunded: { minor: sum(holding), currency: captured.currency },
+    pendingRefunded: { minor: sum(holding.filter((r) => r.status === 'PENDING')), currency: captured.currency },
     // The shop's server writes the customer into custom_id when it charges; card payments carry
     // no payer email, and the buyer can't change custom_id.
     customerEmail: unit?.custom_id ?? null,
