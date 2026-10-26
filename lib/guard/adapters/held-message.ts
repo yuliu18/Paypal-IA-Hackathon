@@ -4,6 +4,8 @@
 
 import { SUBSCRIPTION_ID } from '../domain/cancellation';
 import { DISPUTE_ID } from '../domain/dispute';
+import { INVOICE_ID, parseInvoiceDraft } from '../domain/invoice';
+import { format } from '../domain/policy';
 import { maskEmail } from '../domain/redact';
 import type { AuditRow } from '../ports';
 
@@ -29,6 +31,16 @@ function heldAction(entry: AuditRow): string {
     // The disputed amount is PayPal's, not in the arguments; /guard shows it in the reasons.
     const id = entry.args.dispute_id;
     return `a dispute claim acceptance (${typeof id === 'string' && DISPUTE_ID.test(id) ? id : 'unreadable id'}), which refunds the disputed amount,`;
+  }
+  if (entry.tool === 'create_invoice') {
+    // The total the guard computed; the recipient, item names and notes are the agent's text.
+    const parsed = parseInvoiceDraft(entry.args);
+    return `an invoice of ${'draft' in parsed ? format(parsed.draft.total) : 'an unreadable amount'}`;
+  }
+  if (entry.tool === 'send_invoice' || entry.tool === 'send_invoice_reminder') {
+    const id = entry.args.invoice_id;
+    const shown = typeof id === 'string' && INVOICE_ID.test(id) ? id : '(unreadable id)';
+    return entry.tool === 'send_invoice' ? `sending invoice ${shown} to the customer` : `a reminder of invoice ${shown}`;
   }
   return `a refund of ${amountOf(entry.args)}`;
 }

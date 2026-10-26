@@ -67,7 +67,8 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         customer: maskEmail(e.task.mandate.customerEmail),
         currency: e.moved?.currency ?? requested?.currency ?? null,
         requested: requested?.value ?? null,
-        moved: e.moved ? e.moved.minor / 100 : 0,
+        // An invoice records what it bills, not money that left the shop.
+        moved: e.moved && e.tool !== 'create_invoice' ? e.moved.minor / 100 : 0,
         protected: e.tool !== 'create_refund' || !blocked ? 0 : (requested?.value ?? null),
         awaitingApproval: e.outcome === 'held' && !decided.has(e.id) ? 1 : 0,
         withheld: withheldCount(e.detail),

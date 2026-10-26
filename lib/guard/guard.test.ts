@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { SubscriptionFacts } from './domain/cancellation';
 import type { DisputeFacts } from './domain/dispute';
+import type { InvoiceFacts, InvoiceLimits } from './domain/invoice';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
 import { createPaymentGuard, decideHeldCall, decideHeldRefund } from './guard';
-import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, DisputeLookup, HeldNotifier, IntentJudge, SubscriptionLookup, ToolCall } from './ports';
+import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, CustomerDirectory, DisputeLookup, HeldNotifier, IntentJudge, InvoiceLookup, SubscriptionLookup, ToolCall } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -39,8 +40,12 @@ const audit: AuditLog = {
     if (auditUpdateFails) throw new Error('disk full');
     Object.assign(entries[Number(id)], patch);
   },
+  // Like the SQLite log: an invoice's amount is money billed, never money refunded.
   async movedSince() {
-    return usd(entries.reduce((sum, e) => sum + (e.moved?.minor ?? 0), 0));
+    return usd(entries.reduce((sum, e) => sum + (e.tool === 'create_invoice' ? 0 : (e.moved?.minor ?? 0)), 0));
+  },
+  async billedSince() {
+    return usd(entries.reduce((sum, e) => sum + (e.tool === 'create_invoice' ? (e.moved?.minor ?? 0) : 0), 0));
   },
   async hasUnsettledRefund(captureId) {
     return entries.some((e) => e.tool === 'create_refund' && e.args.capture_id === captureId && e.moved && (e.outcome === 'pending' || e.outcome === 'error'));
@@ -115,7 +120,28 @@ const DISPUTES: Record<string, string> = {
   'PP-D-GARBLED': 'not json',
 };
 
-function fakePayPal() {
+// Invoices as PayPal's get_invoice returns them: the primary recipient is whom it bills.
+const invoiceAnswer = (id: string, emails: string[], status = 'SENT') =>
+  JSON.stringify({
+    id,
+    status,
+    detail: { invoice_number: '0042', currency_code: 'USD', invoice_date: '2026-10-20', payment_term: { term_type: 'NET_10', due_date: '2026-10-30' } },
+    invoicer: { email_address: 'shop@business.example.com' },
+    primary_recipients: emails.map((email_address) => ({ billing_info: { email_address, name: { given_name: 'Someone' } } })),
+    items: [{ name: 'Mug', quantity: '2', unit_amount: { currency_code: 'USD', value: '12.50' } }],
+    amount: { currency_code: 'USD', value: '25.00' },
+    due_amount: { currency_code: 'USD', value: '25.00' },
+    links: [{ href: 'https://api.sandbox.paypal.com/v2/invoicing/invoices/x', rel: 'self' }],
+  });
+const INVOICES: Record<string, string> = {
+  'INV2-ANA': invoiceAnswer('INV2-ANA', ['ana@example.com']),
+  'INV2-BEN': invoiceAnswer('INV2-BEN', ['ben@example.com']),
+  'INV2-BOTH': invoiceAnswer('INV2-BOTH', ['ana@example.com', 'ben@example.com']),
+  'INV2-GARBLED': 'not json',
+};
+
+// The invoice tools are registered only for the invoice tests, so the support agent's tool list stays as it was.
+function fakePayPal({ invoiceTools = false } = {}) {
   const server = new McpServer({ name: 'fake-paypal', version: '0.0.0' });
   const ok = (name: string) => async (args: unknown) => {
     upstreamCalls.push({ name, args });
@@ -152,6 +178,29 @@ function fakePayPal() {
   });
   server.registerTool('accept_dispute_claim', { description: 'accept', inputSchema: { dispute_id: z.string(), note: z.string() } }, ok('accept_dispute_claim'));
   server.registerTool('update_shipment_tracking', { description: 'tracking', inputSchema: { id: z.string() } }, ok('update_shipment_tracking'));
+  if (invoiceTools) {
+    server.registerTool('get_invoice', { description: 'invoice', inputSchema: { invoice_id: z.string() } }, async (args) => {
+      upstreamCalls.push({ name: 'get_invoice', args });
+      return { content: [{ type: 'text' as const, text: INVOICES[args.invoice_id] ?? 'not found' }] };
+    });
+    const creation = {
+      currency_code: z.string().optional(),
+      invoice_number: z.string().optional(),
+      primary_recipients: z.array(z.unknown()).optional(),
+      items: z.array(z.unknown()).optional(),
+      shipping_cost: z.string().optional(),
+    };
+    const sending = {
+      invoice_id: z.string(),
+      note: z.string().optional(),
+      subject: z.string().optional(),
+      send_to_recipient: z.boolean().optional(),
+      additional_recipients: z.array(z.string()).optional(),
+    };
+    server.registerTool('create_invoice', { description: 'create invoice', inputSchema: creation }, ok('create_invoice'));
+    server.registerTool('send_invoice', { description: 'send invoice', inputSchema: sending }, ok('send_invoice'));
+    server.registerTool('send_invoice_reminder', { description: 'remind', inputSchema: sending }, ok('send_invoice_reminder'));
+  }
   return server;
 }
 
@@ -165,10 +214,14 @@ async function connect(
     notifier = undefined as HeldNotifier | undefined,
     subscriptions = undefined as SubscriptionLookup | undefined,
     disputes = undefined as DisputeLookup | undefined,
+    invoices = undefined as InvoiceLookup | undefined,
+    customers = undefined as CustomerDirectory | undefined,
+    invoiceLimits = undefined as InvoiceLimits | undefined,
+    invoiceTools = false,
   } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
-  await fakePayPal().connect(upServer);
+  await fakePayPal({ invoiceTools }).connect(upServer);
   const upstream = new Client({ name: 'guard-upstream', version: '0.0.0' });
   await upstream.connect(upClient);
   if (upstreamThrows) {
@@ -208,6 +261,9 @@ async function connect(
     notifier,
     subscriptions,
     disputes,
+    invoices,
+    customers,
+    invoiceLimits,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -1270,6 +1326,436 @@ describe('held dispute acceptance approval', () => {
 
   it('records a rejection without reaching PayPal', async () => {
     expect(await decide('0', false)).toEqual({ outcome: 'blocked', message: 'Dispute acceptance rejected; nothing was sent to PayPal' });
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('refunds next to invoices', () => {
+  it('keeps invoices out of the refund daily limit: money billed is not money refunded', async () => {
+    entries.push({ at: '2026-10-20T11:00:00Z', tool: 'create_invoice', args: {}, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(19000) });
+    const agent = await connect();
+    const result = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } } });
+    expect(result.isError).toBeFalsy();
+    expect(entries[1]).toMatchObject({ tool: 'create_refund', outcome: 'executed', moved: usd(5000) });
+  });
+});
+
+// create_invoice's flat arguments, billing ana 2 x 12.50 USD.
+const invoiceArgs = (overrides: Record<string, unknown> = {}) => ({
+  currency_code: 'USD',
+  invoice_number: '0042',
+  primary_recipients: [{ billing_info: { email_address: 'ana@example.com' } }],
+  items: [{ name: 'Mug', quantity: '2', unit_amount: { currency_code: 'USD', value: '12.50' } }],
+  ...overrides,
+});
+const invoiceOf = (value: string) => invoiceArgs({ items: [{ name: 'Mug', quantity: '1', unit_amount: { currency_code: 'USD', value } }] });
+const invoiceLimits: InvoiceLimits = { approvalThreshold: usd(10000), perInvoice: usd(50000), daily: usd(100000) };
+
+describe('invoice creation', () => {
+  let known: string[];
+  let directoryCalls: string[];
+  const customers: CustomerDirectory = {
+    async isCustomer(email) {
+      directoryCalls.push(email);
+      return known.includes(email);
+    },
+  };
+  const connectInvoices = (options: Parameters<typeof connect>[1] = {}) => connect(undefined, { customers, invoiceLimits, invoiceTools: true, ...options });
+
+  beforeEach(() => {
+    known = ['ana@example.com', 'ben@example.com', 'carla@example.com'];
+    directoryCalls = [];
+  });
+
+  it('forwards an invoice that passes the checks and the judge, recording its total as the amount billed', async () => {
+    const agent = await connectInvoices();
+    const result = await agent.callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe('create_invoice ok');
+    expect(directoryCalls).toEqual(['ana@example.com']);
+    expect(judgedCalls).toEqual([{ tool: 'create_invoice', args: invoiceArgs() }]);
+    expect(upstreamCalls).toEqual([{ name: 'create_invoice', args: invoiceArgs() }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'create_invoice', outcome: 'executed', moved: usd(2500), decision: { verdict: 'allow', violations: [] } });
+  });
+
+  it('blocks malformed invoices without asking the directory, the judge or PayPal', async () => {
+    const agent = await connectInvoices();
+    const malformed = [
+      invoiceArgs({ primary_recipients: [] }),
+      invoiceArgs({ primary_recipients: [{ billing_info: { email_address: 'ana@example.com' } }, { billing_info: { email_address: 'ben@example.com' } }] }),
+      invoiceArgs({ items: [] }),
+      invoiceArgs({ items: [{ name: 'Mug', quantity: '1', unit_amount: { currency_code: 'USD', value: '-10.00' } }] }),
+      invoiceArgs({ items: [{ name: 'Mug', quantity: '-1', unit_amount: { currency_code: 'USD', value: '10.00' } }] }),
+      invoiceArgs({ items: [{ name: 'Mug', quantity: '1', unit_amount: { currency_code: 'EUR', value: '10.00' } }] }),
+      invoiceArgs({ shipping_cost: '-5.00' }),
+      invoiceOf('0.00'),
+    ];
+    for (const args of malformed) {
+      const result = await agent.callTool({ name: 'create_invoice', arguments: args });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain('INVALID_ARGUMENTS');
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(malformed.map(() => 'blocked'));
+    expect(entries.every((e) => e.moved === undefined)).toBe(true);
+    expect(directoryCalls).toEqual([]);
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks billing anyone but the task customer, without asking the judge', async () => {
+    const result = await (await connectInvoices()).callTool({ name: 'create_invoice', arguments: invoiceArgs({ primary_recipients: [{ billing_info: { email_address: 'ben@example.com' } }] }) });
+    expect(text(result)).toBe('Blocked by payment guard. CUSTOMER_MISMATCH: Invoice recipient is not the task customer ana@example.com');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'create_invoice', outcome: 'blocked' });
+    expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('blocks billing a task customer the shop does not have', async () => {
+    known = ['ben@example.com'];
+    const result = await (await connectInvoices()).callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(text(result)).toBe('Blocked by payment guard. UNKNOWN_CUSTOMER: ana@example.com is not an existing customer of the shop');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('fails closed when the customer directory fails, hangs, or is not configured', async () => {
+    const failing: CustomerDirectory = { isCustomer: async () => { throw new Error('seed file locked by ana@example.com'); } };
+    let result = await (await connectInvoices({ customers: failing })).callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(text(result)).toContain('CUSTOMER_LOOKUP_FAILED');
+    expect(text(result)).not.toContain('ana@example.com');
+    const hanging: CustomerDirectory = { isCustomer: () => new Promise(() => undefined) };
+    result = await (await connectInvoices({ customers: hanging })).callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(text(result)).toContain('CUSTOMER_LOOKUP_FAILED: Customer lookup timed out');
+    result = await (await connect(undefined, { invoiceTools: true })).callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(text(result)).toBe('Blocked by payment guard. CUSTOMER_LOOKUP_FAILED: No customer directory is configured');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('blocks an invoice over the per-invoice limit, without asking for approval', async () => {
+    const result = await (await connectInvoices()).callTool({ name: 'create_invoice', arguments: invoiceOf('500.01') });
+    expect(text(result)).toBe('Blocked by payment guard. INVOICE_LIMIT: Invoice 500.01 USD is over the per-invoice limit 500.00 USD');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('caps what invoices bill per day, counting invoices billed today but not refunds', async () => {
+    entries.push({ at: '2026-10-20T09:00:00Z', tool: 'create_refund', args: { capture_id: 'CAP-9' }, task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(90000) });
+    const agent = await connectInvoices({ invoiceLimits: { ...invoiceLimits, approvalThreshold: usd(50000) } });
+    expect((await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('500.00') })).isError).toBeFalsy();
+    expect((await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('400.00') })).isError).toBeFalsy();
+    const third = await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('100.01') });
+    expect(text(third)).toBe('Blocked by payment guard. DAILY_LIMIT: Invoices today would reach 1000.01 USD, over 1000.00 USD');
+    expect(entries.map((e) => e.outcome)).toEqual(['executed', 'executed', 'executed', 'blocked']);
+    expect(upstreamCalls).toHaveLength(2);
+  });
+
+  it('holds a clean invoice over the approval threshold, tells a person, and bills nothing yet', async () => {
+    const notified: AuditRow[] = [];
+    const agent = await connectInvoices({ notifier: { notifyHeld: async (entry) => void notified.push(entry) } });
+    const result = await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('120.00') });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toContain('Invoice held for human approval; it has not been executed.');
+    expect(text(result)).toContain('APPROVAL_REQUIRED: Invoice 120.00 USD is over the approval threshold 100.00 USD');
+    expect(judgeCalls).toBe(1);
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'create_invoice', outcome: 'held' });
+    expect(entries[0].moved).toBeUndefined();
+    expect(notified).toHaveLength(1);
+  });
+
+  it('blocks a clean invoice the judge rejects', async () => {
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'Nobody asked to bill this' }] };
+    const result = await (await connectInvoices()).callTool({ name: 'create_invoice', arguments: invoiceArgs() });
+    expect(text(result)).toContain('INTENT_MISMATCH');
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ outcome: 'blocked' });
+  });
+
+  it('uses the default invoice limits when none are given', async () => {
+    const agent = await connect(undefined, { customers, invoiceTools: true });
+    expect(text(await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('100.01') }))).toContain('APPROVAL_REQUIRED');
+    expect(text(await agent.callTool({ name: 'create_invoice', arguments: invoiceOf('500.01') }))).toContain('INVOICE_LIMIT');
+  });
+});
+
+describe('held invoice approval', () => {
+  let directory: CustomerDirectory;
+  const held = invoiceOf('120.00');
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over threshold' }] };
+
+  async function decide(heldId: string, approve: boolean, customers: CustomerDirectory | undefined = directory) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal({ invoiceTools: true }).connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldCall(
+      {
+        upstream,
+        captures: { getCapture: async () => facts },
+        customers,
+        audit,
+        limits: { approvalThreshold: usd(1000), perRefund: usd(10000), daily: usd(20000) },
+        invoiceLimits,
+        now: () => new Date('2026-10-20T13:00:00Z'),
+        timeoutMs: 50,
+      },
+      heldId,
+      approve,
+    );
+  }
+
+  beforeEach(() => {
+    directory = { isCustomer: async (email) => email === 'ana@example.com' };
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'create_invoice', args: held, task, decision: hold, outcome: 'held' });
+  });
+
+  it('creates an approved invoice in PayPal, lifting only the approval threshold, and records the amount billed', async () => {
+    expect(await decide('0', true)).toEqual({ outcome: 'executed', message: 'Invoice 0042 created in PayPal for 120.00 USD' });
+    expect(upstreamCalls).toEqual([{ name: 'create_invoice', args: held }]);
+    expect(entries[1]).toMatchObject({ tool: 'create_invoice', resolves: '0', outcome: 'executed', moved: usd(12000), decision: { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON' }] } });
+    expect((await decide('0', true)).outcome).toBe('refused');
+  });
+
+  it('leaves the invoice number out of the message when the invoice has none', async () => {
+    const unnumbered: Record<string, unknown> = { ...held };
+    delete unnumbered.invoice_number;
+    entries[0] = { ...entries[0], args: unnumbered };
+    expect(await decide('0', true)).toEqual({ outcome: 'executed', message: 'Invoice created in PayPal for 120.00 USD' });
+  });
+
+  it('checks the invoice again on approval: the daily cap counts what was billed since the hold', async () => {
+    entries.push({ at: '2026-10-20T12:30:00Z', tool: 'create_invoice', args: invoiceOf('900.00'), task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(90000) });
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(result.message).toContain('DAILY_LIMIT');
+    expect(entries[2]).toMatchObject({ resolves: '0', outcome: 'blocked' });
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('keeps the hold open when the customer directory cannot be read', async () => {
+    const unreachable = await decide('0', true, { isCustomer: async () => { throw new Error('locked'); } });
+    expect(unreachable).toEqual({ outcome: 'error', message: 'The customer directory could not be reached to check the customer; the invoice is still held, try again' });
+    expect(entries).toHaveLength(1);
+    expect((await decide('0', true)).outcome).toBe('executed');
+  });
+
+  it('records a rejection without reaching PayPal', async () => {
+    expect(await decide('0', false)).toEqual({ outcome: 'blocked', message: 'Invoice rejected; nothing was sent to PayPal' });
+    expect(entries[1]).toMatchObject({ tool: 'create_invoice', resolves: '0', outcome: 'blocked', decision: { violations: [{ code: 'REJECTED_BY_PERSON' }] } });
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('invoice sending and reminders', () => {
+  let invoiceFacts: InvoiceFacts | undefined;
+  let lookups: string[];
+  const invoices: InvoiceLookup = {
+    async getInvoice(id) {
+      lookups.push(id);
+      return invoiceFacts && { ...invoiceFacts, id };
+    },
+  };
+  const send = { invoice_id: 'INV2-ANA', note: 'Thanks' };
+  const remind = { invoice_id: 'INV2-ANA', subject: 'Reminder' };
+  const connectInvoices = (options: Parameters<typeof connect>[1] = {}) => connect(undefined, { invoices, invoiceTools: true, ...options });
+
+  beforeEach(() => {
+    invoiceFacts = { id: 'INV2-ANA', status: 'DRAFT', amount: usd(2500), recipientEmails: ['ana@example.com'] };
+    lookups = [];
+  });
+
+  it('sends a draft invoice of the task customer after the judge, moving no money', async () => {
+    const result = await (await connectInvoices()).callTool({ name: 'send_invoice', arguments: send });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe('send_invoice ok');
+    expect(lookups).toEqual(['INV2-ANA']);
+    expect(judgedCalls).toEqual([{ tool: 'send_invoice', args: send }]);
+    expect(upstreamCalls).toEqual([{ name: 'send_invoice', args: send }]);
+    expect(entries[0]).toMatchObject({ tool: 'send_invoice', outcome: 'executed', decision: { verdict: 'allow' } });
+    expect(entries[0].moved).toBeUndefined();
+  });
+
+  it('blocks a non-plain id, or sending to anyone but the invoice recipient, without looking it up', async () => {
+    const agent = await connectInvoices();
+    const cases: [string, Record<string, unknown>, string][] = [
+      ['send_invoice', { invoice_id: '../v2/x' }, 'INVALID_ARGUMENTS: send_invoice needs a plain invoice_id'],
+      ['send_invoice', { ...send, additional_recipients: ['mallory@example.com'] }, "INVALID_ARGUMENTS: send_invoice may send only to the invoice's own recipient: additional_recipients must be empty"],
+      ['send_invoice', { ...send, send_to_recipient: false }, "INVALID_ARGUMENTS: send_invoice may send only to the invoice's own recipient: send_to_recipient cannot be false"],
+      ['send_invoice_reminder', { ...remind, additional_recipients: ['mallory@example.com'] }, "INVALID_ARGUMENTS: send_invoice_reminder may send only to the invoice's own recipient"],
+    ];
+    for (const [name, args, expected] of cases) {
+      expect(text(await agent.callTool({ name, arguments: args }))).toContain(expected);
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'blocked', 'blocked', 'blocked']);
+    expect(lookups).toEqual([]);
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('fails closed when the invoice is unknown, cannot be looked up, or there is no invoice lookup', async () => {
+    invoiceFacts = undefined;
+    let result = await (await connectInvoices()).callTool({ name: 'send_invoice', arguments: send });
+    expect(text(result)).toBe('Blocked by payment guard. INVOICE_LOOKUP_FAILED: Invoice INV2-ANA was not found in PayPal');
+    const failing: InvoiceLookup = { getInvoice: async () => { throw new Error('PayPal 500 for ana@example.com'); } };
+    result = await (await connectInvoices({ invoices: failing })).callTool({ name: 'send_invoice_reminder', arguments: remind });
+    expect(text(result)).toContain('INVOICE_LOOKUP_FAILED');
+    expect(text(result)).not.toContain('ana@example.com');
+    result = await (await connect(undefined, { invoiceTools: true })).callTool({ name: 'send_invoice', arguments: send });
+    expect(text(result)).toBe('Blocked by payment guard. INVOICE_LOOKUP_FAILED: No invoice lookup is configured');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it("blocks sending another customer's invoice, or one billing several people", async () => {
+    for (const recipientEmails of [['ben@example.com'], ['ana@example.com', 'ben@example.com']]) {
+      invoiceFacts = { ...invoiceFacts!, recipientEmails };
+      const result = await (await connectInvoices()).callTool({ name: 'send_invoice', arguments: send });
+      expect(text(result)).toBe('Blocked by payment guard. CUSTOMER_MISMATCH: Invoice INV2-ANA is not billed to the task customer ana@example.com alone');
+    }
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('sends only a draft, and reminds only of an invoice still owed', async () => {
+    invoiceFacts = { ...invoiceFacts!, status: 'PAID' };
+    const agent = await connectInvoices();
+    expect(text(await agent.callTool({ name: 'send_invoice', arguments: send }))).toContain('INVOICE_NOT_SENDABLE: Invoice status is PAID; only a DRAFT invoice can be sent');
+    expect(text(await agent.callTool({ name: 'send_invoice_reminder', arguments: remind }))).toContain('INVOICE_NOT_SENDABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('reminds of an invoice at most once per task, counting executed and held reminders, but not blocked ones', async () => {
+    invoiceFacts = { ...invoiceFacts!, status: 'UNPAID' };
+    const agent = await connectInvoices();
+    expect((await agent.callTool({ name: 'send_invoice_reminder', arguments: remind })).isError).toBeFalsy();
+    const second = await agent.callTool({ name: 'send_invoice_reminder', arguments: remind });
+    expect(text(second)).toBe('Blocked by payment guard. REMINDER_LIMIT: A task may send at most 1 reminder for invoice INV2-ANA');
+    // Another invoice of the same customer has a reminder of its own.
+    expect((await agent.callTool({ name: 'send_invoice_reminder', arguments: { invoice_id: 'INV2-ANA2' } })).isError).toBeFalsy();
+    expect(entries.map((e) => e.outcome)).toEqual(['executed', 'blocked', 'executed']);
+    expect(upstreamCalls).toHaveLength(2);
+
+    entries = [];
+    upstreamCalls = [];
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    const holding = await connectInvoices();
+    expect(text(await holding.callTool({ name: 'send_invoice_reminder', arguments: remind }))).toContain('Invoice reminder held for human approval');
+    judgeDecision = { verdict: 'allow', violations: [] };
+    expect(text(await holding.callTool({ name: 'send_invoice_reminder', arguments: remind }))).toContain('REMINDER_LIMIT');
+    expect(entries.map((e) => e.outcome)).toEqual(['held', 'blocked']);
+
+    entries = [];
+    invoiceFacts = { ...invoiceFacts, status: 'PAID' };
+    const blocking = await connectInvoices();
+    await blocking.callTool({ name: 'send_invoice_reminder', arguments: remind });
+    invoiceFacts = { ...invoiceFacts, status: 'UNPAID' };
+    expect((await blocking.callTool({ name: 'send_invoice_reminder', arguments: remind })).isError).toBeFalsy();
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'executed']);
+  });
+
+  it('holds a sending the judge is unsure about, and blocks one it rejects', async () => {
+    judgeDecision = { verdict: 'hold', violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+    expect(text(await (await connectInvoices()).callTool({ name: 'send_invoice', arguments: send }))).toContain('Invoice sending held for human approval');
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'not asked' }] };
+    expect(text(await (await connectInvoices()).callTool({ name: 'send_invoice', arguments: send }))).toContain('INTENT_MISMATCH');
+    expect(entries.map((e) => e.outcome)).toEqual(['held', 'blocked']);
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('held invoice sending approval', () => {
+  let invoiceFacts: InvoiceFacts | undefined;
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'INTENT_UNCERTAIN', message: 'unclear' }] };
+
+  async function decide(heldId: string, approve: boolean, invoices: InvoiceLookup = { getInvoice: async (id) => invoiceFacts && { ...invoiceFacts, id } }) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal({ invoiceTools: true }).connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldCall(
+      { upstream, captures: { getCapture: async () => facts }, invoices, audit, limits: { approvalThreshold: usd(1000), perRefund: usd(10000), daily: usd(20000) }, now: () => new Date('2026-10-20T13:00:00Z'), timeoutMs: 50 },
+      heldId,
+      approve,
+    );
+  }
+
+  beforeEach(() => {
+    invoiceFacts = { id: 'INV2-ANA', status: 'DRAFT', amount: usd(2500), recipientEmails: ['ana@example.com'] };
+  });
+
+  it('sends an approved invoice, moving no money', async () => {
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'send_invoice', args: { invoice_id: 'INV2-ANA' }, task, decision: hold, outcome: 'held' });
+    expect(await decide('0', true)).toEqual({ outcome: 'executed', message: 'Invoice INV2-ANA sent' });
+    expect(upstreamCalls).toEqual([{ name: 'send_invoice', args: { invoice_id: 'INV2-ANA' } }]);
+    expect(entries[1]).toMatchObject({ tool: 'send_invoice', resolves: '0', outcome: 'executed' });
+    expect(entries[1].moved).toBeUndefined();
+  });
+
+  it('sends an approved reminder: the held reminder is the task one', async () => {
+    invoiceFacts = { ...invoiceFacts!, status: 'SENT' };
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'send_invoice_reminder', args: { invoice_id: 'INV2-ANA' }, task, decision: hold, outcome: 'held' });
+    expect(await decide('0', true)).toEqual({ outcome: 'executed', message: 'Reminder for invoice INV2-ANA sent' });
+    expect(upstreamCalls).toEqual([{ name: 'send_invoice_reminder', args: { invoice_id: 'INV2-ANA' } }]);
+  });
+
+  it('checks the invoice again on approval, and keeps the hold open when PayPal cannot be reached', async () => {
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'send_invoice', args: { invoice_id: 'INV2-ANA' }, task, decision: hold, outcome: 'held' });
+    const unreachable = await decide('0', true, { getInvoice: async () => { throw new Error('connect timeout'); } });
+    expect(unreachable).toEqual({ outcome: 'error', message: 'PayPal could not be reached to check the invoice; the invoice sending is still held, try again' });
+    expect(entries).toHaveLength(1);
+    invoiceFacts = { ...invoiceFacts!, status: 'SENT' };
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('blocked');
+    expect(result.message).toContain('INVOICE_NOT_SENDABLE');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('records a rejection without reaching PayPal', async () => {
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'send_invoice_reminder', args: { invoice_id: 'INV2-ANA' }, task, decision: hold, outcome: 'held' });
+    expect(await decide('0', false)).toEqual({ outcome: 'blocked', message: 'Invoice reminder rejected; nothing was sent to PayPal' });
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+describe('invoice reads', () => {
+  const connectReads = () => connect(undefined, { invoiceTools: true });
+
+  it('returns an invoice of the task customer without the invoicer, the recipients or links, and logs the read', async () => {
+    const result = await (await connectReads()).callTool({ name: 'get_invoice', arguments: { invoice_id: 'INV2-ANA' } });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(text(result))).toEqual({
+      id: 'INV2-ANA',
+      status: 'SENT',
+      detail: { invoice_number: '0042', currency_code: 'USD', invoice_date: '2026-10-20', payment_term: { due_date: '2026-10-30' } },
+      items: [{ name: 'Mug', quantity: '2', unit_amount: { currency_code: 'USD', value: '12.50' } }],
+      amount: { currency_code: 'USD', value: '25.00' },
+      due_amount: { currency_code: 'USD', value: '25.00' },
+      withheld_by_guard: ['detail.payment_term.term_type', 'invoicer', 'primary_recipients', 'links'],
+    });
+    expect(text(result)).not.toContain('ana@example.com');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'get_invoice', outcome: 'executed', detail: 'Withheld from the agent: detail.payment_term.term_type, invoicer, primary_recipients, links' });
+    expect(entries[0].moved).toBeUndefined();
+    expect(judgeCalls).toBe(0);
+  });
+
+  it("withholds another customer's invoice, one billing several people, or one that can't be read", async () => {
+    const agent = await connectReads();
+    for (const invoice_id of ['INV2-BEN', 'INV2-BOTH', 'INV2-GARBLED']) {
+      const result = await agent.callTool({ name: 'get_invoice', arguments: { invoice_id } });
+      expect(text(result)).toBe('Blocked by payment guard. CUSTOMER_MISMATCH: Invoice is not one of the ticket customer ana@example.com');
+      expect(text(result)).not.toContain('ben@example.com');
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(['blocked', 'blocked', 'blocked']);
+  });
+
+  it('refuses an invoice id that is not a plain id before PayPal is called', async () => {
+    const agent = await connectReads();
+    for (const invoice_id of ['../../v2/checkout/orders/X', 'INV2?x=1', '']) {
+      expect(text(await agent.callTool({ name: 'get_invoice', arguments: { invoice_id } }))).toContain('INVALID_ARGUMENTS: invoice_id must be a plain invoice id');
+    }
     expect(upstreamCalls).toEqual([]);
   });
 });

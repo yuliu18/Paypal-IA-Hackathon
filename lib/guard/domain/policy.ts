@@ -21,7 +21,11 @@ export type ViolationCode =
   | 'INTENT_UNCERTAIN'
   | 'SUBSCRIPTION_NOT_CANCELLABLE'
   | 'CANCELLATION_LIMIT'
-  | 'DISPUTE_NOT_ACCEPTABLE';
+  | 'DISPUTE_NOT_ACCEPTABLE'
+  | 'UNKNOWN_CUSTOMER'
+  | 'INVOICE_LIMIT'
+  | 'INVOICE_NOT_SENDABLE'
+  | 'REMINDER_LIMIT';
 
 export type Violation = { code: ViolationCode | string; message: string };
 
@@ -59,10 +63,10 @@ export type RefundContext = {
   refundedToday: Money;
 };
 
-const format = (m: Money) => `${(m.minor / 100).toFixed(2)} ${m.currency}`;
+export const format = (m: Money) => `${(m.minor / 100).toFixed(2)} ${m.currency}`;
 
 // A limit in another currency can't be compared, so it fails closed.
-const exceeds = (amount: Money, limit: Money) => amount.currency !== limit.currency || amount.minor > limit.minor;
+export const exceeds = (amount: Money, limit: Money) => amount.currency !== limit.currency || amount.minor > limit.minor;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 

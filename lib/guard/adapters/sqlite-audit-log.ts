@@ -144,9 +144,13 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
     `INSERT INTO audit_log (id, kind, at, ref, tool, args, task, decision, moved_minor, moved_currency, moved_set, outcome, detail, resolves, prev_hash, hash)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
-  // Pending entries count too: their call may have moved money even if it never settled.
+  // Pending entries count too: their call may have moved money even if it never settled. An
+  // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry.
   const sumSince = db.prepare(
-    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ?`,
+    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool IS NOT 'create_invoice'`,
+  );
+  const billedSumSince = db.prepare(
+    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool = 'create_invoice'`,
   );
   const latest = db.prepare(`SELECT * FROM audit_state ORDER BY id DESC LIMIT ?`);
   const byId = db.prepare(`SELECT * FROM audit_state WHERE id = ?`);
@@ -311,6 +315,11 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
 
     async movedSince(since, currency): Promise<Money> {
       const { total } = sumSince.get(since.toISOString(), currency) as { total: number };
+      return { minor: total, currency };
+    },
+
+    async billedSince(since, currency): Promise<Money> {
+      const { total } = billedSumSince.get(since.toISOString(), currency) as { total: number };
       return { minor: total, currency };
     },
 

@@ -1,5 +1,5 @@
 // Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order,
-// subscription or dispute. An allowlist of the fields its write needs; anything else, wherever
+// subscription, dispute or invoice. An allowlist of the fields its write needs; anything else, wherever
 // PayPal adds it, is withheld: card details, payer, payee and subscriber, names, addresses, the
 // shop's custom_id, notes and links.
 
@@ -46,6 +46,19 @@ const DISPUTE: Shape = {
   disputed_transactions: [{ seller_transaction_id: 'scalar', transaction_status: 'scalar', gross_amount: MONEY, create_time: 'scalar' }],
 };
 
+// An invoice without the invoicer, the recipients or links: what is billed, for how much, what is
+// still due and by when. Notes and item names are the shop's text, kept masked.
+const INVOICE: Shape = {
+  id: 'scalar',
+  status: 'scalar',
+  detail: { invoice_number: 'scalar', currency_code: 'scalar', invoice_date: 'scalar', note: 'text', payment_term: { due_date: 'scalar' } },
+  items: [{ name: 'text', quantity: 'scalar', unit_amount: MONEY }],
+  amount: MONEY,
+  due_amount: MONEY,
+  payments: { paid_amount: MONEY, transactions: [{ amount: MONEY, payment_date: 'scalar' }] },
+  refunds: { refund_amount: MONEY, transactions: [{ amount: MONEY, refund_date: 'scalar' }] },
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // The kept part of `value`, or undefined when its shape doesn't match, so the caller withholds it whole.
@@ -87,6 +100,12 @@ export function minimizeDispute(dispute: unknown): { dispute: Record<string, unk
   const withheld: string[] = [];
   const kept = keep(dispute, DISPUTE, '', withheld);
   return { dispute: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeInvoice(invoice: unknown): { invoice: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(invoice, INVOICE, '', withheld);
+  return { invoice: isRecord(kept) ? kept : {}, withheld };
 }
 
 // How a read's black box entry records what was withheld, and how the dashboard counts it back.

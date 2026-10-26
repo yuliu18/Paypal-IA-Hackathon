@@ -1,7 +1,7 @@
 'use client';
 
-// Refunds, subscription cancellations and dispute acceptances the payment guard held for a person, each with Approve
-// and Reject. Approving runs the call through the guard's checks again before PayPal sees it.
+// Refunds, subscription cancellations, dispute acceptances and invoice actions the payment guard held for a person,
+// each with Approve and Reject. Approving runs the call through the guard's checks again before PayPal sees it.
 
 import { useActionState } from 'react';
 import { decideHeldAction } from './actions';
@@ -10,9 +10,33 @@ export type HeldCall = { id: string; at: string; customer: string; codes: string
   | { kind: 'refund'; amount: string; captureId: string }
   | { kind: 'cancellation'; subscriptionId: string }
   | { kind: 'dispute'; disputeId: string }
+  | { kind: 'invoice'; amount: string }
+  | { kind: 'invoice-sending' | 'invoice-reminder'; invoiceId: string }
 );
 
-const TITLE = { cancellation: 'Cancel subscription', dispute: 'Accept dispute claim' };
+const TITLE = {
+  cancellation: 'Cancel subscription',
+  dispute: 'Accept dispute claim',
+  invoice: 'Create invoice',
+  'invoice-sending': 'Send invoice',
+  'invoice-reminder': 'Send invoice reminder',
+};
+
+// The id or amount that tells one held call from another of its kind.
+function referenceOf(held: HeldCall): string {
+  switch (held.kind) {
+    case 'refund':
+      return held.captureId;
+    case 'cancellation':
+      return held.subscriptionId;
+    case 'dispute':
+      return held.disputeId;
+    case 'invoice':
+      return held.amount;
+    default:
+      return held.invoiceId;
+  }
+}
 
 // A fixed locale and time zone, so the server's HTML and the browser's render show the same text.
 const atUtc = (iso: string) => `${new Date(iso).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`;
@@ -42,7 +66,7 @@ function HeldItem({ held, action, pending }: { held: HeldCall; action: (form: Fo
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <span className="text-lg font-semibold text-pp-navy">{held.kind === 'refund' ? held.amount : TITLE[held.kind]}</span>
             <span>{held.customer}</span>
-            <code className="text-xs text-pp-muted">{held.kind === 'refund' ? held.captureId : held.kind === 'dispute' ? held.disputeId : held.subscriptionId}</code>
+            <code className="text-xs text-pp-muted">{referenceOf(held)}</code>
             <span className="text-xs text-pp-muted">{atUtc(held.at)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">

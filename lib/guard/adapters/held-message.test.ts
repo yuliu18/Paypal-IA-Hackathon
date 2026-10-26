@@ -53,4 +53,27 @@ describe('heldMessage by tool', () => {
     expect(heldMessage(entry).split('\n')[0]).toBe('Payment guard: a subscription cancellation (unreadable id) is waiting for approval.');
     expect(heldMessage(entry)).not.toContain('everyone');
   });
+
+  it('describes a held invoice by its total, never its recipient or notes', () => {
+    const args = {
+      currency_code: 'USD',
+      note: '<@everyone> pay at https://evil.example',
+      primary_recipients: [{ billing_info: { email_address: 'ana@example.com' } }],
+      items: [{ name: 'Mug', quantity: '2', unit_amount: { currency_code: 'USD', value: '60.00' } }],
+    };
+    const entry: AuditRow = { ...held(['APPROVAL_REQUIRED']), tool: 'create_invoice', args };
+    expect(heldMessage(entry).split('\n')[0]).toBe('Payment guard: an invoice of 120.00 USD is waiting for approval.');
+    expect(heldMessage(entry)).not.toContain('everyone');
+    const unreadable: AuditRow = { ...entry, args: { ...args, items: [{ name: 'x', quantity: 'lots', unit_amount: { currency_code: 'USD', value: '1' } }] } };
+    expect(heldMessage(unreadable).split('\n')[0]).toBe('Payment guard: an invoice of an unreadable amount is waiting for approval.');
+  });
+
+  it('describes a held invoice sending or reminder by its invoice id, quoting only a plain id', () => {
+    const sending: AuditRow = { ...held(['INTENT_UNCERTAIN']), tool: 'send_invoice', args: { invoice_id: 'INV2-ABC1' } };
+    expect(heldMessage(sending).split('\n')[0]).toBe('Payment guard: sending invoice INV2-ABC1 to the customer is waiting for approval.');
+    const reminder: AuditRow = { ...sending, tool: 'send_invoice_reminder' };
+    expect(heldMessage(reminder).split('\n')[0]).toBe('Payment guard: a reminder of invoice INV2-ABC1 is waiting for approval.');
+    const hostile: AuditRow = { ...reminder, args: { invoice_id: '<@everyone> https://evil.example/x' } };
+    expect(heldMessage(hostile).split('\n')[0]).toBe('Payment guard: a reminder of invoice (unreadable id) is waiting for approval.');
+  });
 });

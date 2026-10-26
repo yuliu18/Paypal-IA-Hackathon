@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import type { ChainCheck } from '@/lib/guard/adapters/sqlite-audit-log';
+import { parseInvoiceDraft } from '@/lib/guard/domain/invoice';
+import { format } from '@/lib/guard/domain/policy';
 import { maskEmail, maskPersonalData } from '@/lib/guard/domain/redact';
 import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
@@ -74,6 +76,15 @@ export default async function GuardLogPage() {
       }
       if (e.tool === 'accept_dispute_claim') {
         return { ...common, kind: 'dispute' as const, disputeId: maskPersonalData(String(e.args.dispute_id ?? '')) };
+      }
+      if (e.tool === 'create_invoice') {
+        // The total the guard computed from the items, not a figure the agent wrote.
+        const parsed = parseInvoiceDraft(e.args);
+        return { ...common, kind: 'invoice' as const, amount: 'draft' in parsed ? format(parsed.draft.total) : 'Unreadable amount' };
+      }
+      if (e.tool === 'send_invoice' || e.tool === 'send_invoice_reminder') {
+        const kind = e.tool === 'send_invoice' ? ('invoice-sending' as const) : ('invoice-reminder' as const);
+        return { ...common, kind, invoiceId: maskPersonalData(String(e.args.invoice_id ?? '')) };
       }
       const amount = e.args.amount as { value?: string; currency_code?: string } | undefined;
       return {

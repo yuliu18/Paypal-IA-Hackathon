@@ -144,6 +144,30 @@ A cancellation (`cancel_subscription`) moves no money, but it ends a customer's 
 
 A cancellation that passes all of them runs; the intent judge sees it under its real tool name and can only tighten it (hold or block), e.g. a cancellation the customer didn't ask for. A subscription read (`show_subscription_details`) is withheld unless its subscriber is the ticket customer, and the answer keeps only its id, status, plan id, start, create and update times, next billing time and last payment (no subscriber, `custom_id` or links).
 
+Invoices bill a customer, so the guard decides them too ([`lib/guard/domain/invoice.ts`](lib/guard/domain/invoice.ts)). Only `create_invoice`, `send_invoice` and `send_invoice_reminder` are decided; the tools that delete or cancel invoices stay blocked like any tool not listed. The guard computes an invoice's total itself (quantity times unit amount for every item, plus shipping, rounded up to the cent; discounts are left out and a taxed item is refused, since tax would bill more than the checked total) and checks it before the judge:
+
+| Invoice check | Code when it fails | Result |
+|---|---|---|
+| Exactly one recipient with an email, at least one item, positive quantities, plain non-negative amounts in the invoice currency, a total over 0 | `INVALID_ARGUMENTS` | Blocked |
+| The recipient is the task customer | `CUSTOMER_MISMATCH` | Blocked |
+| The task customer is an existing shop customer (the seeded ana, ben and carla) | `UNKNOWN_CUSTOMER` | Blocked |
+| The customer list can be read | `CUSTOMER_LOOKUP_FAILED` | Blocked |
+| The total is at most 500 USD | `INVOICE_LIMIT` | Blocked |
+| Invoices billed today plus this one stay within 1000 USD | `DAILY_LIMIT` | Blocked |
+| The total is at most 100 USD | `APPROVAL_REQUIRED` | Held for a person |
+
+An invoice's total goes into the black box as the amount billed, which counts toward the invoice daily cap only, never toward the refund daily limit. Sending an invoice or a reminder moves no money, but it reaches someone's inbox:
+
+| Sending check | Code when it fails |
+|---|---|
+| A plain `invoice_id`, no `additional_recipients`, and `send_to_recipient` not `false` | `INVALID_ARGUMENTS` |
+| PayPal answers the invoice lookup in time and knows the invoice | `INVOICE_LOOKUP_FAILED` |
+| The invoice bills the task customer alone | `CUSTOMER_MISMATCH` |
+| `send_invoice` targets a `DRAFT`; a reminder targets a `SENT`, `UNPAID` or `PARTIALLY_PAID` invoice | `INVOICE_NOT_SENDABLE` |
+| No other reminder of this invoice ran or is held in this task | `REMINDER_LIMIT` |
+
+Each one blocks; a sending that passes runs, and the judge can still tighten it. An invoice read (`get_invoice`) is withheld unless its only recipient is the task customer, and the answer keeps its id, status, number, dates, note, items, amounts, payments and refunds (no invoicer, recipients or links). The invoice limits are fixed in the code for now (`DEFAULT_INVOICE_LIMITS`), apart from the refund limits on `/settings`.
+
 These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
 
 ### Approving a held refund

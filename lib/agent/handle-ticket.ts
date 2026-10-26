@@ -11,6 +11,8 @@ import { createTelegramNotifier } from '@/lib/guard/adapters/telegram-notifier';
 import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { payPalDisputeLookup } from '@/lib/guard/adapters/paypal-dispute-lookup';
+import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
+import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
 import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldCall, type HeldDecision } from '@/lib/guard/guard';
@@ -43,13 +45,14 @@ async function llmConfig(chosen: ShopSettings['ai']) {
   return { ...ai, headers: clientHeaders() };
 }
 
-async function payPalToolkit() {
+const SUPPORT_ACTIONS = { orders: { get: true }, payments: { createRefund: true }, subscriptions: { show: true, cancel: true }, disputes: { get: true, create: true } };
+
+// The support agent never gets the invoice tools; only a person's approval of a held invoice
+// action (decideHeld) needs them to run it.
+async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS) {
   return new PayPalAgentToolkit({
     accessToken: await accessToken(),
-    configuration: {
-      actions: { orders: { get: true }, payments: { createRefund: true }, subscriptions: { show: true, cancel: true }, disputes: { get: true, create: true } },
-      context: { sandbox: true },
-    },
+    configuration: { actions, context: { sandbox: true } },
   });
 }
 
@@ -108,11 +111,24 @@ export async function handleTicket(
   return { reply: answer.reply, steps, redacted: { ticket: ticketRemoved, reply: answer.removed } };
 }
 
-// A person's decision on a refund, cancellation or dispute acceptance the guard held. Approval re-checks the policy before PayPal runs it.
+// A person's decision on a refund, cancellation, dispute acceptance or invoice action the guard held. Approval re-checks the policy before PayPal runs it.
 export async function decideHeld(heldId: string, approve: boolean): Promise<HeldDecision> {
   const { limits } = await loadSettings();
-  const paypal = await payPalToolkit();
+  const paypal = await payPalToolkit({ ...SUPPORT_ACTIONS, invoices: { create: true, get: true, send: true, sendReminder: true } });
   return withClient(paypal, 'payment-guard-approval', (upstream) =>
-    decideHeldCall({ upstream, captures: payPalCaptureLookup, subscriptions: payPalSubscriptionLookup, disputes: payPalDisputeLookup, audit: auditLog(), limits }, heldId, approve),
+    decideHeldCall(
+      {
+        upstream,
+        captures: payPalCaptureLookup,
+        subscriptions: payPalSubscriptionLookup,
+        disputes: payPalDisputeLookup,
+        invoices: payPalInvoiceLookup,
+        customers: seedCustomerDirectory,
+        audit: auditLog(),
+        limits,
+      },
+      heldId,
+      approve,
+    ),
   );
 }

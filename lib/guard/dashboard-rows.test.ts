@@ -38,6 +38,11 @@ describe('guardDashboardRows', () => {
     ]);
   });
 
+  it('shows an invoice as no money moved: it records what it bills, which never left the shop', () => {
+    const invoice = row({ id: '8', tool: 'create_invoice', args: { currency_code: 'USD' }, moved: { minor: 4000, currency: 'USD' } });
+    expect(guardDashboardRows([invoice]).guardDecisions[0]).toMatchObject({ moved: 0, protected: 0 });
+  });
+
   it('counts the personal data fields a read withheld from the agent', () => {
     const lookup = row({ id: '9', tool: 'get_order', args: { id: 'O-1' }, moved: undefined, detail: 'Withheld from the agent: payment_source, payer, purchase_units[0].custom_id' });
     expect(guardDashboardRows([lookup]).guardDecisions[0].withheld).toBe(3);
