@@ -171,7 +171,7 @@ An invoice's total goes into the black box as the amount billed, which counts to
 
 Each one blocks; a sending that passes runs, and the judge can still tighten it. An invoice read (`get_invoice`) is withheld unless its only recipient is the task customer, and the answer keeps its id, status, number, dates, note, items, amounts, payments and refunds (no invoicer, recipients or links). The invoice limits are fixed in the code for now (`DEFAULT_INVOICE_LIMITS`), apart from the refund limits on `/settings`.
 
-These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
+These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed. The judge gets 15 seconds and, if it times out, one more try, so a slow moment of the AI provider doesn't block a legitimate action; any other provider error blocks at once.
 
 ### Billing agent
 

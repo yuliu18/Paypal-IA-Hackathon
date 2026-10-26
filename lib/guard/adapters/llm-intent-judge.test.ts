@@ -116,6 +116,37 @@ describe('openAiCompatibleChat', () => {
     await expect(chat([{ role: 'user', content: 'hi' }])).rejects.toThrow();
   });
 
+  it('asks once more when the provider times out, so a slow moment does not block the action', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', (_url: string, init: RequestInit) => {
+      calls += 1;
+      if (calls === 1) return new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason)));
+      return Promise.resolve(new Response(JSON.stringify({ choices: [{ message: { content: 'OK' } }] })));
+    });
+    const chat = openAiCompatibleChat({ baseUrl: 'https://llm.test/v1', apiKey: 'k', model: 'm', timeoutMs: 20 });
+    expect(await chat([{ role: 'user', content: 'hi' }])).toBe('OK');
+    expect(calls).toBe(2);
+  });
+
+  it('gives up after a second timeout, and never repeats a request the provider refused', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', (_url: string, init: RequestInit) => {
+      calls += 1;
+      return new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason)));
+    });
+    const chat = openAiCompatibleChat({ baseUrl: 'https://llm.test/v1', apiKey: 'k', model: 'm', timeoutMs: 20 });
+    await expect(chat([{ role: 'user', content: 'hi' }])).rejects.toThrow();
+    expect(calls).toBe(2);
+
+    calls = 0;
+    vi.stubGlobal('fetch', async () => {
+      calls += 1;
+      return new Response('bad key', { status: 401 });
+    });
+    await expect(chat([{ role: 'user', content: 'hi' }])).rejects.toThrow();
+    expect(calls).toBe(1);
+  });
+
   it('sends extra headers such as a client user agent and session id', async () => {
     let sent: Headers | undefined;
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {

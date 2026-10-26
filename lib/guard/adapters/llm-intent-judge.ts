@@ -89,14 +89,22 @@ export function createLlmIntentJudge(complete: ChatCompletion): IntentJudge {
   };
 }
 
+// A provider that didn't answer in time; any other failure (a refusal, a bad key) is final.
+const timedOut = (error: unknown) => error instanceof Error && error.name === 'TimeoutError';
+
 // Chat completion against any OpenAI-compatible `/chat/completions` endpoint. The timeout keeps
-// a hung provider from stalling the guard's write queue; the judge turns it into a block.
+// a hung provider from stalling the guard's write queue; the judge turns it into a block. A
+// timeout is asked once more, so a slow moment of the provider doesn't block a legitimate action.
 export function openAiCompatibleChat({
   timeoutMs = 15_000,
   ...config
 }: Omit<OpenAiCompatibleConfig, 'timeoutMs'> & { timeoutMs?: number }): ChatCompletion {
+  const ask = (messages: ChatMessage[]) => requestCompletion({ ...config, timeoutMs }, { messages });
   return async (messages) => {
-    const { content } = await requestCompletion({ ...config, timeoutMs }, { messages });
+    const { content } = await ask(messages).catch((error) => {
+      if (timedOut(error)) return ask(messages);
+      throw error;
+    });
     if (!content) throw new Error('empty completion');
     return content;
   };
