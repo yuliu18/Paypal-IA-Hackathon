@@ -39,7 +39,8 @@ function Badge({ row }: { row: Row }) {
 
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
 // `subscription`: a sample subscription exists, so the run adds its cancellation attacks.
-export function Evaluator({ model, provider, subscription }: { model: string; provider: string; subscription: boolean }) {
+// `dispute`: the sample PayPal payment was paid, so the run adds dispute attacks if it was disputed.
+export function Evaluator({ model, provider, subscription, dispute }: { model: string; provider: string; subscription: boolean; dispute: boolean }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -82,8 +83,9 @@ export function Evaluator({ model, provider, subscription }: { model: string; pr
   const done = rows.filter((r) => r.status === 'done');
   const score = summarize(rows);
   const finished = rows.length > 0 && done.length === rows.length;
-  // Before a run, the evaluation's sizes without the owner's cancellation, which needs PayPal's word.
-  const attacks = subscription ? 11 : 9;
+  // Before a run, the evaluation's sizes without the cases that use a sample record up, which need
+  // PayPal's word.
+  const attacks = 9 + (subscription ? 2 : 0) + (dispute ? 2 : 0);
   const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: attacks * (full ? 6 : 1) }, refused: { of: attacks * (full ? 3 : 1) } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
@@ -133,7 +135,13 @@ export function Evaluator({ model, provider, subscription }: { model: string; pr
 
       {rows.some((r) => r.id === 'business-cancel') && (
         <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
-          The last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.
+          A last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.
+        </p>
+      )}
+
+      {rows.some((r) => r.id === 'business-dispute') && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          A last ticket accepts the sample dispute for real: pay a new sample PayPal payment on /support and dispute it before the next run to include it again.
         </p>
       )}
 

@@ -1,6 +1,7 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { readSeed } from '@/lib/demo-seed';
 import { fullEvaluationCases, providerFailure, scoreCase } from '@/lib/evaluation/evaluation';
+import { evaluationDispute } from '@/lib/evaluation/dispute';
 import { evaluationSubscription } from '@/lib/evaluation/subscription';
 
 // Runs one case of the model evaluation (lib/evaluation) through the agent its case names and the guard,
@@ -21,8 +22,9 @@ export async function POST(request: Request) {
   const [ana, ben, carla] = await readSeed();
   if (!ana || !ben || !carla) return error(409, 'Create the sample payments first.');
   // The sample subscription as PayPal reports it now, so the owner's cancellation case exists only
-  // while the subscription can still be cancelled.
-  const seed = { ana, ben, carla, subscription: await evaluationSubscription() };
+  // while the subscription can still be cancelled; likewise the sample dispute.
+  const [subscription, dispute] = await Promise.all([evaluationSubscription(), evaluationDispute()]);
+  const seed = { ana, ben, carla, subscription, dispute };
   // Every case of the full evaluation (the quick one is a subset); its agent comes from the case.
   const evalCase = fullEvaluationCases(seed).find((c) => c.id === body.caseId);
   if (!evalCase) return error(400, 'caseId must be one of the evaluation cases.');

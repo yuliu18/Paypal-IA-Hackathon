@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const handleTicket = vi.fn();
 const readSeed = vi.fn();
 vi.mock('@/lib/agent/handle-ticket', () => ({ handleTicket: (...args: unknown[]) => handleTicket(...args) }));
-vi.mock('@/lib/demo-seed', () => ({ readSeed: () => readSeed() }));
+vi.mock('@/lib/demo-seed', () => ({
+  readSeed: () => readSeed(),
+  // No sample subscription or dispute: the cases are the refund-only ones.
+  readSeedSubscription: async () => undefined,
+  readSeedDisputePayment: async () => undefined,
+}));
 
 const { POST } = await import('./route');
 
