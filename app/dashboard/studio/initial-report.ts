@@ -1,6 +1,6 @@
-// The built-in "PayPal overview" report: pages for revenue, receivables, cash, catalogue and the
-// payment guard, as AG Studio report state. Field ids ('invoices.paidAmount') refer to the data
-// sources in ./data.ts.
+// The built-in "PayPal overview" report: the payment guard first, then pages for revenue,
+// receivables, cash and catalogue, as AG Studio report state. Field ids ('invoices.paidAmount')
+// refer to the data sources in ./data.ts.
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from 'ag-studio';
 
@@ -396,42 +396,19 @@ const catalogue: AgPageState = {
     'catalogue-sunburst': at(16, 27, 8, 24),
   },
 };
-// What the payment guard did for the AI support agent: money it kept in the account, how it
-// decided, which rules were broken, what still waits for a person and how much personal data it
-// kept from the agent (lib/guard/dashboard-rows.ts).
+// How the shop's AI agents (support and billing) worked through the payment guard: money it kept in
+// the account, money it let move, what the billing agent billed, how it decided over time, why it
+// blocked, what still waits for a person and how much personal data it kept from the agents
+// (lib/guard/dashboard-rows.ts).
 const guard: AgPageState = {
   id: 'guard',
   widgets: {
-    'kpi-protected': kpi('Money protected', sum('guardDecisions.protected')),
-    'kpi-refunded': kpi('Refunded through guard', sum('guardDecisions.moved')),
+    'kpi-protected': kpi('Money protected (blocked)', sum('guardDecisions.protected')),
+    'kpi-moved': kpi('Money moved (allowed)', sum('guardDecisions.moved')),
+    'kpi-billed': kpi('Money billed (invoices)', sum('guardDecisions.billed')),
     'kpi-awaiting': kpi('Awaiting approval', sum('guardDecisions.awaitingApproval')),
     'kpi-decisions': kpi('Guard decisions', countd('guardDecisions.id')),
     'kpi-withheld': kpi('Data withheld', sum('guardDecisions.withheld')),
-    'by-verdict': {
-      type: 'donut-chart',
-      dataMapping: {
-        categoryKey: [{ id: 'guardDecisions.verdict' }],
-        valueKey: [countd('guardDecisions.id')],
-      },
-      format: {
-        ...title('Decisions by verdict'),
-        style: {
-          custom: {
-            pieDataLabel: { enabled: true },
-            totalLabel: { enabled: true },
-          },
-        },
-      },
-    },
-    'by-violation': {
-      type: 'bar-chart-grouped',
-      dataMapping: {
-        categoryKey: [{ id: 'guardViolations.code' }],
-        valueKey: [countd('guardViolations.id')],
-      },
-      sort: [{ field: countd('guardViolations.id'), direction: 'desc' }],
-      format: title('Rules broken'),
-    },
     timeline: {
       type: 'column-chart-stacked',
       dataMapping: {
@@ -442,7 +419,68 @@ const guard: AgPageState = {
         legendKey: [{ id: 'guardDecisions.verdict' }],
       },
       format: {
-        ...title('Decisions per day by verdict'),
+        ...title('Decisions per day by verdict (allow, hold, block)'),
+        style: { theme: { common: { legend: { enabled: true } } } },
+      },
+    },
+    'by-agent': {
+      type: 'column-chart-stacked',
+      dataMapping: {
+        categoryKey: [{ id: 'guardDecisions.agent' }],
+        valueKey: [countd('guardDecisions.id')],
+        legendKey: [{ id: 'guardDecisions.verdict' }],
+      },
+      format: {
+        ...title('Decisions by agent'),
+        style: { theme: { common: { legend: { enabled: true } } } },
+      },
+    },
+    'refunds-vs-sales': {
+      type: 'column-chart-grouped',
+      dataMapping: {
+        // Both tables meet on the shared calendar. Amounts aren't converted between currencies.
+        categoryKey: [{ id: 'calendar::day' }],
+        valueKey: [sum('transactions.sales'), sum('guardDecisions.moved')],
+      },
+      format: {
+        ...title('Sales and money moved by the agents, per day'),
+        style: { theme: { common: { legend: { enabled: true } } } },
+      },
+    },
+    'by-violation': {
+      type: 'bar-chart-grouped',
+      dataMapping: {
+        categoryKey: [{ id: 'guardViolations.code' }],
+        valueKey: [countd('guardViolations.id')],
+      },
+      sort: [{ field: countd('guardViolations.id'), direction: 'desc' }],
+      format: title('Why the guard stopped a call'),
+    },
+    held: {
+      type: 'grid',
+      dataMapping: {
+        // The entry id keeps one row per held action, which a person decides on /guard.
+        cols: [
+          { id: 'guardDecisions.at' },
+          { id: 'guardDecisions.id' },
+          { id: 'guardDecisions.agent' },
+          { id: 'guardDecisions.action' },
+          { id: 'guardDecisions.customer' },
+          { id: 'guardDecisions.tool' },
+        ],
+      },
+      sort: [{ field: { id: 'guardDecisions.at' }, direction: 'asc' }],
+      format: title('Held actions waiting for a person, oldest first'),
+    },
+    'by-action': {
+      type: 'bar-chart-stacked',
+      dataMapping: {
+        categoryKey: [{ id: 'guardDecisions.action' }],
+        valueKey: [countd('guardDecisions.id')],
+        legendKey: [{ id: 'guardDecisions.verdict' }],
+      },
+      format: {
+        ...title('Decisions by action'),
         style: { theme: { common: { legend: { enabled: true } } } },
       },
     },
@@ -451,6 +489,8 @@ const guard: AgPageState = {
       dataMapping: {
         cols: [
           { id: 'guardDecisions.at' },
+          { id: 'guardDecisions.agent' },
+          { id: 'guardDecisions.action' },
           { id: 'guardDecisions.tool' },
           { id: 'guardDecisions.verdict' },
           { id: 'guardDecisions.outcome' },
@@ -459,6 +499,7 @@ const guard: AgPageState = {
           sum('guardDecisions.requested'),
           sum('guardDecisions.moved'),
           sum('guardDecisions.protected'),
+          sum('guardDecisions.billed'),
           sum('guardDecisions.awaitingApproval'),
         ],
       },
@@ -467,20 +508,30 @@ const guard: AgPageState = {
     },
   },
   widgetLayout: {
-    'kpi-protected': at(0, 0, 5, 7),
-    'kpi-refunded': at(5, 0, 5, 7),
-    'kpi-awaiting': at(10, 0, 5, 7),
-    'kpi-decisions': at(15, 0, 5, 7),
+    'kpi-protected': at(0, 0, 4, 7),
+    'kpi-moved': at(4, 0, 4, 7),
+    'kpi-billed': at(8, 0, 4, 7),
+    'kpi-awaiting': at(12, 0, 4, 7),
+    'kpi-decisions': at(16, 0, 4, 7),
     'kpi-withheld': at(20, 0, 4, 7),
-    'by-verdict': at(0, 7, 8, 18),
-    'by-violation': at(8, 7, 16, 18),
-    timeline: at(0, 25, 24, 16),
-    decisions: at(0, 41, 24, 24),
+    timeline: at(0, 7, 16, 16),
+    'by-agent': at(16, 7, 8, 16),
+    'refunds-vs-sales': at(0, 23, 16, 16),
+    'by-violation': at(16, 23, 8, 16),
+    held: at(0, 39, 14, 16),
+    'by-action': at(14, 39, 10, 16),
+    decisions: at(0, 55, 24, 24),
+  },
+  filter: {
+    // Only held actions no person has decided yet.
+    widget: {
+      held: [{ field: { id: 'guardDecisions.awaitingApproval' }, model: { operator: 'equals', value: 1 } }],
+    },
   },
 };
 
-// The report opens on its first page.
+// The report opens on the payment guard; the PayPal pages follow it.
 export const dashboardReport: AgReportState = {
-  selectedPageId: revenue.id,
-  pages: [revenue, receivables, cash, catalogue, guard],
+  selectedPageId: guard.id,
+  pages: [guard, revenue, receivables, cash, catalogue],
 };

@@ -228,7 +228,11 @@ const campaignOf = (customField?: string) => {
   return campaign ? humanise(campaign) : 'Other';
 };
 
-function transactionRows(transactions: Transaction[]) {
+// PayPal's T00xx event codes are payments between accounts; a positive one is money a customer
+// paid the shop. Payouts (T0001) are negative, and refunds (T11xx) and holds are other codes.
+const isSale = (code: string | undefined, amount: number) => !!code?.startsWith('T00') && amount > 0;
+
+export function transactionRows(transactions: Transaction[]) {
   return transactions.map(({ transaction_info: t, payer_info: p }) => {
     const amt = amountOf(t.transaction_amount);
     const fee = amountOf(t.fee_amount);
@@ -242,6 +246,7 @@ function transactionRows(transactions: Transaction[]) {
       amount: amt,
       fee,
       net: round2(amt + fee),
+      sales: isSale(t.transaction_event_code, amt) ? amt : 0,
       endingBalance: t.ending_balance ? amountOf(t.ending_balance) : null,
       counterparty: p?.email_address ?? null,
       note: t.transaction_note ?? null,

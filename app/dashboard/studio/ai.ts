@@ -11,6 +11,10 @@ const PROMPT_STARTERS: AgAiPromptStarter[] = [
     prompt: 'Summarise what this page shows: every widget, the fields it reads, and what stands out.',
   },
   {
+    label: 'What the guard stopped',
+    prompt: 'Which actions of the AI agents did the payment guard block or hold, and why?',
+  },
+  {
     label: 'Overdue invoices',
     prompt: 'Which customers owe the most on overdue invoices?',
   },

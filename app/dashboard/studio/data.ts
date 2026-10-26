@@ -179,7 +179,9 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       },
       {
         id: 'transactions',
-        description: 'Account ledger from Transaction Search, last 31 days. Amounts are signed (debits negative); net is amount plus fee.',
+        description:
+          'Account ledger from Transaction Search, last 31 days. Amounts are signed (debits negative); net is amount plus fee. ' +
+          'Sales is the amount of a payment a customer made to the shop, 0 for every other transaction.',
         data: data.transactions,
         fields: fields([
           ['id', 'Transaction ID', 'textFormat'],
@@ -191,6 +193,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['amount', 'Transaction Amount', 'currencyFormat'],
           ['fee', 'Transaction Fee', 'currencyFormat'],
           ['net', 'Transaction Net', 'currencyFormat'],
+          ['sales', 'Sales', 'currencyFormat'],
           ['endingBalance', 'Ending Balance', 'currencyFormat'],
           ['counterparty', 'Counterparty', 'textFormat'],
           ['note', 'Transaction Note', 'textFormat'],
@@ -226,9 +229,11 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
         id: 'guardDecisions',
         name: 'Guard Decisions',
         description:
-          'The newest 5,000 tool calls the AI support agent made through the payment guard, and the decisions people made on held refunds. ' +
-          'Verdict is allow, hold or block. Money protected is the requested amount of blocked refunds; it is empty when the agent asked ' +
-          'for a full refund without stating the amount. Refunded through guard is what may have left the account. Awaiting approval is 1 for held refunds no person has decided yet.',
+          'The newest 5,000 PayPal tool calls the shop\'s AI agents made through the payment guard, and the decisions people made on held actions. ' +
+          'Agent is support (refunds, dispute acceptances, cancellations, order reads) or billing (invoices). Verdict is allow, hold or block. ' +
+          'Money protected is the requested amount of blocked refunds (empty when the agent asked for a full refund without stating it) ' +
+          'and the recorded amount of blocked dispute acceptances. Money moved is what refunds and dispute acceptances may have taken out of the account. ' +
+          'Money billed is the total of invoices the billing agent created; it is billed, not yet paid. Awaiting approval is 1 for held actions no person has decided yet.',
         data: data.guardDecisions,
         fields: fields([
           ['id', 'Guard Entry', 'textFormat'],
@@ -240,8 +245,11 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['customer', 'Ticket Customer', 'textFormat'],
           ['currency', 'Guard Currency', 'textFormat'],
           ['requested', 'Requested Refund', 'currencyFormat'],
-          ['moved', 'Refunded Through Guard', 'currencyFormat'],
+          ['agent', 'Agent', 'textFormat'],
+          ['action', 'Action', 'textFormat'],
+          ['moved', 'Money Moved', 'currencyFormat'],
           ['protected', 'Money Protected', 'currencyFormat'],
+          ['billed', 'Money Billed', 'currencyFormat'],
           ['awaitingApproval', 'Awaiting Approval', 'integerFormat'],
           ['withheld', 'Personal Data Withheld', 'integerFormat'],
           ['decidedBy', 'Decided By', 'textFormat'],

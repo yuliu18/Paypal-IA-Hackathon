@@ -17,18 +17,52 @@ export type GuardDecisionRow = {
   // What the agent asked to refund; null when it asked for the full remaining amount without stating it.
   requested: number | null;
   moved: number;
-  // A blocked refund's requested amount: money the guard kept from leaving the account.
+  // A blocked refund's requested amount, or a blocked dispute acceptance's recorded amount: money
+  // the guard kept from leaving the account.
   protected: number | null;
   // 1 while a held refund waits for a person, so the dashboard can sum it.
   awaitingApproval: number;
   // Personal data fields of a PayPal answer the guard kept from the agent (lib/guard/domain/privacy.ts).
   withheld: number;
   decidedBy: 'guard' | 'person';
+  // Which AI agent made the call: the billing agent works with invoices, the support agent with the rest.
+  agent: 'support' | 'billing';
+  // What kind of action the call was, in words a person reads on the dashboard.
+  action: string;
+  // An executed invoice's total: money billed to a customer, which has not been paid yet.
+  billed: number;
 };
 
 export type GuardViolationRow = { id: string; decisionId: string; code: string; message: string };
 
 export type GuardDashboardRows = { guardDecisions: GuardDecisionRow[]; guardViolations: GuardViolationRow[] };
+
+const BILLING_TOOLS = new Set(['create_invoice', 'send_invoice', 'send_invoice_reminder', 'get_invoice']);
+
+const ACTIONS: Record<string, string> = {
+  create_refund: 'refund',
+  accept_dispute_claim: 'dispute acceptance',
+  cancel_subscription: 'cancellation',
+  create_invoice: 'invoice',
+  send_invoice: 'invoice sending',
+  send_invoice_reminder: 'reminder',
+  get_order: 'read',
+  show_subscription_details: 'read',
+  get_dispute: 'read',
+  get_invoice: 'read',
+};
+
+const major = (entry: AuditRow) => (entry.moved ? entry.moved.minor / 100 : 0);
+
+// Money a block kept in the account: a refund's stated amount (null when it stated none), or a
+// dispute acceptance's recorded amount. The guard records no amount on a blocked entry today, and a
+// dispute's amount isn't in its args, so a blocked acceptance usually counts 0 rather than a guess.
+function protectedAmount(entry: AuditRow, requested: number | null) {
+  if (entry.decision.verdict !== 'block') return 0;
+  if (entry.tool === 'create_refund') return requested;
+  if (entry.tool === 'accept_dispute_claim') return major(entry);
+  return 0;
+}
 
 function requestedAmount(entry: AuditRow) {
   if (entry.tool !== 'create_refund') return null;
@@ -56,7 +90,6 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
   return {
     guardDecisions: entries.map((e) => {
       const requested = requestedAmount(e);
-      const blocked = e.decision.verdict === 'block';
       return {
         id: e.id,
         at: e.at,
@@ -68,11 +101,14 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         currency: e.moved?.currency ?? requested?.currency ?? null,
         requested: requested?.value ?? null,
         // An invoice records what it bills, not money that left the shop.
-        moved: e.moved && e.tool !== 'create_invoice' ? e.moved.minor / 100 : 0,
-        protected: e.tool !== 'create_refund' || !blocked ? 0 : (requested?.value ?? null),
+        moved: e.tool !== 'create_invoice' ? major(e) : 0,
+        protected: protectedAmount(e, requested?.value ?? null),
         awaitingApproval: e.outcome === 'held' && !decided.has(e.id) ? 1 : 0,
         withheld: withheldCount(e.detail),
         decidedBy: e.resolves ? 'person' : 'guard',
+        agent: BILLING_TOOLS.has(e.tool) ? 'billing' : 'support',
+        action: ACTIONS[e.tool] ?? 'other',
+        billed: e.tool === 'create_invoice' && e.outcome === 'executed' ? major(e) : 0,
       };
     }),
     guardViolations: entries.flatMap((e) =>

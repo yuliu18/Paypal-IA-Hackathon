@@ -34,8 +34,65 @@ describe('guardDashboardRows', () => {
         awaitingApproval: 0,
         withheld: 0,
         decidedBy: 'guard',
+        agent: 'support',
+        action: 'refund',
+        billed: 0,
       },
     ]);
+  });
+
+  it('names the agent behind each call: invoice tools belong to the billing agent, the rest to support', () => {
+    const agents = ['create_invoice', 'send_invoice', 'send_invoice_reminder', 'get_invoice', 'create_refund', 'accept_dispute_claim', 'cancel_subscription', 'get_order'].map(
+      (tool, i) => guardDashboardRows([row({ id: String(i), tool, moved: undefined })]).guardDecisions[0].agent,
+    );
+    expect(agents).toEqual(['billing', 'billing', 'billing', 'billing', 'support', 'support', 'support', 'support']);
+  });
+
+  it('names what kind of action each call was', () => {
+    const tools = [
+      'create_refund',
+      'accept_dispute_claim',
+      'cancel_subscription',
+      'create_invoice',
+      'send_invoice',
+      'send_invoice_reminder',
+      'get_order',
+      'show_subscription_details',
+      'get_dispute',
+      'get_invoice',
+      'list_products',
+    ];
+    const actions = tools.map((tool, i) => guardDashboardRows([row({ id: String(i), tool, moved: undefined })]).guardDecisions[0].action);
+    expect(actions).toEqual(['refund', 'dispute acceptance', 'cancellation', 'invoice', 'invoice sending', 'reminder', 'read', 'read', 'read', 'read', 'other']);
+  });
+
+  it('counts the recorded amount of a blocked dispute acceptance as money protected', () => {
+    const blocked = row({
+      id: '10',
+      tool: 'accept_dispute_claim',
+      args: { dispute_id: 'PP-D-1', note: 'ok' },
+      decision: { verdict: 'block', violations: [{ code: 'PER_REFUND_LIMIT', message: 'over' }] },
+      outcome: 'blocked',
+      moved: { minor: 7000, currency: 'USD' },
+    });
+    expect(guardDashboardRows([blocked]).guardDecisions[0]).toMatchObject({ protected: 70, requested: null });
+  });
+
+  it('leaves a blocked dispute acceptance with no recorded amount at zero protected instead of guessing', () => {
+    const blocked = row({ id: '11', tool: 'accept_dispute_claim', args: { dispute_id: 'PP-D-1', note: 'ok' }, decision: { verdict: 'block', violations: [] }, outcome: 'blocked', moved: undefined });
+    expect(guardDashboardRows([blocked]).guardDecisions[0].protected).toBe(0);
+  });
+
+  it('counts an allowed dispute acceptance as money moved, not protected', () => {
+    const accepted = row({ id: '12', tool: 'accept_dispute_claim', args: { dispute_id: 'PP-D-1', note: 'ok' }, moved: { minor: 7000, currency: 'USD' } });
+    expect(guardDashboardRows([accepted]).guardDecisions[0]).toMatchObject({ moved: 70, protected: 0 });
+  });
+
+  it('counts an executed invoice total as billed, and anything else as nothing billed', () => {
+    const invoice = (id: string, outcome: AuditRow['outcome'], tool = 'create_invoice') =>
+      row({ id, tool, args: { currency_code: 'USD' }, outcome, moved: { minor: 4000, currency: 'USD' } });
+    const rows = guardDashboardRows([invoice('a', 'executed'), invoice('b', 'pending'), invoice('c', 'held'), invoice('d', 'executed', 'send_invoice'), row({ id: 'e' })]).guardDecisions;
+    expect(rows.map((r) => r.billed)).toEqual([40, 0, 0, 0, 0]);
   });
 
   it('shows an invoice as no money moved: it records what it bills, which never left the shop', () => {

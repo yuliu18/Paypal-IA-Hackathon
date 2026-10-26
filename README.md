@@ -107,7 +107,7 @@ Things worth knowing about these endpoints:
 
 ## Dashboard
 
-[`/dashboard`](app/dashboard/page.tsx) fetches all five at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. It adds the payment guard's decisions from its audit log ([`lib/guard/dashboard-rows.ts`](lib/guard/dashboard-rows.ts)) as two more tables, guard decisions and guard violations. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). Reports you create or edit are saved in the browser's localStorage; a browser that saved the built-in report keeps that copy, so use **Reset demo** to see pages added to it later, such as Payment guard.
+[`/dashboard`](app/dashboard/page.tsx) fetches all five at once. [`lib/dashboard-data.ts`](lib/dashboard-data.ts) turns them into related tables: customers, invoices, invoice line items, invoice payments, products, plans, transactions, payouts and balances. It adds the payment guard's decisions from its audit log ([`lib/guard/dashboard-rows.ts`](lib/guard/dashboard-rows.ts)) as two more tables, guard decisions and guard violations. AG Studio's data sources, relationships, theme, default report and AI assistant are configured in [`app/dashboard/studio`](app/dashboard/studio). The report opens on the **Payment guard** page, which shows how the shop's AI agents worked; the PayPal pages (revenue, receivables, cash, catalogue) follow it. Reports you create or edit are saved in the browser's localStorage. A saved copy of the built-in report is replaced when the built-in report changes version ([`reports-store.ts`](app/dashboard/reports-store.ts)); otherwise use **Reset demo** to go back to it.
 
 ## Payment guard
 
@@ -202,7 +202,7 @@ What it can't see: someone with write access who rewrites the whole chain with f
 
 Several processes can write to the same file: each append locks the database before reading the last hash, so the chain can't fork. A log written before the chain existed (table `audit`) is copied into the chain once, renumbered from 1, the first time the new version opens it; the old table is left as it was.
 
-The **Payment guard** page of the dashboard report shows the same log as charts: money protected (the requested amount of blocked refunds; a full refund with no stated amount isn't counted), money refunded through the guard, refunds awaiting approval, personal data fields withheld from the agent, decisions by verdict, rules broken, and decisions per day.
+The **Payment guard** page, the dashboard's first, shows the same log as a panel of how the AI agents worked: money protected (the requested amount of blocked refunds, and the recorded amount of blocked dispute acceptances; a full refund with no stated amount isn't counted), money moved (refunds and dispute acceptances allowed), money billed (invoices the billing agent created), actions awaiting approval, decisions, and personal data fields withheld; decisions per day by verdict (allow, hold, block), by agent (support or billing) and by action; sales and money moved per day; why the guard stopped calls (violation codes); the held actions still waiting for a person; and every decision.
 
 ### Privacy
 
