@@ -36,9 +36,11 @@ Execute each refund the ticket asks for with create_refund (look the order up to
 
 export type AgentMode = 'careful' | 'vulnerable';
 
+// llmConfig, payPalToolkit and heldNotifier are shared with the billing agent (./handle-billing-task.ts).
+
 // The LLM the shop chose on /settings for the agent and the judge (provider and key may come from
 // the environment); without a chosen model, the provider's newest one from the catalog.
-async function llmConfig(chosen: ShopSettings['ai']) {
+export async function llmConfig(chosen: ShopSettings['ai']) {
   const ai = await withDefaultModels(chosen);
   if (!ai.baseUrl || !ai.apiKey) throw new Error('Choose an AI provider and API key on /settings, or set LLM_BASE_URL and LLM_API_KEY in .env.local');
   if (!ai.agentModel) throw new Error('Choose the agent model on /settings: the catalog knows no default for this provider');
@@ -49,7 +51,7 @@ const SUPPORT_ACTIONS = { orders: { get: true }, payments: { createRefund: true 
 
 // The support agent never gets the invoice tools; only a person's approval of a held invoice
 // action (decideHeld) needs them to run it.
-async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS) {
+export async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS) {
   return new PayPalAgentToolkit({
     accessToken: await accessToken(),
     configuration: { actions, context: { sandbox: true } },
@@ -58,7 +60,7 @@ async function payPalToolkit(actions: Record<string, Record<string, boolean>> = 
 
 // Every held-refund channel the shop set up; each one left empty is a no-op. APP_URL turns /guard
 // in the message into a link.
-function heldNotifier(shop: ShopSettings) {
+export function heldNotifier(shop: ShopSettings) {
   const { webhookUrl, email, smtp, telegram } = shop.notifications;
   const appUrl = process.env.APP_URL;
   const to = shop.business.contactEmails;

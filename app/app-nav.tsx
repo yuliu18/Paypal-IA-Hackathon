@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { setNavSlot } from './nav-slot';
 
-// The control panel's side menu, on every page: the agent and its guard first, then the reports,
+// The control panel's side menu, on every page: the agents and their guard first, then the reports,
 // and the settings. On the dashboard, its reports and their pages appear
 // under "Dashboard" (./nav-slot). The toggle at the bottom folds the menu into a rail of icons.
 // On small screens it is a scrolling top bar.
@@ -14,6 +14,7 @@ const icon = 'size-4 shrink-0';
 const Icons = {
   home: <path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z" />,
   chat: <path d="M4 5h16v11H8l-4 4z" />,
+  invoice: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3" />,
   shield: <path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z" />,
   chart: <path d="M4 20V10m6 10V4m6 16v-7m4 7H2" />,
   check: <path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />,
@@ -29,6 +30,7 @@ const SECTIONS: { title?: string; items: Item[] }[] = [
     title: 'Agent',
     items: [
       { href: '/support', label: 'Support desk', icon: 'chat' },
+      { href: '/billing', label: 'Billing desk', icon: 'invoice' },
       { href: '/guard', label: 'Guard log', icon: 'shield' },
       { href: '/evaluate', label: 'Evaluate model', icon: 'check' },
     ],

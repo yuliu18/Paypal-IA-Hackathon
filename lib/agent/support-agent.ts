@@ -31,6 +31,11 @@ When you are done, answer the customer in one short paragraph.`;
 
 const userPrompt = ({ customerEmail, message }: SupportTicket) => `Ticket from ${customerEmail}:\n\n${message}`;
 
+// What the agent is told: its role around the shop's instructions, and how the request reaches it.
+// Another agent (lib/agent/billing-agent.ts) runs the same loop with its own.
+export type AgentPrompts = { system: (instructions: string) => string; user: (ticket: SupportTicket) => string };
+export const SUPPORT_PROMPTS: AgentPrompts = { system: systemPrompt, user: userPrompt };
+
 const textOf = (result: CallToolResult) =>
   result.content.map((part) => (part.type === 'text' ? part.text : `[${part.type}]`)).join('\n');
 
@@ -59,6 +64,7 @@ export async function runSupportAgent({
   tools,
   ticket,
   instructions,
+  prompts = SUPPORT_PROMPTS,
   maxSteps = 8,
   deadlineMs = 90_000,
 }: {
@@ -66,6 +72,7 @@ export async function runSupportAgent({
   tools: Client;
   ticket: SupportTicket;
   instructions: string;
+  prompts?: AgentPrompts;
   // Bound on tool calls, so a model that keeps calling tools can't run (or spend) forever.
   maxSteps?: number;
   // Bound on the whole ticket, so one request stays within the hosting platform's request timeout.
@@ -79,8 +86,8 @@ export async function runSupportAgent({
     parameters: t.inputSchema,
   }));
   const messages: AgentMessage[] = [
-    { role: 'system', content: systemPrompt(instructions) },
-    { role: 'user', content: userPrompt(ticket) },
+    { role: 'system', content: prompts.system(instructions) },
+    { role: 'user', content: prompts.user(ticket) },
   ];
   const steps: AgentStep[] = [];
 

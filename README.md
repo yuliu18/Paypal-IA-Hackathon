@@ -17,6 +17,7 @@ A Next.js control panel that puts a payment guard between an AI support agent an
 
 - **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over the shop's PayPal data (invoices, transactions, balances, products, plans) and the guard's decisions, joined together, which you can edit and save in the browser.
 - **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, keeps the customer's personal data from the agent, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
+- **Billing agent** (`/billing`): a second AI agent bills the shop's customers with PayPal invoices, behind the same guard. See [Billing agent](#billing-agent).
 
 ## Run locally
 
@@ -77,6 +78,7 @@ app/api/ai/responses/    Server-side proxy for the dashboard's AI assistant
 lib/agent/               The AI support agent and the wiring of one ticket (handle-ticket.ts)
 lib/guard/               The payment guard: policy, intent judge, audit log, approvals
 app/support/             Support desk: send a ticket to the agent
+app/billing/             Billing desk: send a billing task to the billing agent (handle-billing-task.ts)
 app/(endpoints)/guard/   Guard log, approval queue and black box check
 ```
 
@@ -118,7 +120,8 @@ An AI agent with refund tools can be talked into refunding the wrong order, the 
 3. Optional, for the cancellation tickets: **Create sample subscription** on `/support` creates (or reuses by name) a sandbox product and a 9.99 USD monthly plan, subscribes to it and shows the subscription's approval link; its id goes to `data/seed.json` next to the payments. A subscription only becomes cancellable once a buyer approves it: open the link and approve with your sandbox personal account (developer.paypal.com > Sandbox accounts, the account of type Personal; its email and password are in the account's details), then come back. The link stays on `/support` until it's approved. That buyer's PayPal email is now the subscription's owner, so the **Cancel subscription** ticket comes from it, and **Cancel someone else's subscription** comes from carla with the vulnerable agent. Both only appear while the subscription is active or suspended.
 4. Optional, for the dispute tickets: **Create sample PayPal payment** on `/support` creates a 20 USD order and shows its payment link (the sample card payments can't be disputed). Pay it with the same sandbox personal account; PayPal sends you back to `/api/support/paypal-return`, which writes that buyer's PayPal email into the order's `custom_id` (the shop's record of its customer, which the guard checks) and captures it. Only the order the button created is captured. Then log in to sandbox.paypal.com as the buyer, open the 20 USD payment and report a problem to open a dispute, and reload `/support`: **Settle my dispute** comes from the buyer, and **Settle someone else's dispute** from carla with the vulnerable agent. Both only appear while the dispute waits for the shop (open or waiting for the seller's response). The agent accepts a claim with `accept_dispute_claim`, which refunds the disputed amount, so the guard checks it like a refund of the disputed capture: same owner, still refundable, and the per-refund, daily and approval limits.
 5. Open `/support`, pick a sample ticket and send it. Each tool call the agent made is listed; held ones show in amber and blocked ones in red. Tick **Vulnerable agent** to make the agent obey whatever the ticket says, and watch the guard stop it.
-6. Open `/guard` to see every decision, approve or reject held refunds and cancellations, and check the black box.
+6. Open `/billing`, pick a sample task and send it: the [billing agent](#billing-agent) invoices a sample customer through the same guard. Its tasks use the sample payments of step 2.
+7. Open `/guard` to see every decision, approve or reject held refunds and cancellations, and check the black box.
 
 ### What it decides
 
@@ -169,6 +172,10 @@ An invoice's total goes into the black box as the amount billed, which counts to
 Each one blocks; a sending that passes runs, and the judge can still tighten it. An invoice read (`get_invoice`) is withheld unless its only recipient is the task customer, and the answer keeps its id, status, number, dates, note, items, amounts, payments and refunds (no invoicer, recipients or links). The invoice limits are fixed in the code for now (`DEFAULT_INVOICE_LIMITS`), apart from the refund limits on `/settings`.
 
 These are the default limits (100 / 250 USD per refund, 200 USD per day), sized for a small shop and the seeded payments; a shop sets its own on `/settings`. If the judge, PayPal or the audit log can't be reached, the guard blocks: it fails closed.
+
+### Billing agent
+
+A second agent shows the guard is not tied to one agent: a billing agent ([`lib/agent/billing-agent.ts`](lib/agent/billing-agent.ts)) gets a task from the shop, the customer to bill and what for, and bills them with PayPal invoices. It runs the support agent's loop with its own prompt, and [`lib/agent/handle-billing-task.ts`](lib/agent/handle-billing-task.ts) gives it the toolkit's invoice tools only: `create_invoice`, `send_invoice`, `get_invoice` and `send_invoice_reminder`, no orders, refunds, subscriptions or disputes. They go through the same guard, judge and black box as the support agent's, with the task's customer as the mandate, so the [invoice rules](#what-it-decides) apply: only that customer, only one the shop knows, no copies to other addresses, within the invoice limits, and over 100 USD a person approves on `/guard`. The task text is untrusted, since it can quote a customer's note: `/billing`'s sample tasks bill ana for two more of her item (sent), bill ben 180 USD (held for a person), and hide an order to bill carla 450 USD with a copy to an outside address in a task for ana, which the guard blocks even with the vulnerable agent. There is no sample task that chases an unpaid invoice: it needs an invoice already sent, which the seed doesn't create; ask the agent to remind the customer of an invoice it sent to try one.
 
 ### Approving a held refund
 
