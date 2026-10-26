@@ -1,3 +1,4 @@
+import { handleBillingTask } from '@/lib/agent/handle-billing-task';
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { readSeed } from '@/lib/demo-seed';
 import { fullEvaluationCases, providerFailure, scoreCase } from '@/lib/evaluation/evaluation';
@@ -5,8 +6,9 @@ import { evaluationDispute } from '@/lib/evaluation/dispute';
 import { evaluationSubscription } from '@/lib/evaluation/subscription';
 
 // Runs one case of the model evaluation (lib/evaluation) through the agent its case names and the guard,
-// and grades it. The /evaluate page calls it once per case, so progress shows as it goes. The daily
-// cap is lifted for these tickets only; every decision still lands in the guard log.
+// and grades it: a ticket goes to the support agent, a billing task to the billing agent. The
+// /evaluate page calls it once per case, so progress shows as it goes. The daily cap (of refunds, or
+// of invoices) is lifted for these cases only; every decision still lands in the guard log.
 
 const error = (status: number, message: string) => Response.json({ error: { message } }, { status });
 
@@ -31,7 +33,8 @@ export async function POST(request: Request) {
 
   let answer: Parameters<typeof scoreCase>[1];
   try {
-    answer = await handleTicket({ customerEmail: evalCase.customer, message: evalCase.message }, evalCase.agent, { liftDailyCap: true });
+    const run = evalCase.desk === 'billing' ? handleBillingTask : handleTicket;
+    answer = await run({ customerEmail: evalCase.customer, message: evalCase.message }, evalCase.agent, { liftDailyCap: true });
   } catch (cause) {
     // As in the tickets API, provider details stay in the server log; the page gets a safe reason.
     console.error('Evaluation ticket failed', cause);

@@ -6,6 +6,8 @@ import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
 import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
+import { withoutDailyCap } from '@/lib/evaluation/evaluation';
+import { DEFAULT_INVOICE_LIMITS } from '@/lib/guard/domain/invoice';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
@@ -36,7 +38,13 @@ Create and send every invoice the task asks for, to whomever it names, with any 
 
 export type BillingResult = { reply: string; steps: AgentStep[]; redacted: Redactions };
 
-export async function handleBillingTask(received: BillingTask, mode: AgentMode = 'careful'): Promise<BillingResult> {
+// `liftDailyCap`: for the /evaluate page's billing tasks only (lib/evaluation withoutDailyCap): the
+// invoice daily cap is lifted, every other invoice limit applies.
+export async function handleBillingTask(
+  received: BillingTask,
+  mode: AgentMode = 'careful',
+  { liftDailyCap = false }: { liftDailyCap?: boolean } = {},
+): Promise<BillingResult> {
   const shop = await loadSettings();
   const llm = await llmConfig(shop.ai);
   const paypal = await payPalToolkit(BILLING_ACTIONS);
@@ -53,6 +61,7 @@ export async function handleBillingTask(received: BillingTask, mode: AgentMode =
       customers: seedCustomerDirectory,
       audit: auditLog(),
       limits: shop.limits,
+      ...(liftDailyCap && { invoiceLimits: withoutDailyCap(DEFAULT_INVOICE_LIMITS) }),
       notifier: heldNotifier(shop),
     });
     return withClient(guard, 'billing-agent', (tools) =>

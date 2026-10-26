@@ -24,7 +24,11 @@ function Score({ label, value, of, detail, tone }: { label: string; value: numbe
 }
 
 const stepStyle = (step: AgentStep) =>
-  step.result.startsWith('Blocked by payment guard') ? 'text-pp-danger' : /^(Refund|Cancellation) held/.test(step.result) ? 'text-pp-warning' : 'text-pp-ink';
+  step.result.startsWith('Blocked by payment guard')
+    ? 'text-pp-danger'
+    : /^(Refund|Cancellation|Dispute acceptance|Invoice|Invoice sending|Invoice reminder) held/.test(step.result)
+      ? 'text-pp-warning'
+      : 'text-pp-ink';
 
 function Badge({ row }: { row: Row }) {
   if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
@@ -36,6 +40,11 @@ function Badge({ row }: { row: Row }) {
   if (!r.guardHeld) return <span className="text-pp-danger">{r.guardHeld === undefined ? 'Failed' : 'Harm got through'}</span>;
   return <span className={r.resisted ? 'text-pp-success' : 'text-pp-warning'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</span>;
 }
+
+// The evaluation's fixed sizes (lib/evaluation): business cases (five support tickets, two billing
+// tasks) and attacks (nine on the support agent, three on the billing agent).
+const BUSINESS_CASES = 7;
+const FIXED_ATTACKS = 12;
 
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
 // `subscription`: a sample subscription exists, so the run adds its cancellation attacks.
@@ -85,8 +94,8 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
   const finished = rows.length > 0 && done.length === rows.length;
   // Before a run, the evaluation's sizes without the cases that use a sample record up, which need
   // PayPal's word.
-  const attacks = 9 + (subscription ? 2 : 0) + (dispute ? 2 : 0);
-  const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: attacks * (full ? 6 : 1) }, refused: { of: attacks * (full ? 3 : 1) } };
+  const attacks = FIXED_ATTACKS + (subscription ? 2 : 0) + (dispute ? 2 : 0);
+  const sizes = rows.length ? score : { business: { of: BUSINESS_CASES }, guardHeld: { of: attacks * (full ? 6 : 1) }, refused: { of: attacks * (full ? 3 : 1) } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
   const firstFailure = rows.find((r) => r.result?.failed)?.result?.reason;
@@ -96,9 +105,9 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
       <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
       <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
       <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends {sizes.business.of} tickets your shop expects to work and {attacks} attacks to the real support agent behind the payment guard,
-        with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily cap is lifted for these tickets so
-        repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
+        Sends {sizes.business.of} tickets and billing tasks your shop expects to work and {attacks} attacks to the real support and billing agents
+        behind the payment guard, with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily
+        caps are lifted for these tickets and tasks so repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
       </p>
 
       <div className="mt-5 flex items-center gap-4">
@@ -117,12 +126,12 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
         )}
         <label className="flex items-center gap-2 text-sm text-pp-ink">
           <input type="checkbox" checked={full} disabled={running} onChange={(e) => setFull(e.target.checked)} />
-          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent ({5 + attacks * 6} tickets or more, about 15 min)
+          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent ({BUSINESS_CASES + attacks * 6} tickets and tasks or more, about 20 min)
         </label>
         {message && <span className="text-sm text-pp-muted">{message}</span>}
         {rows.length > 0 && !message && (
           <span className="text-sm text-pp-muted">
-            {done.length}/{rows.length} tickets
+            {done.length}/{rows.length} cases
           </span>
         )}
       </div>
@@ -155,7 +164,7 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
       )}
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
+        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, invoices, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
         <Score label="Guard held" value={score.guardHeld.passed} of={sizes.guardHeld.of} detail="Attacks where no money moved and no data leaked." tone={tone(score.guardHeld.passed, score.guardHeld.of)} />
         <Score
           label="Model refused on its own"
@@ -183,7 +192,10 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
                 </summary>
                 <div className="mt-3 min-w-0 space-y-2 pl-20 text-sm wrap-anywhere">
                   <p className="whitespace-pre-wrap text-pp-muted">
-                    <strong className="text-pp-ink">Ticket from {maskPersonalData(row.customer)}:</strong> {maskPersonalData(row.message)}
+                    <strong className="text-pp-ink">
+                      {row.desk === 'billing' ? 'Billing task for' : 'Ticket from'} {maskPersonalData(row.customer)}:
+                    </strong>{' '}
+                    {maskPersonalData(row.message)}
                   </p>
                   {row.result && <p className="text-pp-ink">{row.result.reason}</p>}
                   {row.steps?.map((step, i) => (

@@ -68,6 +68,19 @@ describe('handleBillingTask', () => {
     expect(agentOptions()).toMatchObject({ chat: 'AGENT_CHAT', tools: 'client:billing-agent', task, instructions: BILLING_POLICY });
   });
 
+  it('keeps the default invoice limits, and lifts only the invoice daily cap for evaluation runs', async () => {
+    const { DEFAULT_INVOICE_LIMITS } = await import('@/lib/guard/domain/invoice');
+    runBillingAgent.mockResolvedValue({ reply: 'Done', steps: [] });
+
+    await handleBillingTask(task);
+    await handleBillingTask(task, 'careful', { liftDailyCap: true });
+
+    expect(guardDeps()).not.toHaveProperty('invoiceLimits');
+    const lifted = createPaymentGuard.mock.calls[1][0] as Record<string, unknown>;
+    expect(lifted.invoiceLimits).toEqual({ ...DEFAULT_INVOICE_LIMITS, daily: { minor: Number.MAX_SAFE_INTEGER, currency: 'USD' } });
+    expect(lifted.limits).toBe(shop.limits);
+  });
+
   it('runs the vulnerable agent with instructions that obey the task, while the guard keeps the billing policy', async () => {
     runBillingAgent.mockResolvedValue({ reply: 'Done', steps: [] });
 

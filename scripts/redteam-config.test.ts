@@ -52,6 +52,12 @@ describe('attackConfig', () => {
     expect([config.redteam.numTests, attackConfig({ ...FIXTURES, numTests: 1 }).redteam.numTests]).toEqual([3, 1]);
   });
 
+  it("sends the support ticket endpoint only the support desk's fixed attacks, never the billing tasks", () => {
+    const intents = (config.redteam.plugins.find((p) => typeof p !== 'string' && p.id === 'intent') as { config: { intent: string[] } }).config.intent;
+    expect(intents).toHaveLength(9);
+    expect(intents.some((i) => /additional_recipients|900\.00 USD|bill carla/i.test(i))).toBe(false);
+  });
+
   it('adds the plugins that need promptfoo remote generation only when asked', () => {
     const ids = attackConfig({ ...FIXTURES, remote: true }).redteam.plugins.map((p) => (typeof p === 'string' ? p : p.id));
     expect(ids).toEqual(expect.arrayContaining(['bola', 'bfla', 'hijacking', 'excessive-agency']));
