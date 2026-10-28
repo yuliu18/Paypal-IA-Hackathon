@@ -36,7 +36,7 @@ export function ReportHeader({
   onEditingChange: (editing: boolean) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start gap-x-6 gap-y-3 bg-pp-canvas px-8 pt-8 pb-4">
+    <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 pt-6 pb-4 sm:px-8 sm:pt-8">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-pp-blue">{reportName}</p>
         <h1 className="mt-1 truncate text-[28px] font-semibold leading-tight text-pp-navy">{pageTitle}</h1>
@@ -106,13 +106,13 @@ function DataFreshness({ asOf }: { asOf: string }) {
   const at = useSyncExternalStore(subscribeNow, () => now, () => 0);
 
   return (
-    <p className="mt-1 flex items-center gap-2 text-sm text-pp-muted">
-      <span className="inline-flex items-center gap-1.5">
+    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-pp-muted">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
         <span className="size-2 rounded-full bg-pp-success" aria-hidden />
         PayPal sandbox
       </span>
       <span aria-hidden>·</span>
-      <span title={`${new Date(asOf).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`}>
+      <span className="whitespace-nowrap" title={`${new Date(asOf).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`}>
         {refreshing ? 'Refreshing…' : `Updated ${at ? relativeTime(asOf, at) : `${new Date(asOf).toLocaleTimeString('en-GB', { timeZone: 'UTC' })} UTC`}`}
       </span>
       <button
@@ -126,8 +126,8 @@ function DataFreshness({ asOf }: { asOf: string }) {
         <RefreshIcon className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
       </button>
       <span aria-hidden>·</span>
-      <span className="inline-flex items-center gap-1">
-        Built with <AgStudioLogo className="h-6 w-auto" />
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        Built with <AgStudioLogo className="h-6 w-auto text-pp-navy" />
       </span>
     </p>
   );

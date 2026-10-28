@@ -23,6 +23,7 @@ import { AgStudio, AgStudioProvider } from 'ag-studio-react';
 import type { DashboardData } from '@/lib/dashboard-data';
 import { useNavSlot } from '../nav-slot';
 import { AppShell } from './components/app-shell';
+import { ControlRoomHeader } from './components/control-room-header';
 import {
   CreateReportDialog,
   DeleteReportDialog,
@@ -47,6 +48,7 @@ import { pagesFor, pageTitlesFor } from './page-titles';
 import { ReportsSidebar } from './components/sidebar';
 import { DashboardSkeleton } from './components/skeleton';
 import * as reportState from './report-state';
+import { controlRoomCounters } from './control-room/counters';
 import { buildAi } from './studio/ai';
 import { buildStudioData, hasData } from './studio/data';
 import { agStudioPayPalTheme } from './studio/theme';
@@ -66,6 +68,9 @@ type DashboardProps = {
 type StudioHistory = { canUndo: boolean; canRedo: boolean };
 
 const NO_HISTORY: StudioHistory = { canUndo: false, canRedo: false };
+
+// The built-in report's cover page (./studio/initial-report.ts); copies of the report keep its id.
+const GUARD_PAGE_ID = 'guard';
 
 const noSubscription = () => () => {};
 
@@ -98,6 +103,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
   const [initialState] = useState(() => reportState.withFiltersPanelFor('view', saved.state));
   const state = studioState ?? initialState;
   const studioData = useMemo(() => buildStudioData(data), [data]);
+  const counters = useMemo(() => controlRoomCounters(data.guardDecisions), [data]);
   // `ai` is read once, when Studio is created.
   const ai = useMemo(() => (aiModels?.length ? buildAi(aiModels) : undefined), [aiModels]);
 
@@ -261,6 +267,9 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
           next ? changeMode('edit') : guard(() => changeMode('view'))
         }
       />
+
+      {/* The control room's status band sits above the cover page, the one about the guard. */}
+      {state.selectedPageId === GUARD_PAGE_ID && <ControlRoomHeader counters={counters} />}
 
       {/* AG Studio needs at least 600px; on shorter windows the whole frame grows and scrolls. */}
       <div className="min-h-[600px] flex-1">

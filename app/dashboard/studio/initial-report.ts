@@ -4,7 +4,7 @@
 // in ./data.ts.
 //
 // Studio colours series by position (./theme.ts): the guard charts plot allowed, held and blocked
-// as three measures in that order, so they are always green, amber and red.
+// as three measures in that order, so they are always the traffic light's green, amber and red.
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from 'ag-studio';
 
@@ -48,7 +48,12 @@ type Measure = { id: string; aggregation?: 'sum' | 'avg' | 'countd' };
 // A KPI tile, styled the same everywhere: a full (wrapping) title, a large value, a caption saying
 // what the number means and an optional sparkline along `sparklineX`. KPIs follow the clicks on
 // the page's charts (cross-filter), so they always describe the current selection.
-const kpi = (text: string, value: Measure, caption: string, { size = 30, sparklineX }: { size?: number; sparklineX?: string } = {}) => ({
+const kpi = (
+  text: string,
+  value: Measure,
+  caption: string,
+  { size = 30, sparklineX, color = 'var(--pp-navy)' }: { size?: number; sparklineX?: string; color?: string } = {},
+) => ({
   type: 'value' as const,
   dataMapping: {
     value: [value],
@@ -59,7 +64,7 @@ const kpi = (text: string, value: Measure, caption: string, { size = 30, sparkli
     caption: { enabled: true, text: caption, wrapping: true, typography: typography(12) },
     style: {
       typography: typography(size, 'bold'),
-      color: 'var(--pp-navy)',
+      color,
       verticalAlign: 'top' as const,
       ...(sparklineX && { sparkline: { type: 'bar' as const } }),
     },
@@ -68,58 +73,29 @@ const kpi = (text: string, value: Measure, caption: string, { size = 30, sparkli
 });
 
 // --- AI operations: the cover ------------------------------------------------------
-// What the shop's AI agents (support and billing) did through the payment guard: money it kept in
-// the account, money it let move, what the billing agent billed, what waits for a person, how it
-// decided over time and why it blocked (lib/guard/dashboard-rows.ts).
+// The control room: what the shop's AI agents (support and billing) did through the payment guard.
+// The money figures sit in the header above the canvas; the canvas has the agent switch, how the
+// guard decided over time, why it blocked, a live feed of its latest calls, what the agents did,
+// the money they handled and what waits for a person (lib/guard/dashboard-rows.ts).
 
 const guard: AgPageState = {
   id: 'guard',
   widgets: {
-    intro: {
-      type: 'text',
-      dataMapping: {},
-      format: {
-        title: { enabled: false },
-        style: {
-          text:
-            'Two AI agents run this shop\'s PayPal work: support handles refunds, disputes and cancellations, billing creates and sends invoices. ' +
-            'The payment guard checks every call and allows it, holds it for a person or blocks it. Click any bar to filter the page.',
-          typography: typography(15),
-          color: '#ffffff',
-          textAlign: 'left',
-          verticalAlign: 'center',
-        },
-        // The text widget has no padding of its own: a thick border in the same navy makes some.
-        widget: { backgroundColor: 'var(--pp-navy)', borderEnabled: true, borderWidth: 14, borderColor: 'var(--pp-navy)' },
-      },
-    },
+    // The control-room header above the canvas (../components/control-room-header.tsx) shows the
+    // money protected, moved and billed and what awaits approval; the canvas starts with the agent
+    // switch and the figures that follow it.
     agent: {
       type: 'button-filter',
       dataMapping: { value: [{ id: 'guardDecisions.agent' }] },
       format: {
+        // No title: the two buttons fill the tile. None picked shows both agents.
         title: { enabled: false },
         style: { selection: { type: 'multiple' }, dimensions: { height: 36, minWidth: 96 } },
       },
     },
-    'kpi-protected': kpi('Money protected', sum('guardDecisions.protected'), 'Refunds and dispute payouts the guard blocked', {
-      size: 34,
-      sparklineX: 'guardDecisions.day',
-    }),
-    'kpi-moved': kpi('Money moved', sum('guardDecisions.moved'), 'Refunds and dispute payouts the guard allowed', {
-      size: 34,
-      sparklineX: 'guardDecisions.day',
-    }),
-    'kpi-billed': kpi('Money billed', sum('guardDecisions.billed'), 'Invoices the billing agent created (not yet paid)', {
-      size: 34,
-      sparklineX: 'guardDecisions.day',
-    }),
-    'kpi-awaiting': kpi('Awaiting approval', sum('guardDecisions.awaitingApproval'), 'Held actions a person still has to decide on /guard', {
-      size: 34,
-    }),
-    'kpi-decisions': kpi('Agent actions', countd('guardDecisions.id'), 'PayPal calls checked by the guard', { size: 24 }),
-    'kpi-block-rate': kpi('Block rate', { id: 'blockRate' }, 'Share of calls the guard blocked', { size: 24 }),
-    'kpi-held': kpi('Held for a person', sum('guardDecisions.held'), 'Calls the guard paused for approval', { size: 24 }),
-    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Fields kept from the agents on reads', { size: 24 }),
+    'kpi-block-rate': kpi('Block rate', { id: 'blockRate' }, 'Share of calls the guard blocked', { color: 'var(--pp-danger)' }),
+    'kpi-held': kpi('Held for a person', sum('guardDecisions.held'), 'Calls the guard paused for approval', { color: 'var(--pp-warning)' }),
+    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Fields kept from the agents on reads', { color: 'var(--pp-chart-3)' }),
     timeline: {
       type: 'combo-chart-stacked-column-line',
       dataMapping: {
@@ -154,7 +130,7 @@ const guard: AgPageState = {
         valueKey: [{ id: 'moneyMoved' }, { id: 'moneyBilled' }, { id: 'moneyProtected' }],
       },
       format: {
-        ...titled('Money the agents handled, per day', 'Moved out by allowed refunds, billed by invoices, and protected by blocks (USD)'),
+        ...titled('Money handled per day', 'Moved out by allowed refunds, billed by invoices, and protected by blocks (USD)'),
         style: legend,
       },
     },
@@ -168,7 +144,7 @@ const guard: AgPageState = {
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('Why the guard stopped a call', 'Rules the agents broke, most blocks first'),
+        ...titled('Why it blocked', 'Rules the agents broke, most blocks first; red blocked, amber held'),
         style: { ...legend, custom: { categoryAxis: { label: { fontSize: 12 } } } },
       },
     },
@@ -190,23 +166,40 @@ const guard: AgPageState = {
       sort: [{ field: { id: 'guardDecisions.at' }, direction: 'asc' }],
       format: { ...titled('Held actions waiting for a person', 'Oldest first; approve or reject them on /guard'), crossFilter: 'filter' },
     },
+    feed: {
+      type: 'grid',
+      dataMapping: {
+        // Dimensions only: the grid drops rows whose measures are all blank, and reads carry no
+        // money, so a measure column would hide them. The time keeps one row per decision.
+        cols: [
+          { id: 'guardDecisions.at' },
+          { id: 'guardDecisions.agent' },
+          { id: 'guardDecisions.action' },
+          { id: 'guardDecisions.decision' },
+          { id: 'guardDecisions.customer' },
+        ],
+      },
+      sort: [{ field: { id: 'guardDecisions.at' }, direction: 'desc' }],
+      format: {
+        ...titled('Live feed', 'The guard\'s latest decisions, newest first; click one to filter the page'),
+        // Columns as wide as their text; a narrow tile scrolls sideways instead of cutting words.
+        style: { columnAutoSize: true },
+        crossFilter: 'filter',
+      },
+    },
   },
   widgetLayout: {
-    intro: at(0, 0, 17, 6),
-    agent: at(17, 0, 7, 6),
-    'kpi-protected': at(0, 6, 6, 9),
-    'kpi-moved': at(6, 6, 6, 9),
-    'kpi-billed': at(12, 6, 6, 9),
-    'kpi-awaiting': at(18, 6, 6, 9),
-    'kpi-decisions': at(0, 15, 6, 7),
-    'kpi-block-rate': at(6, 15, 6, 7),
-    'kpi-held': at(12, 15, 6, 7),
-    'kpi-withheld': at(18, 15, 6, 7),
-    timeline: at(0, 22, 13, 19),
-    'by-action': at(13, 22, 11, 19),
-    money: at(0, 41, 11, 20),
-    reasons: at(11, 41, 13, 20),
-    held: at(0, 61, 24, 14),
+    agent: at(0, 0, 6, 8),
+    'kpi-block-rate': at(6, 0, 6, 8),
+    'kpi-held': at(12, 0, 6, 8),
+    'kpi-withheld': at(18, 0, 6, 8),
+    // Full width and tall: the cover's main chart.
+    timeline: at(0, 8, 24, 24),
+    reasons: at(0, 32, 12, 24),
+    feed: at(12, 32, 12, 24),
+    'by-action': at(0, 56, 12, 23),
+    money: at(12, 56, 12, 23),
+    held: at(0, 79, 24, 16),
   },
   filter: {
     // The agent switch on the canvas; no agent picked shows both.
@@ -269,9 +262,9 @@ const activity: AgPageState = {
     },
   },
   widgetLayout: {
-    pivot: at(0, 0, 13, 20),
-    customers: at(13, 0, 11, 20),
-    decisions: at(0, 20, 24, 26),
+    pivot: at(0, 0, 13, 24),
+    customers: at(13, 0, 11, 24),
+    decisions: at(0, 24, 24, 28),
   },
 };
 
@@ -332,7 +325,8 @@ const revenue: AgPageState = {
         ],
       },
       sort: [{ field: { id: 'transactions.date' }, direction: 'desc' }],
-      format: { ...titled('PayPal ledger, newest first', 'Last 31 days of account activity'), crossFilter: 'filter' },
+      // Long field names ('Transaction Amount (sum)') wrap instead of being cut off.
+      format: { ...titled('PayPal ledger, newest first', 'Last 31 days of account activity'), style: { headerRow: { wrapText: true } }, crossFilter: 'filter' },
     },
   },
   widgetLayout: {
@@ -340,11 +334,11 @@ const revenue: AgPageState = {
     'kpi-net': at(6, 0, 6, 9),
     'kpi-balance': at(12, 0, 6, 9),
     'kpi-invoiced': at(18, 0, 6, 9),
-    sales: at(0, 9, 12, 19),
-    'in-out': at(12, 9, 12, 19),
-    'event-types': at(0, 28, 14, 20),
-    'status-sunburst': at(14, 28, 10, 20),
-    ledger: at(0, 48, 24, 24),
+    sales: at(0, 9, 12, 23),
+    'in-out': at(12, 9, 12, 23),
+    'event-types': at(0, 32, 14, 23),
+    'status-sunburst': at(14, 32, 10, 23),
+    ledger: at(0, 55, 24, 24),
   },
 };
 
@@ -406,9 +400,9 @@ const receivables: AgPageState = {
     'kpi-overdue': at(6, 0, 6, 9),
     'kpi-open': at(12, 0, 6, 9),
     currency: at(18, 0, 6, 9),
-    aging: at(0, 9, 10, 20),
-    'by-invoice-date': at(10, 9, 14, 20),
-    'open-invoices': at(0, 29, 24, 22),
+    aging: at(0, 9, 10, 23),
+    'by-invoice-date': at(10, 9, 14, 23),
+    'open-invoices': at(0, 32, 24, 22),
   },
   filter: {
     page: [
@@ -480,10 +474,10 @@ const catalogue: AgPageState = {
     'kpi-plans': at(6, 0, 6, 9),
     'kpi-monthly': at(12, 0, 6, 9),
     'kpi-trial': at(18, 0, 6, 9),
-    'plan-intervals': at(0, 9, 7, 20),
-    'catalogue-sunburst': at(7, 9, 8, 20),
-    'price-range': at(15, 9, 9, 20),
-    plans: at(0, 29, 24, 14),
+    'plan-intervals': at(0, 9, 7, 23),
+    'catalogue-sunburst': at(7, 9, 8, 23),
+    'price-range': at(15, 9, 9, 23),
+    plans: at(0, 32, 24, 14),
   },
 };
 

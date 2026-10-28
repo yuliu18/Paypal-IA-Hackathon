@@ -36,6 +36,8 @@ export type GuardDecisionRow = {
   allowed: number;
   held: number;
   blocked: number;
+  // The verdict in words, for the dashboard's live feed: 'Allowed', 'Held' or 'Blocked'.
+  decision: string;
 };
 
 // `reason` is the rule's code in words: 'CUSTOMER_MISMATCH' -> 'Customer mismatch'.
@@ -57,6 +59,8 @@ const ACTIONS: Record<string, string> = {
   get_dispute: 'read',
   get_invoice: 'read',
 };
+
+const DECISIONS: Record<string, string> = { allow: 'Allowed', hold: 'Held', block: 'Blocked' };
 
 const reasonOf = (code: string) => code.charAt(0) + code.slice(1).toLowerCase().replaceAll('_', ' ');
 
@@ -120,6 +124,7 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         allowed: e.decision.verdict === 'allow' ? 1 : 0,
         held: e.decision.verdict === 'hold' ? 1 : 0,
         blocked: e.decision.verdict === 'block' ? 1 : 0,
+        decision: DECISIONS[e.decision.verdict] ?? e.decision.verdict,
       };
     }),
     guardViolations: entries.flatMap((e) =>

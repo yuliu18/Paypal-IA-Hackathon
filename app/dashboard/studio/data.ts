@@ -272,6 +272,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['day', 'Decision Date', 'dateFormat'],
           ['tool', 'Tool', 'textFormat'],
           ['verdict', 'Verdict', 'textFormat'],
+          ['decision', 'Decision', 'textFormat'],
           ['outcome', 'Guard Outcome', 'textFormat'],
           ['customer', 'Ticket Customer', 'textFormat'],
           ['currency', 'Guard Currency', 'textFormat'],

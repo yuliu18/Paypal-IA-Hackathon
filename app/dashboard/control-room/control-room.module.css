@@ -1,0 +1,151 @@
+/*
+ * The dashboard's "control room": a dark security-operations look, for the dashboard only.
+ *
+ * `.room` redefines the PayPal design tokens of app/globals.css for everything inside it. The
+ * shell's Tailwind classes (bg-pp-canvas, text-pp-navy...) and the AG Studio theme
+ * (../studio/theme.ts) both read these variables, so the header, the edit bar, the dialogs and
+ * every widget, grid and chart turn dark together; the rest of the app keeps the light tokens.
+ * Inside the room `--pp-navy` is the strongest text colour (headings, big figures), not a fill.
+ */
+.room {
+  --pp-canvas: #060b1a;
+  --pp-surface: #0c1530;
+  --pp-border: #1e2b4f;
+  --pp-gridline: #16203f;
+  --pp-ink: #e4ebf7;
+  --pp-muted: #9aa8c4;
+  --pp-navy: #f4f7ff;
+  --pp-blue: #2f80ed;
+  --pp-blue-dark: #1f6fdc;
+  --pp-sky: #38bdf8;
+  --pp-highlight: #142650;
+
+  /* The traffic light: allowed, held, blocked. */
+  --pp-success: #22e39b;
+  --pp-warning: #ffb547;
+  --pp-danger: #ff4d6d;
+
+  /* Series after the traffic light: cyan and violet accents, then softer tones. */
+  --pp-chart-1: #2f80ed;
+  --pp-chart-2: #93c5fd;
+  --pp-chart-3: #22d3ee;
+  --pp-chart-4: #ffb547;
+  --pp-chart-5: #a78bfa;
+  --pp-chart-6: #fb7185;
+  --pp-chart-7: #60cdff;
+  --pp-chart-8: #34d399;
+  --pp-chart-9: #c4b5fd;
+  --pp-chart-10: #94a3b8;
+
+  color-scheme: dark;
+  background:
+    radial-gradient(1200px 480px at 15% -10%, rgb(47 128 237 / 0.14), transparent 60%),
+    radial-gradient(900px 420px at 95% 0%, rgb(34 211 238 / 0.08), transparent 60%),
+    var(--pp-canvas);
+}
+
+/* --- The header band ------------------------------------------------------------- */
+
+.band {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--pp-border);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgb(20 38 80 / 0.9), rgb(8 15 36 / 0.95) 55%);
+  box-shadow:
+    0 0 0 1px rgb(47 128 237 / 0.06) inset,
+    0 20px 60px -30px rgb(34 211 238 / 0.35);
+}
+
+/* A faint scan line across the top edge. */
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.7), transparent);
+}
+
+.status {
+  color: var(--pp-success);
+  text-shadow: 0 0 12px rgb(34 227 155 / 0.6);
+}
+
+.dot {
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--pp-success);
+  box-shadow: 0 0 10px var(--pp-success);
+}
+
+.dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--pp-success);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.counter {
+  border: 1px solid var(--pp-border);
+  border-radius: 12px;
+  background: rgb(6 11 26 / 0.55);
+}
+
+/* Big glowing figures, one colour per meaning. */
+.figure {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.protected {
+  color: var(--pp-success);
+  text-shadow: 0 0 22px rgb(34 227 155 / 0.45);
+}
+
+.moved {
+  color: var(--pp-chart-3);
+  text-shadow: 0 0 22px rgb(34 211 238 / 0.4);
+}
+
+.billed {
+  color: var(--pp-chart-5);
+  text-shadow: 0 0 22px rgb(167 139 250 / 0.45);
+}
+
+.awaiting {
+  color: var(--pp-warning);
+  text-shadow: 0 0 22px rgb(255 181 71 / 0.45);
+}
+
+.calm {
+  color: var(--pp-muted);
+}
+
+.awaitingCard:hover,
+.awaitingCard:focus-within {
+  border-color: var(--pp-warning);
+}

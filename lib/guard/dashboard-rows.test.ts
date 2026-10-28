@@ -40,6 +40,7 @@ describe('guardDashboardRows', () => {
         allowed: 1,
         held: 0,
         blocked: 0,
+        decision: 'Allowed',
       },
     ]);
   });
@@ -60,6 +61,13 @@ describe('guardDashboardRows', () => {
       [0, 1, 0],
       [0, 0, 1],
     ]);
+  });
+
+  it('names each verdict in words, for the live feed of the latest decisions', () => {
+    const decisions = (['allow', 'hold', 'block'] as const).map(
+      (verdict, i) => guardDashboardRows([row({ id: String(i), decision: { verdict, violations: [] }, moved: undefined })]).guardDecisions[0].decision,
+    );
+    expect(decisions).toEqual(['Allowed', 'Held', 'Blocked']);
   });
 
   it('names what kind of action each call was', () => {
