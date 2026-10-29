@@ -179,18 +179,18 @@ A second agent shows the guard is not tied to one agent: a billing agent ([`lib/
 
 ### What else an agent could do with PayPal
 
-PayPal's agent toolkit (1.11) offers an agent 46 tools. The support agent here gets only two, `get_order` and `create_refund` ([`lib/agent/handle-ticket.ts`](lib/agent/handle-ticket.ts)), and the guard checks the one that moves money. Grouped by what a fooled agent could do with them:
+PayPal's agent toolkit (1.11) offers an agent 46 tools. The support agent here gets six: `get_order`, `create_refund`, `show_subscription_details`, `cancel_subscription`, `get_dispute` and `accept_dispute_claim` ([`lib/agent/handle-ticket.ts`](lib/agent/handle-ticket.ts)). The billing agent gets four: `create_invoice`, `get_invoice`, `send_invoice` and `send_invoice_reminder` ([`lib/agent/handle-billing-task.ts`](lib/agent/handle-billing-task.ts)). The guard checks every write and owner-checks every read. Grouped by what a fooled agent could do with them:
 
 | Risk | Tools | What a mistake costs |
 |---|---|---|
-| **Money out** | `create_refund` (guarded), `accept_dispute_claim` | Money goes back to a buyer: accepting a dispute is a refund under another name |
-| **Lost revenue** | `cancel_subscription`, `update_subscription`, `cancel_recurring_series`, `delete_recurring_series`, `cancel_sent_invoice`, `delete_invoice`, `update_invoicing` | Income stops, or a bill disappears or shrinks; a cancelled subscription can't be resumed |
+| **Money out** | `create_refund` (guarded), `accept_dispute_claim` (guarded) | Money goes back to a buyer: accepting a dispute is a refund under another name |
+| **Lost revenue** | `cancel_subscription` (guarded), `update_subscription`, `cancel_recurring_series`, `delete_recurring_series`, `cancel_sent_invoice`, `delete_invoice`, `update_invoicing` | Income stops, or a bill disappears or shrinks; a cancelled subscription can't be resumed |
 | **Everyone at once** | `update_plan`, `update_product` | One call changes the price every subscriber pays, or the product every customer sees |
-| **Charging a customer** | `create_order`, `pay_order`, `create_subscription`, `create_invoice`, `send_invoice`, `send_invoice_reminder`, `create_recurring_series`, `activate_recurring_series`, `create_conditional_rules_for_invoice`, `setup_invoice_auto_reminders`, `update_invoice_auto_reminder`, `cancel_invoice_auto_reminder`, `create_product`, `create_subscription_plan` | A customer is billed or pestered for something they didn't ask for |
+| **Charging a customer** | `create_order`, `pay_order`, `create_subscription`, `create_invoice`, `send_invoice`, `send_invoice_reminder` (guarded), `create_recurring_series`, `activate_recurring_series`, `create_conditional_rules_for_invoice`, `setup_invoice_auto_reminders`, `update_invoice_auto_reminder`, `cancel_invoice_auto_reminder`, `create_product`, `create_subscription_plan` | A customer is billed or pestered for something they didn't ask for |
 | **False records** | `record_payment_for_invoice`, `record_refund_for_invoice`, `create_shipment_tracking` | The books or the shipping status say something that didn't happen, which can lose a dispute |
 | **Reads only** | `get_order`, `list_transactions`, `list_disputes`, `get_dispute`, `get_refund`, `get_invoice`, `list_invoices`, `search_invoicing`, `get_recurring_series`, `list_products`, `show_product_details`, `list_subscription_plans`, `show_subscription_plan_details`, `show_subscription_details`, `get_shipment_tracking`, `get_merchant_insights`, `generate_invoice_number`, `generate_invoice_qr_code` | Nothing changes, but the answers can carry personal data: the guard masks it ([Privacy](#privacy)) |
 
-The next two to guard are the ones a support agent would really be given: `cancel_subscription` ("cancel my subscription") and `accept_dispute_claim` ("I opened a dispute, just refund me").
+Every other tool stays out of the agents' hands: the guard refuses any write it has no rules for.
 
 ### Approving a held refund
 
