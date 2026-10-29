@@ -52,6 +52,12 @@ describe('guardDashboardRows', () => {
     expect(agents).toEqual(['billing', 'billing', 'billing', 'billing', 'support', 'support', 'support', 'support']);
   });
 
+  it('names the sales agent behind an order it created, and shows the order as no money moved or billed', () => {
+    const order = { currencyCode: 'USD', items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98 }] };
+    const [created] = guardDashboardRows([row({ id: '1', tool: 'create_order', args: order, moved: undefined })]).guardDecisions;
+    expect(created).toMatchObject({ agent: 'sales', action: 'order', moved: 0, billed: 0, protected: 0, requested: null });
+  });
+
   it('counts each decision once under its verdict, so charts can stack allowed, held and blocked', () => {
     const verdicts = (['allow', 'hold', 'block'] as const).map(
       (verdict, i) => guardDashboardRows([row({ id: String(i), decision: { verdict, violations: [] }, moved: undefined })]).guardDecisions[0],

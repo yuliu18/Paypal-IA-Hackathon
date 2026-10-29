@@ -1,6 +1,6 @@
 'use client';
 
-// Refunds, subscription cancellations, dispute acceptances and invoice actions the payment guard held for a person,
+// Refunds, subscription cancellations, dispute acceptances, invoice actions and orders the payment guard held for a person,
 // each with Approve and Reject. Approving runs the call through the guard's checks again before PayPal sees it.
 
 import { useActionState } from 'react';
@@ -11,6 +11,7 @@ export type HeldCall = { id: string; at: string; customer: string; codes: string
   | { kind: 'cancellation'; subscriptionId: string }
   | { kind: 'dispute'; disputeId: string }
   | { kind: 'invoice'; amount: string }
+  | { kind: 'order'; amount: string }
   | { kind: 'invoice-sending' | 'invoice-reminder'; invoiceId: string }
 );
 
@@ -18,6 +19,7 @@ const TITLE = {
   cancellation: 'Cancel subscription',
   dispute: 'Accept dispute claim',
   invoice: 'Create invoice',
+  order: 'Create order',
   'invoice-sending': 'Send invoice',
   'invoice-reminder': 'Send invoice reminder',
 };
@@ -32,6 +34,7 @@ function referenceOf(held: HeldCall): string {
     case 'dispute':
       return held.disputeId;
     case 'invoice':
+    case 'order':
       return held.amount;
     default:
       return held.invoiceId;

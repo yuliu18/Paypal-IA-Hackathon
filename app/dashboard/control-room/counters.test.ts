@@ -39,7 +39,7 @@ describe('controlRoomCounters', () => {
     expect(controlRoomCounters([])).toEqual({ protected: 0, moved: 0, billed: 0, decisions: 0, blocked: 0, awaiting: 0, lastDecisionAt: null });
   });
 
-  it('lists the two AI agents the guard watches', () => {
-    expect(AGENTS.map((a) => a.id)).toEqual(['support', 'billing']);
+  it('lists the three AI agents the guard watches, in order', () => {
+    expect(AGENTS.map((a) => a.id)).toEqual(['support', 'billing', 'sales']);
   });
 });

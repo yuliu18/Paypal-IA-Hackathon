@@ -25,8 +25,10 @@ export type GuardDecisionRow = {
   // Personal data fields of a PayPal answer the guard kept from the agent (lib/guard/domain/privacy.ts).
   withheld: number;
   decidedBy: 'guard' | 'person';
-  // Which AI agent made the call: the billing agent works with invoices, the support agent with the rest.
-  agent: 'support' | 'billing';
+  // Which AI agent made the call: the billing agent works with invoices, the sales agent creates
+  // orders, the support agent does the rest (order reads included: both it and the sales agent read
+  // orders, and the log doesn't say which one did).
+  agent: 'support' | 'billing' | 'sales';
   // What kind of action the call was, in words a person reads on the dashboard.
   action: string;
   // An executed invoice's total: money billed to a customer, which has not been paid yet.
@@ -46,6 +48,8 @@ export type GuardViolationRow = { id: string; decisionId: string; code: string; 
 export type GuardDashboardRows = { guardDecisions: GuardDecisionRow[]; guardViolations: GuardViolationRow[] };
 
 const BILLING_TOOLS = new Set(['create_invoice', 'send_invoice', 'send_invoice_reminder', 'get_invoice']);
+const SALES_TOOLS = new Set(['create_order']);
+const agentOf = (tool: string) => (BILLING_TOOLS.has(tool) ? 'billing' : SALES_TOOLS.has(tool) ? 'sales' : 'support');
 
 const ACTIONS: Record<string, string> = {
   create_refund: 'refund',
@@ -54,6 +58,7 @@ const ACTIONS: Record<string, string> = {
   create_invoice: 'invoice',
   send_invoice: 'invoice sending',
   send_invoice_reminder: 'reminder',
+  create_order: 'order',
   get_order: 'read',
   show_subscription_details: 'read',
   get_dispute: 'read',
@@ -112,13 +117,14 @@ export function guardDashboardRows(entries: AuditRow[]): GuardDashboardRows {
         customer: maskEmail(e.task.mandate.customerEmail),
         currency: e.moved?.currency ?? requested?.currency ?? null,
         requested: requested?.value ?? null,
-        // An invoice records what it bills, not money that left the shop.
-        moved: e.tool !== 'create_invoice' ? major(e) : 0,
+        // An invoice records what it bills, not money that left the shop; an order records nothing
+        // (the buyer pays it later on PayPal), so it moves nothing either.
+        moved: e.tool !== 'create_invoice' && e.tool !== 'create_order' ? major(e) : 0,
         protected: protectedAmount(e, requested?.value ?? null),
         awaitingApproval: e.outcome === 'held' && !decided.has(e.id) ? 1 : 0,
         withheld: withheldCount(e.detail),
         decidedBy: e.resolves ? 'person' : 'guard',
-        agent: BILLING_TOOLS.has(e.tool) ? 'billing' : 'support',
+        agent: agentOf(e.tool),
         action: ACTIONS[e.tool] ?? 'other',
         billed: e.tool === 'create_invoice' && e.outcome === 'executed' ? major(e) : 0,
         allowed: e.decision.verdict === 'allow' ? 1 : 0,
