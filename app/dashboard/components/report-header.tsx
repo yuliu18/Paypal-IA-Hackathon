@@ -38,7 +38,7 @@ export function ReportHeader({
   return (
     <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 pt-6 pb-4 sm:px-8 sm:pt-8">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-pp-blue">{reportName}</p>
+        <p className="truncate text-sm text-pp-muted">{reportName}</p>
         <h1 className="mt-1 truncate text-[28px] font-semibold leading-tight text-pp-navy">{pageTitle}</h1>
         <DataFreshness asOf={asOf} />
       </div>
@@ -106,28 +106,25 @@ function DataFreshness({ asOf }: { asOf: string }) {
   const at = useSyncExternalStore(subscribeNow, () => now, () => 0);
 
   return (
-    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-pp-muted">
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-        <span className="size-2 rounded-full bg-pp-success" aria-hidden />
-        PayPal sandbox
-      </span>
-      <span aria-hidden>·</span>
-      <span className="whitespace-nowrap" title={`${new Date(asOf).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`}>
-        {refreshing ? 'Refreshing…' : `Updated ${at ? relativeTime(asOf, at) : `${new Date(asOf).toLocaleTimeString('en-GB', { timeZone: 'UTC' })} UTC`}`}
-      </span>
-      <button
-        type="button"
-        onClick={() => startRefresh(() => router.refresh())}
-        disabled={refreshing}
-        aria-label="Refresh data"
-        title="Refresh data"
-        className="inline-flex size-7 items-center justify-center rounded-full text-pp-blue hover:bg-pp-highlight disabled:text-pp-muted"
-      >
-        <RefreshIcon className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-      </button>
-      <span aria-hidden>·</span>
+    <p className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-pp-muted">
+      <span className="whitespace-nowrap">PayPal sandbox</span>
       <span className="inline-flex items-center gap-1 whitespace-nowrap">
-        Built with <AgStudioLogo className="h-6 w-auto text-pp-navy" />
+        <span title={`${new Date(asOf).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC`}>
+          {refreshing ? 'Refreshing…' : `Updated ${at ? relativeTime(asOf, at) : `${new Date(asOf).toLocaleTimeString('en-GB', { timeZone: 'UTC' })} UTC`}`}
+        </span>
+        <button
+          type="button"
+          onClick={() => startRefresh(() => router.refresh())}
+          disabled={refreshing}
+          aria-label="Refresh data"
+          title="Refresh data"
+          className="inline-flex size-7 items-center justify-center rounded-full text-pp-blue hover:bg-pp-highlight focus-visible:outline-2 focus-visible:outline-pp-blue disabled:text-pp-muted"
+        >
+          <RefreshIcon className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        Built with <AgStudioLogo className="h-5 w-auto text-pp-navy" />
       </span>
     </p>
   );

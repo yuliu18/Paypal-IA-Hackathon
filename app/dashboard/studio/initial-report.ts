@@ -73,17 +73,16 @@ const kpi = (
 });
 
 // --- AI operations: the cover ------------------------------------------------------
-// The control room: what the shop's AI agents (support and billing) did through the payment guard.
-// The money figures sit in the header above the canvas; the canvas has the agent switch, how the
-// guard decided over time, why it blocked, a live feed of its latest calls, what the agents did,
-// the money they handled and what waits for a person (lib/guard/dashboard-rows.ts).
+// What the shop's AI agents (support and billing) did through the payment guard. The sentence,
+// verdict strip and money above the canvas (../components/control-room-header.tsx) already say how
+// many calls went through, were held or were stopped, so the canvas doesn't repeat them as KPIs: it
+// has the agent switch, the personal data the guard withheld, how it decided over time, why it
+// stopped calls, its latest decisions, what the agents did, the money they handled and what waits
+// for the owner (lib/guard/dashboard-rows.ts).
 
 const guard: AgPageState = {
   id: 'guard',
   widgets: {
-    // The control-room header above the canvas (../components/control-room-header.tsx) shows the
-    // money protected, moved and billed and what awaits approval; the canvas starts with the agent
-    // switch and the figures that follow it.
     agent: {
       type: 'button-filter',
       dataMapping: { value: [{ id: 'guardDecisions.agent' }] },
@@ -93,9 +92,7 @@ const guard: AgPageState = {
         style: { selection: { type: 'multiple' }, dimensions: { height: 36, minWidth: 96 } },
       },
     },
-    'kpi-block-rate': kpi('Block rate', { id: 'blockRate' }, 'Share of calls the guard blocked', { color: 'var(--pp-danger)' }),
-    'kpi-held': kpi('Held for a person', sum('guardDecisions.held'), 'Calls the guard paused for approval', { color: 'var(--pp-warning)' }),
-    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Fields kept from the agents on reads', { color: 'var(--pp-chart-3)' }),
+    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Customer details the guard kept from the agents when they read PayPal'),
     timeline: {
       type: 'combo-chart-stacked-column-line',
       dataMapping: {
@@ -106,7 +103,7 @@ const guard: AgPageState = {
         secondaryValueKey: [{ id: 'blockRate' }],
       },
       format: {
-        ...titled('Decisions per day', 'Allowed, held and blocked calls (columns) and the block rate (line, right axis)'),
+        ...titled('Decisions per day', 'Calls that went through, were held or were stopped, and the share stopped (line, right axis)'),
         style: legend,
       },
     },
@@ -118,7 +115,7 @@ const guard: AgPageState = {
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('What the agents did', 'Calls by action and verdict, most blocked first'),
+        ...titled('What the agents tried to do', 'Calls by action, most stopped first'),
         style: legend,
       },
     },
@@ -130,7 +127,7 @@ const guard: AgPageState = {
         valueKey: [{ id: 'moneyMoved' }, { id: 'moneyBilled' }, { id: 'moneyProtected' }],
       },
       format: {
-        ...titled('Money handled per day', 'Moved out by allowed refunds, billed by invoices, and protected by blocks (USD)'),
+        ...titled('Money handled per day', 'Paid back to customers, invoiced, and kept in the shop by the guard (USD)'),
         style: legend,
       },
     },
@@ -144,7 +141,7 @@ const guard: AgPageState = {
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('Why it blocked', 'Rules the agents broke, most blocks first; red blocked, amber held'),
+        ...titled('Why the guard stopped a call', 'Rules the agents broke, most stops first'),
         style: { ...legend, custom: { categoryAxis: { label: { fontSize: 12 } } } },
       },
     },
@@ -164,7 +161,7 @@ const guard: AgPageState = {
         ],
       },
       sort: [{ field: { id: 'guardDecisions.at' }, direction: 'asc' }],
-      format: { ...titled('Held actions waiting for a person', 'Oldest first; approve or reject them on /guard'), crossFilter: 'filter' },
+      format: { ...titled('Held actions waiting for you', 'Oldest first. Approve or reject them in the guard log.'), crossFilter: 'filter' },
     },
     feed: {
       type: 'grid',
@@ -181,7 +178,7 @@ const guard: AgPageState = {
       },
       sort: [{ field: { id: 'guardDecisions.at' }, direction: 'desc' }],
       format: {
-        ...titled('Live feed', 'The guard\'s latest decisions, newest first; click one to filter the page'),
+        ...titled('Latest decisions', 'Newest first. Click one to filter the page.'),
         // Columns as wide as their text; a narrow tile scrolls sideways instead of cutting words.
         style: { columnAutoSize: true },
         crossFilter: 'filter',
@@ -189,10 +186,8 @@ const guard: AgPageState = {
     },
   },
   widgetLayout: {
-    agent: at(0, 0, 6, 8),
-    'kpi-block-rate': at(6, 0, 6, 8),
-    'kpi-held': at(12, 0, 6, 8),
-    'kpi-withheld': at(18, 0, 6, 8),
+    agent: at(0, 0, 12, 8),
+    'kpi-withheld': at(12, 0, 12, 8),
     // Full width and tall: the cover's main chart.
     timeline: at(0, 8, 24, 24),
     reasons: at(0, 32, 12, 24),

@@ -1,11 +1,14 @@
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import { AGENTS, type ControlRoomCounters } from '../control-room/counters';
+import type { ControlRoomCounters } from '../control-room/counters';
+import { heroSentence, verdictShares, type VerdictTally } from '../control-room/hero';
 import styles from '../control-room/control-room.module.css';
 
-// The control room's own header above the AG Studio canvas: the payment guard is active, which AI
-// agents it watches, and the money it has seen, computed from the rows the report reads
-// (../control-room/counters.ts). These are totals for the whole log: the agent switch on the canvas
-// filters the widgets below, not this header.
+// The opening of the dashboard, above the AG Studio canvas: one sentence saying what the shop's AI
+// agents did with its PayPal account, a strip splitting their calls into what went through, what
+// waits for the owner and what the guard stopped, and a line of money. Everything comes from the
+// rows the report reads (../control-room/counters.ts and hero.ts) and covers the whole log: the
+// agent switch on the canvas filters the widgets below, not this.
 
 const usd = (amount: number) =>
   amount.toLocaleString('en-US', {
@@ -19,70 +22,90 @@ const usd = (amount: number) =>
 const when = (iso: string) =>
   `${new Date(iso).toLocaleString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} UTC`;
 
-export function ControlRoomHeader({ counters }: { counters: ControlRoomCounters }) {
-  const blockRate = counters.decisions ? Math.round((counters.blocked / counters.decisions) * 100) : 0;
+const SEGMENTS = [
+  { key: 'allowed', label: 'went through', tone: styles.allowed },
+  { key: 'held', label: 'held for you', tone: styles.held },
+  { key: 'blocked', label: 'stopped', tone: styles.blocked },
+] as const;
+
+export function ControlRoomHeader({ counters, calls }: { counters: ControlRoomCounters; calls: VerdictTally }) {
+  const shares = verdictShares(calls);
+  const shown = SEGMENTS.filter((s) => calls[s.key] > 0);
   return (
-    <section aria-label="Payment guard status" className={`${styles.band} mx-4 mb-2 px-5 py-5 sm:mx-8 sm:px-7`}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold uppercase tracking-[0.18em]">
-        <span className="text-pp-navy">Payment guard</span>
-        <span className="text-pp-border" aria-hidden>
-          ·
-        </span>
-        <span className={`${styles.status} inline-flex items-center gap-2`}>
-          <span className={styles.dot} aria-hidden />
-          Active
-        </span>
-        <span className="text-pp-border" aria-hidden>
-          ·
-        </span>
-        <span className="text-pp-ink">{AGENTS.length} agents online</span>
-        <span className="flex flex-wrap gap-2 normal-case tracking-normal">
-          {AGENTS.map((agent) => (
-            <span
-              key={agent.id}
-              title={agent.does}
-              className="inline-flex items-center gap-1.5 rounded-full border border-pp-border px-2.5 py-0.5 text-xs font-medium text-pp-ink"
-            >
-              <span className="size-1.5 rounded-full bg-pp-success" aria-hidden />
-              {agent.name}
-            </span>
-          ))}
-        </span>
-        <span className="ml-auto text-[11px] font-medium normal-case tracking-normal text-pp-muted">
-          {counters.decisions.toLocaleString('en-US')} calls checked · {blockRate}% blocked
-          {counters.lastDecisionAt && <> · last {when(counters.lastDecisionAt)}</>}
-        </span>
+    // On a phone the guard's status moves under the money, so the sentence opens the page.
+    <section
+      aria-label="What your agents did"
+      className={`${styles.hero} mx-4 mb-4 flex flex-col pt-2 pb-8 sm:mx-8 lg:grid lg:grid-cols-[1fr_auto] lg:gap-x-10`}
+    >
+      <p className={`${styles.sentence} lg:col-start-1 lg:row-start-1`}>{heroSentence(calls)}</p>
+      <div className="order-last mt-6 text-sm text-pp-muted lg:order-none lg:col-start-2 lg:row-start-1 lg:mt-0 lg:pt-2 lg:text-right">
+        <p className="inline-flex items-center gap-2 font-medium text-pp-ink">
+          <span className={styles.statusDot} aria-hidden />
+          Guard on
+        </p>
+        <p className="mt-0.5">Watching the support and billing agents</p>
+        {counters.lastDecisionAt && <p className="mt-0.5">Last call {when(counters.lastDecisionAt)}</p>}
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Counter label="Money protected" hint="Refunds and dispute payouts the guard blocked" value={usd(counters.protected)} tone={styles.protected} />
-        <Counter label="Money moved" hint="Refunds and dispute payouts the guard allowed" value={usd(counters.moved)} tone={styles.moved} />
-        <Counter label="Money billed" hint="Invoices the billing agent created (not yet paid)" value={usd(counters.billed)} tone={styles.billed} />
-        <div className={`${styles.counter} ${styles.awaitingCard} relative px-4 py-3 transition-colors`}>
-          <dt className="text-xs font-semibold uppercase tracking-wider text-pp-muted">Awaiting approval</dt>
-          <dd className={`${styles.figure} ${counters.awaiting ? styles.awaiting : styles.calm} mt-1 text-2xl font-bold sm:text-4xl`}>
-            {counters.awaiting}
-          </dd>
-          <dd className="mt-1 text-xs">
-            {/* The link covers the whole card, so the card is the click target. */}
-            <Link href="/guard" className="text-pp-sky after:absolute after:inset-0 after:rounded-xl hover:underline">
-              {counters.awaiting ? 'Decide them on /guard →' : 'Open the guard →'}
-            </Link>
-          </dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
+      {calls.calls === 0 ? (
+        <p className="mt-4 max-w-[60ch] text-base text-pp-muted lg:col-span-2">
+          Send a ticket from the{' '}
+          <Link href="/support" className={styles.link}>
+            support desk
+          </Link>{' '}
+          or a task from the{' '}
+          <Link href="/billing" className={styles.link}>
+            billing desk
+          </Link>
+          , and every PayPal call the agents make shows up here.
+        </p>
+      ) : (
+        <figure className="mt-7 lg:col-span-2">
+          <div className={styles.strip} role="img" aria-label={shown.map((s) => `${shares[s.key]}% ${s.label}`).join(', ')}>
+            {shown.map((s) => (
+              <span key={s.key} className={`${styles.segment} ${s.tone}`} style={{ width: `${shares[s.key]}%` }} />
+            ))}
+          </div>
+          <figcaption className={`${styles.labels} mt-3`}>
+            {shown.map((s) => (
+              <span key={s.key} className={styles.label} style={{ '--share': `${shares[s.key]}%` } as CSSProperties}>
+                <span className={`${styles.mark} ${s.tone}`} aria-hidden />
+                <span className="text-[15px] font-medium text-pp-ink">
+                  {calls[s.key].toLocaleString('en-US')} {s.label}
+                </span>
+                <span className="text-[13px] text-pp-muted">{shares[s.key]}%</span>
+              </span>
+            ))}
+          </figcaption>
+        </figure>
+      )}
 
-function Counter({ label, hint, value, tone }: { label: string; hint: string; value: string; tone: string }) {
-  return (
-    <div className={`${styles.counter} px-4 py-3`}>
-      <dt className="text-xs font-semibold uppercase tracking-wider text-pp-muted">{label}</dt>
-      <dd className={`${styles.figure} ${tone} mt-1 truncate text-2xl font-bold sm:text-4xl`} title={value}>
-        {value}
-      </dd>
-      <dd className="mt-1 text-xs text-pp-muted">{hint}</dd>
-    </div>
+      <ul className="mt-6 flex flex-col lg:col-span-2 gap-x-8 gap-y-1.5 text-[15px] text-pp-muted sm:flex-row sm:flex-wrap sm:items-baseline">
+        {counters.protected > 0 && (
+          <li>
+            <span className="font-medium text-pp-ink">{usd(counters.protected)}</span> kept from leaving the shop
+          </li>
+        )}
+        {counters.moved > 0 && (
+          <li>
+            <span className="font-medium text-pp-ink">{usd(counters.moved)}</span> paid back to customers
+          </li>
+        )}
+        {counters.billed > 0 && (
+          <li>
+            <span className="font-medium text-pp-ink">{usd(counters.billed)}</span> invoiced
+          </li>
+        )}
+        <li>
+          <Link href="/guard" className={styles.link}>
+            {counters.awaiting === 0
+              ? 'Open the guard log'
+              : counters.awaiting === 1
+                ? 'Review the held action'
+                : `Review the ${counters.awaiting.toLocaleString('en-US')} held actions`}
+          </Link>
+        </li>
+      </ul>
+    </section>
   );
 }

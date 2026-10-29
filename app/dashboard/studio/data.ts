@@ -328,9 +328,9 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       },
     ],
     expressions: [
-      ratio('collectionRate', 'Collection Rate', 'Paid / invoiced. Filter to one currency first.', 'invoices.paidAmount', 'invoices.issuedAmount'),
-      ratio('overdueShare', 'Overdue Share', 'Share of outstanding receivables that is past due.', 'invoices.overdueAmount', 'invoices.outstanding'),
-      ratio('refundRate', 'Refund Rate', 'Refunded / paid.', 'invoices.refundedAmount', 'invoices.paidAmount'),
+      ratio('collectionRate', 'Collection rate', 'Paid / invoiced. Filter to one currency first.', 'invoices.paidAmount', 'invoices.issuedAmount'),
+      ratio('overdueShare', 'Overdue share', 'Share of outstanding receivables that is past due.', 'invoices.overdueAmount', 'invoices.outstanding'),
+      ratio('refundRate', 'Refund rate', 'Refunded / paid.', 'invoices.refundedAmount', 'invoices.paidAmount'),
       total('allowedCalls', 'Allowed', 'Calls the payment guard allowed.', 'guardDecisions.allowed'),
       total('heldCalls', 'Held', 'Calls the payment guard held for a person.', 'guardDecisions.held'),
       total('blockedCalls', 'Blocked', 'Calls the payment guard blocked.', 'guardDecisions.blocked'),
@@ -340,7 +340,7 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       total('moneyInTotal', 'Money in', 'Credits on the PayPal ledger.', 'transactions.moneyIn', 'currencyFormat'),
       total('moneyOutTotal', 'Money out', 'Debits on the PayPal ledger, as positive amounts.', 'transactions.moneyOut', 'currencyFormat'),
       total('salesTotal', 'Sales', 'Payments customers made to the shop.', 'transactions.sales', 'currencyFormat'),
-      ratio('blockRate', 'Block Rate', 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
+      ratio('blockRate', 'Block rate', 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
     ],
   };
 }

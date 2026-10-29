@@ -1,151 +1,176 @@
 /*
- * The dashboard's "control room": a dark security-operations look, for the dashboard only.
+ * The dashboard's dark look, for the dashboard only: a ledger the shop owner reads at night,
+ * ink blue rather than black, with the guard's verdicts in stamp and banknote tones.
  *
  * `.room` redefines the PayPal design tokens of app/globals.css for everything inside it. The
  * shell's Tailwind classes (bg-pp-canvas, text-pp-navy...) and the AG Studio theme
  * (../studio/theme.ts) both read these variables, so the header, the edit bar, the dialogs and
  * every widget, grid and chart turn dark together; the rest of the app keeps the light tokens.
- * Inside the room `--pp-navy` is the strongest text colour (headings, big figures), not a fill.
+ * Inside the room `--pp-navy` is the strongest text colour (headings, big figures), not a fill,
+ * and PayPal blue is kept for things you can click.
  */
 .room {
-  --pp-canvas: #060b1a;
-  --pp-surface: #0c1530;
-  --pp-border: #1e2b4f;
-  --pp-gridline: #16203f;
-  --pp-ink: #e4ebf7;
-  --pp-muted: #9aa8c4;
-  --pp-navy: #f4f7ff;
-  --pp-blue: #2f80ed;
-  --pp-blue-dark: #1f6fdc;
-  --pp-sky: #38bdf8;
-  --pp-highlight: #142650;
+  --pp-canvas: #0f1b2d;
+  --pp-surface: #16243a;
+  /* Raised: hovers, selected rows, tooltips. */
+  --pp-highlight: #1d2e48;
+  --pp-border: #26385a;
+  --pp-gridline: #26385a;
+  --pp-ink: #e6ecf3;
+  --pp-muted: #9aa8ba;
+  --pp-navy: #f3f6fa;
+  --pp-blue: #2f8cff;
+  --pp-blue-dark: #1f74e0;
+  --pp-sky: #2f8cff;
 
-  /* The traffic light: allowed, held, blocked. */
-  --pp-success: #22e39b;
-  --pp-warning: #ffb547;
-  --pp-danger: #ff4d6d;
+  /* The guard's verdicts: allowed, held, blocked. Fills, not text: blocked is 4.4:1 on the canvas. */
+  --pp-success: #3fa37a;
+  --pp-warning: #d9a23a;
+  --pp-danger: #d6574b;
 
-  /* Series after the traffic light: cyan and violet accents, then softer tones. */
-  --pp-chart-1: #2f80ed;
-  --pp-chart-2: #93c5fd;
-  --pp-chart-3: #22d3ee;
-  --pp-chart-4: #ffb547;
-  --pp-chart-5: #a78bfa;
-  --pp-chart-6: #fb7185;
-  --pp-chart-7: #60cdff;
-  --pp-chart-8: #34d399;
-  --pp-chart-9: #c4b5fd;
-  --pp-chart-10: #94a3b8;
+  /* Quiet accents after the verdicts. */
+  --pp-chart-1: #2f8cff;
+  --pp-chart-2: #8fb3d9;
+  --pp-chart-3: #6fa8dc;
+  --pp-chart-4: #d9a23a;
+  --pp-chart-5: #a58bd6;
+  --pp-chart-6: #c98a7d;
+  --pp-chart-7: #7fb8a4;
+  --pp-chart-8: #3fa37a;
+  --pp-chart-9: #b7a6d9;
+  --pp-chart-10: #8796ab;
 
   color-scheme: dark;
-  background:
-    radial-gradient(1200px 480px at 15% -10%, rgb(47 128 237 / 0.14), transparent 60%),
-    radial-gradient(900px 420px at 95% 0%, rgb(34 211 238 / 0.08), transparent 60%),
-    var(--pp-canvas);
+  background: var(--pp-canvas);
+  font-variant-numeric: tabular-nums;
 }
 
-/* --- The header band ------------------------------------------------------------- */
+/* --- The opening: one sentence, one strip, one line of money ------------------------ */
 
-.band {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--pp-border);
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgb(20 38 80 / 0.9), rgb(8 15 36 / 0.95) 55%);
-  box-shadow:
-    0 0 0 1px rgb(47 128 237 / 0.06) inset,
-    0 20px 60px -30px rgb(34 211 238 / 0.35);
+.hero {
+  border-bottom: 1px solid var(--pp-border);
 }
 
-/* A faint scan line across the top edge. */
-.band::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(34 211 238 / 0.7), transparent);
+.sentence {
+  max-width: 30ch;
+  font-size: 26px;
+  line-height: 1.22;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--pp-navy);
+  text-wrap: balance;
 }
 
-.status {
-  color: var(--pp-success);
-  text-shadow: 0 0 12px rgb(34 227 155 / 0.6);
-}
-
-.dot {
-  position: relative;
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 9999px;
-  background: var(--pp-success);
-  box-shadow: 0 0 10px var(--pp-success);
-}
-
-.dot::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--pp-success);
-  animation: pulse 1.8s ease-out infinite;
-}
-
-@keyframes pulse {
-  from {
-    transform: scale(1);
-    opacity: 0.7;
+@media (min-width: 768px) {
+  .sentence {
+    max-width: 34ch;
+    font-size: 38px;
+    line-height: 1.18;
   }
-  to {
-    transform: scale(3);
-    opacity: 0;
+}
+
+/* The verdict strip: one bar cut into allowed, held and blocked, like the stub of a receipt. */
+.strip {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+}
+
+.segment {
+  height: 100%;
+  border-radius: 2px;
+  /* Grows from nothing to its share once, when the page opens. */
+  animation: grow 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes grow {
+  from {
+    width: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot::after {
+  .segment {
     animation: none;
-    opacity: 0;
   }
 }
 
-.counter {
-  border: 1px solid var(--pp-border);
-  border-radius: 12px;
-  background: rgb(6 11 26 / 0.55);
+.allowed {
+  background: var(--pp-success);
 }
 
-/* Big glowing figures, one colour per meaning. */
-.figure {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+.held {
+  background: var(--pp-warning);
 }
 
-.protected {
-  color: var(--pp-success);
-  text-shadow: 0 0 22px rgb(34 227 155 / 0.45);
+.blocked {
+  background: var(--pp-danger);
 }
 
-.moved {
-  color: var(--pp-chart-3);
-  text-shadow: 0 0 22px rgb(34 211 238 / 0.4);
+/* Labels under the strip: each is as wide as its segment, so it starts where the segment starts,
+ * and a narrow segment's label pushes the next one along instead of overlapping it. On a phone
+ * they stack. */
+.labels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.billed {
-  color: var(--pp-chart-5);
-  text-shadow: 0 0 22px rgb(167 139 250 / 0.45);
+@media (min-width: 640px) {
+  .labels {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 3px;
+  }
+
+  /* Only the last label gives way: shrinking the others would pull them off their segments. */
+  .label {
+    flex: 0 0 var(--share);
+    min-width: max-content;
+    padding-right: 16px;
+  }
+
+  .label:last-child {
+    flex: 1 1 0;
+  }
 }
 
-.awaiting {
-  color: var(--pp-warning);
-  text-shadow: 0 0 22px rgb(255 181 71 / 0.45);
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.calm {
-  color: var(--pp-muted);
+/* A short mark in the verdict's colour ties the label to its segment. */
+.mark {
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 3px;
+  border-radius: 1px;
 }
 
-.awaitingCard:hover,
-.awaitingCard:focus-within {
-  border-color: var(--pp-warning);
+.link {
+  color: var(--pp-blue);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--pp-blue);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--pp-success);
 }

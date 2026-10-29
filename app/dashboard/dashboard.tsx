@@ -49,6 +49,7 @@ import { ReportsSidebar } from './components/sidebar';
 import { DashboardSkeleton } from './components/skeleton';
 import * as reportState from './report-state';
 import { controlRoomCounters } from './control-room/counters';
+import { agentCalls } from './control-room/hero';
 import { buildAi } from './studio/ai';
 import { buildStudioData, hasData } from './studio/data';
 import { agStudioPayPalTheme } from './studio/theme';
@@ -104,6 +105,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
   const state = studioState ?? initialState;
   const studioData = useMemo(() => buildStudioData(data), [data]);
   const counters = useMemo(() => controlRoomCounters(data.guardDecisions), [data]);
+  const calls = useMemo(() => agentCalls(data.guardDecisions), [data]);
   // `ai` is read once, when Studio is created.
   const ai = useMemo(() => (aiModels?.length ? buildAi(aiModels) : undefined), [aiModels]);
 
@@ -268,8 +270,8 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
         }
       />
 
-      {/* The control room's status band sits above the cover page, the one about the guard. */}
-      {state.selectedPageId === GUARD_PAGE_ID && <ControlRoomHeader counters={counters} />}
+      {/* What the agents did opens the cover page, the one about the guard. */}
+      {state.selectedPageId === GUARD_PAGE_ID && <ControlRoomHeader counters={counters} calls={calls} />}
 
       {/* AG Studio needs at least 600px; on shorter windows the whole frame grows and scrolls. */}
       <div className="min-h-[600px] flex-1">

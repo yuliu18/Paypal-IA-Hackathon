@@ -3,9 +3,9 @@
 // part of the page rather than a component embedded in it: change a token there and the shell,
 // widgets, grids and charts all follow.
 //
-// The dashboard is the dark "control room": its frame redefines those tokens with night-navy
-// values (../control-room/control-room.module.css), so this theme is dark too, while the rest of
-// the app stays light. Studio, its grids and its charts resolve the variables inside that frame.
+// The dashboard is dark: its frame redefines those tokens with ink-blue values
+// (../control-room/control-room.module.css), so this theme is dark too, while the rest of the app
+// stays light. Studio, its grids and its charts resolve the variables inside that frame.
 
 import { studioTheme } from 'ag-studio';
 
@@ -14,15 +14,15 @@ const line = (color: string) => ({ width: 1, color: token(color) });
 
 // Studio colours series by position: the first measure (or legend value) of a chart takes colour 1,
 // the second colour 2 and so on, and a chart can't pick its own. So the palette starts with the
-// guard's verdicts as a traffic light, which the guard charts plot as measures in this order:
-// allowed green, held amber, blocked red. Cyan and violet accents follow for everything else.
+// guard's verdicts, which the guard charts plot as measures in this order: allowed green, held
+// ochre, blocked red. Two quiet accents, a dusty blue and a lilac, follow for everything else.
 const SERIES = [
   token('success'),
   token('warning'),
   token('danger'),
   token('chart-3'),
   token('chart-5'),
-  token('blue'),
+  token('chart-2'),
   token('chart-7'),
   token('chart-9'),
   token('chart-6'),
@@ -45,8 +45,8 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   subtleTextColor: token('muted'),
   backgroundColor: token('surface'),
   borderColor: token('border'),
-  // Sky, not PayPal blue: selected buttons and focus rings need to stand out on the dark surface.
-  accentColor: token('sky'),
+  // PayPal blue marks what you can click: selected buttons and focus rings.
+  accentColor: token('blue'),
   iconColor: token('navy'),
   rowHoverColor: token('highlight'),
   // Native scrollbars, inputs and pickers drawn dark.
@@ -60,8 +60,7 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   tooltipTextColor: token('ink'),
   tooltipBorder: line('border'),
 
-  // No frame: the canvas is the page's own background, the control room's night gradient
-  // showing through. Each widget is inset 12px inside its grid cell, so 20px of padding puts
+  // No frame: the canvas is the page's own ink-blue background. Each widget is inset 12px inside its grid cell, so 20px of padding puts
   // widget edges on the header's 32px gutter.
   studioWrapperBorder: false,
   studioWrapperBorderRadius: 0,
@@ -77,10 +76,10 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioCanvasRowHeight: 20,
   studioCanvasFontFamily: token('font'),
 
-  // Widgets are the control room's panels: dark surface, 1px border, 14px radius, generous padding.
+  // Widgets sit on a slightly lighter surface with no border: the step in colour is the edge.
   studioWidgetBackgroundColor: token('surface'),
-  studioWidgetBorder: line('border'),
-  studioWidgetBorderRadius: 14,
+  studioWidgetBorder: false,
+  studioWidgetBorderRadius: 6,
   studioWidgetPadding: 18,
   studioWidgetTitleFontFamily: token('font'),
   studioWidgetTitleFontSize: 15,
@@ -120,10 +119,11 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioDragAndDropImageTextColor: token('ink'),
   studioPanelChevronButtonHoverBackgroundColor: token('highlight'),
   studioPanelChevronButtonHoverColor: token('blue'),
-  // Selected toggles: highlight fill, sky text and edge.
+  // Selected toggles (the agent switch): raised fill, PayPal blue edge, light text. Blue text on
+  // the raised fill would be 4.1:1, under AA for small text.
   studioToggleButtonActiveBackgroundColor: token('highlight'),
-  studioToggleButtonActiveBorderColor: token('sky'),
-  studioToggleButtonActiveColor: token('sky'),
+  studioToggleButtonActiveBorderColor: token('blue'),
+  studioToggleButtonActiveColor: token('navy'),
 
   // Grid widgets: muted semibold headers, faint dividers, roomy rows.
   gridFontFamily: token('font'),
