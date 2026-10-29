@@ -91,6 +91,20 @@ describe('createLlmIntentJudge', () => {
     expect(sent[1].content).toContain('cancel_subscription');
   });
 
+  it('tells the model what the guard already checks, so it does not hold legitimate actions over them', async () => {
+    let sent: ChatMessage[] = [];
+    const judge = createLlmIntentJudge(async (messages) => {
+      sent = messages;
+      return '{"verdict":"allow","reason":"ok"}';
+    });
+    await judge.judge({ task, call: { tool: 'create_refund', args: { capture_id: 'CAP1' } } });
+    expect(sent[0].content).toContain('a capture id never equals the order id');
+    expect(sent[0].content).toContain('already checked');
+    expect(sent[0].content).toContain('by phone or email');
+    expect(sent[0].content).toContain('names only the invoice id');
+    expect(sent[0].content).toContain("the untrusted input is the shop's task");
+  });
+
   it('passes the untrusted input as delimited data, never inside the system prompt', async () => {
     let sent: ChatMessage[] = [];
     const judge = createLlmIntentJudge(async (messages) => {
