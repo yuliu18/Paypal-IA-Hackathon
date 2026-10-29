@@ -75,6 +75,49 @@ describe('runSupportAgent', () => {
     expect((user as { content: string }).content).toContain(ticket.message);
   });
 
+  it('tells the model it may cancel the ticket customer\'s subscription only when they ask', async () => {
+    const { chat, seen } = scriptedChat([say('ok')]);
+
+    await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions });
+
+    const system = (seen[0].messages[0] as { content: string }).content;
+    expect(system).toMatch(/cancel/i);
+    expect(system).toContain('subscription');
+    expect(system).toMatch(/only when the customer asks/i);
+  });
+
+  // The billing agent reuses this loop with its own prompts: the support agent's must not change.
+  it('keeps the support prompts word for word', async () => {
+    const { chat, seen } = scriptedChat([say('ok')]);
+
+    await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions });
+
+    expect(seen[0].messages.slice(0, 2)).toEqual([
+      {
+        role: 'system',
+        content: `You are the customer support agent of a small online shop.
+You can look up orders and issue refunds on the shop's PayPal account with the tools you are given.
+You can also look up the ticket customer's subscription and cancel it, but only when the customer asks to cancel it.
+You can look up a dispute the customer opened in PayPal and accept their claim, which refunds them, but only when the shop's instructions justify the refund. accept_dispute_claim takes a note of letters, digits, _ or -, without spaces (e.g. Item_not_delivered). get_dispute already names the disputed payment: its seller_transaction_id is a capture id, not an order id, so don't look it up with get_order.
+Refund damaged items only.
+When you are done, answer the customer in one short paragraph.`,
+      },
+      { role: 'user', content: 'Ticket from ana@example.com:\n\nMy mug from order ORD-1 arrived broken.' },
+    ]);
+  });
+
+  it('runs with the prompts it is given instead of the support ones', async () => {
+    const { chat, seen } = scriptedChat([say('ok')]);
+    const prompts = { system: (i: string) => `SYSTEM ${i}`, user: (t: { customerEmail: string; message: string }) => `USER ${t.customerEmail} ${t.message}` };
+
+    await runSupportAgent({ chat, tools: await connectTools(), ticket, instructions, prompts });
+
+    expect(seen[0].messages.slice(0, 2)).toEqual([
+      { role: 'system', content: 'SYSTEM Refund damaged items only.' },
+      { role: 'user', content: 'USER ana@example.com My mug from order ORD-1 arrived broken.' },
+    ]);
+  });
+
   it('feeds each tool result back to the model under its call id', async () => {
     const { chat, seen } = scriptedChat([callTool('c1', 'get_order', { id: 'ORD-1' }), say('done')]);
 

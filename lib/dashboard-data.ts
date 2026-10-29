@@ -206,8 +206,18 @@ function planRows(plans: Plan[]) {
 
 // --- Ledger -------------------------------------------------------------------------
 
+// PayPal's transaction event codes, for the ones this shop's ledger holds.
 const EVENT_TYPES: Record<string, string> = {
   T0001: 'Payout',
+  T0002: 'Subscription payment',
+  T0005: 'Card payment',
+  T0006: 'Checkout payment',
+  T0200: 'Currency conversion',
+  T1106: 'Payment reversal',
+  T1107: 'Refund',
+  T1110: 'Dispute hold',
+  T1111: 'Dispute hold released',
+  T1900: 'Account correction',
   T1105: 'Hold released',
   T1503: 'Payout hold',
 };
@@ -228,7 +238,11 @@ const campaignOf = (customField?: string) => {
   return campaign ? humanise(campaign) : 'Other';
 };
 
-function transactionRows(transactions: Transaction[]) {
+// PayPal's T00xx event codes are payments between accounts; a positive one is money a customer
+// paid the shop. Payouts (T0001) are negative, and refunds (T11xx) and holds are other codes.
+const isSale = (code: string | undefined, amount: number) => !!code?.startsWith('T00') && amount > 0;
+
+export function transactionRows(transactions: Transaction[]) {
   return transactions.map(({ transaction_info: t, payer_info: p }) => {
     const amt = amountOf(t.transaction_amount);
     const fee = amountOf(t.fee_amount);
@@ -242,6 +256,10 @@ function transactionRows(transactions: Transaction[]) {
       amount: amt,
       fee,
       net: round2(amt + fee),
+      sales: isSale(t.transaction_event_code, amt) ? amt : 0,
+      // The amount split by direction, both positive.
+      moneyIn: amt > 0 ? amt : 0,
+      moneyOut: amt < 0 ? -amt : 0,
       endingBalance: t.ending_balance ? amountOf(t.ending_balance) : null,
       counterparty: p?.email_address ?? null,
       note: t.transaction_note ?? null,

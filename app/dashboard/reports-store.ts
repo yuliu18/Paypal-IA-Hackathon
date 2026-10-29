@@ -2,7 +2,7 @@
 // report carries its page titles alongside the AG Studio state.
 //
 // The built-in report comes from ./studio/initial-report.ts until it is saved;
-// after that the saved copy wins until it is reset to default.
+// after that the saved copy wins until it is reset to default, or until BUILT_IN_VERSION changes.
 
 import type { AgReportState } from 'ag-studio';
 import { dashboardReport } from './studio/initial-report';
@@ -11,6 +11,8 @@ export type SavedReport = {
   id: string;
   name: string;
   builtIn?: boolean;
+  // The built-in report's BUILT_IN_VERSION when it was saved.
+  version?: number;
   pageTitles: Record<string, string>;
   state: AgReportState;
   updatedAt: string;
@@ -22,19 +24,27 @@ const STORAGE_KEY = 'ag-paypal-demo:reports:v1';
 
 export const BUILT_IN_ID = 'paypal-overview';
 
+// Bump when initial-report.ts changes in a way a saved built-in copy must not hide. A copy saved
+// under another version is replaced by the code's report on load; reports people made are kept.
+// 2: the payment guard page comes first.
+// 3: redesign: "AI operations" cover and "Agent activity"; cash folded into "Revenue & cash".
+// 4: control room: the cover's money figures move to the header; live feed; taller charts.
+const BUILT_IN_VERSION = 5;
+
 // Sidebar titles for the built-in report's pages, keyed by page id in initial-report.ts.
 const defaultPageTitles: Record<string, string> = {
-  revenue: 'Revenue',
+  guard: 'AI operations',
+  activity: 'Agent activity',
+  revenue: 'Revenue & cash',
   receivables: 'Receivables',
-  cash: 'Cash & payouts',
   catalogue: 'Catalogue',
-  guard: 'Payment guard',
 };
 
 export const defaultReport = (): SavedReport => ({
   id: BUILT_IN_ID,
   name: 'PayPal overview',
   builtIn: true,
+  version: BUILT_IN_VERSION,
   pageTitles: defaultPageTitles,
   state: dashboardReport,
   updatedAt: new Date(0).toISOString(),
@@ -92,7 +102,7 @@ export function loadReports(): StoredReports {
     const stored = JSON.parse(raw) as StoredReports;
     // The built-in report is always listed first, from code unless a saved copy exists.
     const reports = [
-      stored.reports.find((r) => r.id === BUILT_IN_ID) ?? defaultReport(),
+      stored.reports.find((r) => r.id === BUILT_IN_ID && r.version === BUILT_IN_VERSION) ?? defaultReport(),
       ...stored.reports.filter((r) => r.id !== BUILT_IN_ID),
     ];
     const activeId = reports.some((r) => r.id === stored.activeId) ? stored.activeId : BUILT_IN_ID;

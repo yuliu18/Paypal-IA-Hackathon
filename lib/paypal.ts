@@ -234,6 +234,7 @@ export type Refund = { id: string; status: string; amount?: Money };
 export type Capture = {
   id: string;
   status: string;
+  status_details?: { reason?: string };
   amount: Money;
   supplementary_data?: { related_ids?: { order_id?: string } };
 };

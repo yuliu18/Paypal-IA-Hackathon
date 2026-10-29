@@ -52,6 +52,22 @@ describe('sqlite audit log', () => {
     expect(await log.movedSince(new Date('2026-10-20T00:00:00Z'), 'GBP')).toEqual({ minor: 0, currency: 'GBP' });
   });
 
+  it('keeps invoices out of the money refunded, and sums them apart as money billed', async () => {
+    const invoice = (overrides: Partial<AuditEntry> = {}) => entry({ tool: 'create_invoice', args: { currency_code: 'USD' }, moved: { minor: 4000, currency: 'USD' }, ...overrides });
+    await log.record(entry());
+    await log.record(invoice());
+    await log.record(invoice({ outcome: 'executed', moved: { minor: 1000, currency: 'USD' } }));
+    await log.record(invoice({ at: '2026-10-19T23:59:59.000Z' }));
+    await log.record(invoice({ moved: { minor: 9999, currency: 'EUR' } }));
+    await log.record(invoice({ outcome: 'held', moved: undefined }));
+    const rejected = await log.record(invoice());
+    await log.update(rejected, { outcome: 'error', moved: undefined });
+    const since = new Date('2026-10-20T00:00:00Z');
+    expect(await log.movedSince(since, 'USD')).toEqual({ minor: 2500, currency: 'USD' });
+    expect(await log.billedSince(since, 'USD')).toEqual({ minor: 5000, currency: 'USD' });
+    expect(await log.billedSince(since, 'GBP')).toEqual({ minor: 0, currency: 'GBP' });
+  });
+
   it('keeps the amount when an update omits it', async () => {
     const id = await log.record(entry());
     await log.update(id, { outcome: 'executed' });

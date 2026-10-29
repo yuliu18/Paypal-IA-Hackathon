@@ -1,0 +1,176 @@
+/*
+ * The dashboard's dark look, for the dashboard only: a ledger the shop owner reads at night,
+ * ink blue rather than black, with the guard's verdicts in stamp and banknote tones.
+ *
+ * `.room` redefines the PayPal design tokens of app/globals.css for everything inside it. The
+ * shell's Tailwind classes (bg-pp-canvas, text-pp-navy...) and the AG Studio theme
+ * (../studio/theme.ts) both read these variables, so the header, the edit bar, the dialogs and
+ * every widget, grid and chart turn dark together; the rest of the app keeps the light tokens.
+ * Inside the room `--pp-navy` is the strongest text colour (headings, big figures), not a fill,
+ * and PayPal blue is kept for things you can click.
+ */
+.room {
+  --pp-canvas: #0f1b2d;
+  --pp-surface: #16243a;
+  /* Raised: hovers, selected rows, tooltips. */
+  --pp-highlight: #1d2e48;
+  --pp-border: #26385a;
+  --pp-gridline: #26385a;
+  --pp-ink: #e6ecf3;
+  --pp-muted: #9aa8ba;
+  --pp-navy: #f3f6fa;
+  --pp-blue: #2f8cff;
+  --pp-blue-dark: #1f74e0;
+  --pp-sky: #2f8cff;
+
+  /* The guard's verdicts: allowed, held, blocked. Fills, not text: blocked is 4.4:1 on the canvas. */
+  --pp-success: #3fa37a;
+  --pp-warning: #d9a23a;
+  --pp-danger: #d6574b;
+
+  /* Quiet accents after the verdicts. */
+  --pp-chart-1: #2f8cff;
+  --pp-chart-2: #8fb3d9;
+  --pp-chart-3: #6fa8dc;
+  --pp-chart-4: #d9a23a;
+  --pp-chart-5: #a58bd6;
+  --pp-chart-6: #c98a7d;
+  --pp-chart-7: #7fb8a4;
+  --pp-chart-8: #3fa37a;
+  --pp-chart-9: #b7a6d9;
+  --pp-chart-10: #8796ab;
+
+  color-scheme: dark;
+  background: var(--pp-canvas);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- The opening: one sentence, one strip, one line of money ------------------------ */
+
+.hero {
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.sentence {
+  max-width: 30ch;
+  font-size: 26px;
+  line-height: 1.22;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--pp-navy);
+  text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .sentence {
+    max-width: 34ch;
+    font-size: 38px;
+    line-height: 1.18;
+  }
+}
+
+/* The verdict strip: one bar cut into allowed, held and blocked, like the stub of a receipt. */
+.strip {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+}
+
+.segment {
+  height: 100%;
+  border-radius: 2px;
+  /* Grows from nothing to its share once, when the page opens. */
+  animation: grow 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes grow {
+  from {
+    width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment {
+    animation: none;
+  }
+}
+
+.allowed {
+  background: var(--pp-success);
+}
+
+.held {
+  background: var(--pp-warning);
+}
+
+.blocked {
+  background: var(--pp-danger);
+}
+
+/* Labels under the strip: each is as wide as its segment, so it starts where the segment starts,
+ * and a narrow segment's label pushes the next one along instead of overlapping it. On a phone
+ * they stack. */
+.labels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (min-width: 640px) {
+  .labels {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 3px;
+  }
+
+  /* Only the last label gives way: shrinking the others would pull them off their segments. */
+  .label {
+    flex: 0 0 var(--share);
+    min-width: max-content;
+    padding-right: 16px;
+  }
+
+  .label:last-child {
+    flex: 1 1 0;
+  }
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* A short mark in the verdict's colour ties the label to its segment. */
+.mark {
+  flex: none;
+  align-self: center;
+  width: 10px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.link {
+  color: var(--pp-blue);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--pp-blue);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--pp-success);
+}

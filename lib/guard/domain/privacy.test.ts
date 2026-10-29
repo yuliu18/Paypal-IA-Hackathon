@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { minimizeOrder } from './privacy';
+import { minimizeInvoice, minimizeOrder, minimizeSubscription } from './privacy';
 
 // Shaped like a live sandbox get_order answer.
 const paypalOrder = {
@@ -94,5 +94,138 @@ describe('minimizeOrder', () => {
   it('drops a kept field whose value has the wrong shape instead of passing it through', () => {
     const odd = { id: 'O-1', status: { email: 'ana@example.com' }, purchase_units: 'ana@example.com' };
     expect(minimizeOrder(odd)).toEqual({ order: { id: 'O-1' }, withheld: ['status', 'purchase_units'] });
+  });
+});
+
+// Shaped like a live sandbox GET /v1/billing/subscriptions/{id} answer, with ?fields=plan.
+const paypalSubscription = {
+  id: 'I-BW452GLLEP1G',
+  plan_id: 'P-5ML4271244454362WXNWU5NQ',
+  status: 'ACTIVE',
+  status_update_time: '2026-10-21T21:30:00Z',
+  start_time: '2026-10-21T21:00:00Z',
+  create_time: '2026-10-21T20:59:00Z',
+  update_time: '2026-10-21T21:30:00Z',
+  quantity: '1',
+  custom_id: 'ana@example.com',
+  plan_overridden: false,
+  shipping_amount: { currency_code: 'USD', value: '0.0' },
+  subscriber: {
+    email_address: 'ana@example.com',
+    payer_id: 'QYR5Z8XDVJNXQ',
+    name: { given_name: 'Ana', surname: 'Lopez' },
+    shipping_address: { address: { address_line_1: 'Calle Mayor 1', admin_area_2: 'Madrid' } },
+  },
+  billing_info: {
+    outstanding_balance: { currency_code: 'USD', value: '0.0' },
+    cycle_executions: [{ tenure_type: 'REGULAR', sequence: 1, cycles_completed: 1 }],
+    last_payment: { amount: { currency_code: 'USD', value: '9.99' }, time: '2026-10-21T21:30:00Z' },
+    next_billing_time: '2026-11-21T10:00:00Z',
+    failed_payments_count: 0,
+  },
+  plan: { name: 'Coffee club', billing_cycles: [] },
+  links: [{ href: 'https://api.sandbox.paypal.com/v1/billing/subscriptions/I-BW452GLLEP1G', rel: 'self' }],
+};
+
+describe('minimizeSubscription', () => {
+  it('keeps only what a cancellation needs: ids, status, dates, next billing time and last payment', () => {
+    expect(minimizeSubscription(paypalSubscription).subscription).toEqual({
+      id: 'I-BW452GLLEP1G',
+      plan_id: 'P-5ML4271244454362WXNWU5NQ',
+      status: 'ACTIVE',
+      start_time: '2026-10-21T21:00:00Z',
+      create_time: '2026-10-21T20:59:00Z',
+      update_time: '2026-10-21T21:30:00Z',
+      billing_info: {
+        last_payment: { amount: { currency_code: 'USD', value: '9.99' }, time: '2026-10-21T21:30:00Z' },
+        next_billing_time: '2026-11-21T10:00:00Z',
+      },
+    });
+  });
+
+  it('lists every field it withheld, subscriber, custom_id and links included', () => {
+    expect(minimizeSubscription(paypalSubscription).withheld).toEqual([
+      'status_update_time',
+      'quantity',
+      'custom_id',
+      'plan_overridden',
+      'shipping_amount',
+      'subscriber',
+      'billing_info.outstanding_balance',
+      'billing_info.cycle_executions',
+      'billing_info.failed_payments_count',
+      'plan',
+      'links',
+    ]);
+  });
+
+  it('never lets the subscriber email, name or address through', () => {
+    const text = JSON.stringify(minimizeSubscription(paypalSubscription).subscription);
+    for (const secret of ['@', 'Ana', 'Lopez', 'Calle Mayor', 'QYR5Z8XDVJNXQ']) expect(text).not.toContain(secret);
+  });
+
+  it('drops a kept field whose value has the wrong shape instead of passing it through', () => {
+    const odd = { id: 'I-1', status: { email: 'ana@example.com' }, billing_info: 'ana@example.com' };
+    expect(minimizeSubscription(odd)).toEqual({ subscription: { id: 'I-1' }, withheld: ['status', 'billing_info'] });
+  });
+});
+
+// Shaped like PayPal's get_invoice answer.
+const paypalInvoice = {
+  id: 'INV2-ABCD-1234',
+  status: 'SENT',
+  detail: {
+    invoice_number: '0042',
+    reference: 'PO-9',
+    currency_code: 'USD',
+    note: 'Thanks, write to ana@example.com',
+    invoice_date: '2026-10-26',
+    payment_term: { term_type: 'NET_10', due_date: '2026-11-05' },
+    metadata: { create_time: '2026-10-26T10:00:00Z', recipient_view_url: 'https://www.sandbox.paypal.com/invoice/p/#X' },
+  },
+  invoicer: { email_address: 'shop@business.example.com', name: { given_name: 'Shop' } },
+  primary_recipients: [{ billing_info: { email_address: 'ana@example.com', name: { given_name: 'Ana', surname: 'Lopez' } }, shipping_info: { address: { address_line_1: 'Calle Mayor 1' } } }],
+  items: [{ id: 'ITEM-1', name: 'Ceramic mug set', description: 'Blue', quantity: '2', unit_amount: { currency_code: 'USD', value: '12.50' }, tax: { name: 'VAT', percent: '0' } }],
+  amount: { currency_code: 'USD', value: '25.00', breakdown: { item_total: { currency_code: 'USD', value: '25.00' } } },
+  due_amount: { currency_code: 'USD', value: '15.00' },
+  payments: { paid_amount: { currency_code: 'USD', value: '10.00' }, transactions: [{ payment_id: 'PAY-1', amount: { currency_code: 'USD', value: '10.00' }, payment_date: '2026-10-27', note: 'by ana@example.com' }] },
+  refunds: { refund_amount: { currency_code: 'USD', value: '0.00' }, transactions: [] },
+  links: [{ href: 'https://api.sandbox.paypal.com/v2/invoicing/invoices/INV2-ABCD-1234', rel: 'self' }],
+};
+
+describe('minimizeInvoice', () => {
+  it('keeps only what billing needs: id, status, number, dates, items, amounts, payments and refunds', () => {
+    expect(minimizeInvoice(paypalInvoice).invoice).toEqual({
+      id: 'INV2-ABCD-1234',
+      status: 'SENT',
+      detail: { invoice_number: '0042', currency_code: 'USD', note: 'Thanks, write to a***@example.com', invoice_date: '2026-10-26', payment_term: { due_date: '2026-11-05' } },
+      items: [{ name: 'Ceramic mug set', quantity: '2', unit_amount: { currency_code: 'USD', value: '12.50' } }],
+      amount: { currency_code: 'USD', value: '25.00' },
+      due_amount: { currency_code: 'USD', value: '15.00' },
+      payments: { paid_amount: { currency_code: 'USD', value: '10.00' }, transactions: [{ amount: { currency_code: 'USD', value: '10.00' }, payment_date: '2026-10-27' }] },
+      refunds: { refund_amount: { currency_code: 'USD', value: '0.00' }, transactions: [] },
+    });
+  });
+
+  it('lists every field it withheld, the invoicer, the recipients and links included', () => {
+    expect(minimizeInvoice(paypalInvoice).withheld).toEqual([
+      'detail.reference',
+      'detail.payment_term.term_type',
+      'detail.metadata',
+      'invoicer',
+      'primary_recipients',
+      'items[0].id',
+      'items[0].description',
+      'items[0].tax',
+      'amount.breakdown',
+      'payments.transactions[0].payment_id',
+      'payments.transactions[0].note',
+      'links',
+    ]);
+  });
+
+  it('never lets the recipient or invoicer email, name or address through', () => {
+    const text = JSON.stringify(minimizeInvoice(paypalInvoice).invoice);
+    for (const secret of ['ana@example.com', 'shop@business', 'Lopez', 'Calle Mayor', 'recipient_view_url']) expect(text).not.toContain(secret);
   });
 });

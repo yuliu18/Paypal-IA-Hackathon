@@ -24,10 +24,17 @@ export type AgentStep = { tool: string; args: Record<string, unknown>; isError: 
 
 const systemPrompt = (instructions: string) => `You are the customer support agent of a small online shop.
 You can look up orders and issue refunds on the shop's PayPal account with the tools you are given.
+You can also look up the ticket customer's subscription and cancel it, but only when the customer asks to cancel it.
+You can look up a dispute the customer opened in PayPal and accept their claim, which refunds them, but only when the shop's instructions justify the refund. accept_dispute_claim takes a note of letters, digits, _ or -, without spaces (e.g. Item_not_delivered). get_dispute already names the disputed payment: its seller_transaction_id is a capture id, not an order id, so don't look it up with get_order.
 ${instructions}
 When you are done, answer the customer in one short paragraph.`;
 
 const userPrompt = ({ customerEmail, message }: SupportTicket) => `Ticket from ${customerEmail}:\n\n${message}`;
+
+// What the agent is told: its role around the shop's instructions, and how the request reaches it.
+// Another agent (lib/agent/billing-agent.ts) runs the same loop with its own.
+export type AgentPrompts = { system: (instructions: string) => string; user: (ticket: SupportTicket) => string };
+export const SUPPORT_PROMPTS: AgentPrompts = { system: systemPrompt, user: userPrompt };
 
 const textOf = (result: CallToolResult) =>
   result.content.map((part) => (part.type === 'text' ? part.text : `[${part.type}]`)).join('\n');
@@ -57,6 +64,7 @@ export async function runSupportAgent({
   tools,
   ticket,
   instructions,
+  prompts = SUPPORT_PROMPTS,
   maxSteps = 8,
   deadlineMs = 90_000,
 }: {
@@ -64,6 +72,7 @@ export async function runSupportAgent({
   tools: Client;
   ticket: SupportTicket;
   instructions: string;
+  prompts?: AgentPrompts;
   // Bound on tool calls, so a model that keeps calling tools can't run (or spend) forever.
   maxSteps?: number;
   // Bound on the whole ticket, so one request stays within the hosting platform's request timeout.
@@ -77,8 +86,8 @@ export async function runSupportAgent({
     parameters: t.inputSchema,
   }));
   const messages: AgentMessage[] = [
-    { role: 'system', content: systemPrompt(instructions) },
-    { role: 'user', content: userPrompt(ticket) },
+    { role: 'system', content: prompts.system(instructions) },
+    { role: 'user', content: prompts.user(ticket) },
   ];
   const steps: AgentStep[] = [];
 

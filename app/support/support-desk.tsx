@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
+import type { Scenario } from './scenarios';
 import { SeedButton } from './seed-button';
+import { DisputePaymentButton, type DisputePaymentStep } from './dispute-payment-button';
+import { SubscriptionButton } from './subscription-button';
 
-type AgentMode = 'careful' | 'vulnerable';
-export type Scenario = { label: string; agent: AgentMode; customerEmail: string; message: string };
+type AgentMode = Scenario['agent'];
 
 type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
 
@@ -23,13 +25,24 @@ function withheldFields(step: AgentStep): number {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// Held refunds (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
+// Held refunds and cancellations (lib/guard/guard.ts heldResult) wait for a person on /guard: amber, not red.
+const HELD_PREFIXES = ['Refund held for human approval', 'Cancellation held for human approval'];
 const stepStyle = (step: AgentStep) =>
-  step.isError ? 'border-pp-danger text-pp-danger' : step.result.startsWith('Refund held for human approval') ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
+  step.isError ? 'border-pp-danger text-pp-danger' : HELD_PREFIXES.some((prefix) => step.result.startsWith(prefix)) ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
 
 // Sends one ticket to the support agent (app/api/support/tickets) and shows each tool call it
 // made through the payment guard, blocked ones in red and held ones in amber.
-export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
+// `pendingApproveUrl`: the sample subscription's approval link while no buyer has approved it yet.
+// `disputePayment`: where the sample PayPal payment for the dispute tickets stands.
+export function SupportDesk({
+  scenarios,
+  pendingApproveUrl,
+  disputePayment,
+}: {
+  scenarios: Scenario[];
+  pendingApproveUrl?: string;
+  disputePayment: DisputePaymentStep;
+}) {
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
   const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
@@ -94,6 +107,12 @@ export function SupportDesk({ scenarios }: { scenarios: Scenario[] }) {
           <SeedButton label="Create sample payments" />
         </div>
       )}
+      <div className="mt-2">
+        <SubscriptionButton pendingApproveUrl={pendingApproveUrl} />
+      </div>
+      <div className="mt-2">
+        <DisputePaymentButton payment={disputePayment} />
+      </div>
 
       <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm font-semibold">

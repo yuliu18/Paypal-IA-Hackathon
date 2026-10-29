@@ -1,6 +1,9 @@
 // Ports of the payment guard: what the core needs from the outside world. Adapters for
 // PayPal, the LLM provider and storage implement these, so each can be swapped freely.
 
+import type { SubscriptionFacts } from './domain/cancellation';
+import type { DisputeFacts } from './domain/dispute';
+import type { InvoiceFacts } from './domain/invoice';
 import type { CaptureFacts, Decision, Money, TaskMandate } from './domain/policy';
 
 // The task the agent is working on, as the business framed it. `untrustedInput` is what an
@@ -19,6 +22,26 @@ export interface IntentJudge {
 
 export interface CaptureLookup {
   getCapture(captureId: string): Promise<CaptureFacts>;
+}
+
+// Undefined when PayPal knows no such subscription.
+export interface SubscriptionLookup {
+  getSubscription(subscriptionId: string): Promise<SubscriptionFacts | undefined>;
+}
+
+// Undefined when PayPal knows no such dispute.
+export interface DisputeLookup {
+  getDispute(disputeId: string): Promise<DisputeFacts | undefined>;
+}
+
+// Undefined when PayPal knows no such invoice.
+export interface InvoiceLookup {
+  getInvoice(invoiceId: string): Promise<InvoiceFacts | undefined>;
+}
+
+// The shop's existing customers: an invoice only bills someone the shop already sells to.
+export interface CustomerDirectory {
+  isCustomer(email: string): Promise<boolean>;
 }
 
 export type AuditEntry = {
@@ -43,7 +66,10 @@ export interface AuditLog {
   // Returns the entry id. Writes are logged as `pending` before they run (write-ahead).
   record(entry: AuditEntry): Promise<string>;
   update(id: string, patch: Partial<Pick<AuditEntry, 'outcome' | 'moved' | 'detail'>>): Promise<void>;
+  // Money refunded (refunds and dispute acceptances); invoices bill money in, so they don't count.
   movedSince(since: Date, currency: string): Promise<Money>;
+  // What create_invoice billed, counted the same way (pending and ambiguous failures included).
+  billedSince(since: Date, currency: string): Promise<Money>;
   // Whether a refund of this capture may have moved money but never settled (pending, or failed
   // with its amount still counting), so a retry could refund twice.
   hasUnsettledRefund(captureId: string): Promise<boolean>;

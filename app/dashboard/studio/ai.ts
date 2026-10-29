@@ -7,16 +7,24 @@ import { openaiAdapter } from './openai-adapter';
 // Suggestions shown in a new AI conversation, before anything has been typed.
 const PROMPT_STARTERS: AgAiPromptStarter[] = [
   {
+    label: 'Which agent was stopped most?',
+    prompt: 'Which AI agent did the payment guard stop most often, and for which reasons? Use the guard decisions and violations.',
+  },
+  {
+    label: 'Money protected vs moved',
+    prompt: 'How much money did the guard protect by blocking, compared with what the agents moved and billed? Break it down by agent and action.',
+  },
+  {
+    label: 'What waits for a person?',
+    prompt: 'List the held actions still awaiting approval, oldest first, with the agent, action, customer and amount.',
+  },
+  {
+    label: 'Chart the block rate',
+    prompt: 'Add a line chart of the guard block rate per day, split by agent.',
+  },
+  {
     label: 'Summarise this page',
     prompt: 'Summarise what this page shows: every widget, the fields it reads, and what stands out.',
-  },
-  {
-    label: 'Overdue invoices',
-    prompt: 'Which customers owe the most on overdue invoices?',
-  },
-  {
-    label: 'Revenue by month',
-    prompt: 'Add a chart of paid invoice revenue by month.',
   },
 ];
 

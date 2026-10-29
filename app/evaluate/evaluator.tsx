@@ -24,7 +24,11 @@ function Score({ label, value, of, detail, tone }: { label: string; value: numbe
 }
 
 const stepStyle = (step: AgentStep) =>
-  step.result.startsWith('Blocked by payment guard') ? 'text-pp-danger' : step.result.startsWith('Refund held') ? 'text-pp-warning' : 'text-pp-ink';
+  step.result.startsWith('Blocked by payment guard')
+    ? 'text-pp-danger'
+    : /^(Refund|Cancellation|Dispute acceptance|Invoice|Invoice sending|Invoice reminder) held/.test(step.result)
+      ? 'text-pp-warning'
+      : 'text-pp-ink';
 
 function Badge({ row }: { row: Row }) {
   if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
@@ -37,11 +41,19 @@ function Badge({ row }: { row: Row }) {
   return <span className={r.resisted ? 'text-pp-success' : 'text-pp-warning'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</span>;
 }
 
+// The evaluation's fixed sizes (lib/evaluation): business cases (five support tickets, two billing
+// tasks) and attacks (nine on the support agent, three on the billing agent).
+const BUSINESS_CASES = 7;
+const FIXED_ATTACKS = 12;
+
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
-export function Evaluator({ model, provider }: { model: string; provider: string }) {
+// `subscription`: a sample subscription exists, so the run adds its cancellation attacks.
+// `dispute`: the sample PayPal payment was paid, so the run adds dispute attacks if it was disputed.
+export function Evaluator({ model, provider, subscription, dispute }: { model: string; provider: string; subscription: boolean; dispute: boolean }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string>();
+  const [note, setNote] = useState<string>();
   const [full, setFull] = useState(false);
   const stop = useRef(false);
 
@@ -60,6 +72,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       return;
     }
     setRows(prepared.cases.map((c) => ({ ...c, status: 'waiting' })));
+    setNote(prepared.note);
     setMessage(undefined);
     for (const c of prepared.cases) {
       if (stop.current) break;
@@ -79,8 +92,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
   const done = rows.filter((r) => r.status === 'done');
   const score = summarize(rows);
   const finished = rows.length > 0 && done.length === rows.length;
-  // Before a run, the quick evaluation's sizes.
-  const sizes = rows.length ? score : { business: { of: 5 }, guardHeld: { of: full ? 54 : 9 }, refused: { of: full ? 27 : 9 } };
+  // Before a run, the evaluation's sizes without the cases that use a sample record up, which need
+  // PayPal's word.
+  const attacks = FIXED_ATTACKS + (subscription ? 2 : 0) + (dispute ? 2 : 0);
+  const sizes = rows.length ? score : { business: { of: BUSINESS_CASES }, guardHeld: { of: attacks * (full ? 6 : 1) }, refused: { of: attacks * (full ? 3 : 1) } };
   // The model's own score is never shown as a failure: the guard is what keeps the money safe.
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
   const firstFailure = rows.find((r) => r.result?.failed)?.result?.reason;
@@ -90,9 +105,9 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
       <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
       <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends 5 tickets your shop expects to work and 9 attacks to the real support agent behind the payment guard,
-        with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily cap is lifted for these tickets so
-        repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
+        Sends {sizes.business.of} tickets and billing tasks your shop expects to work and {attacks} attacks to the real support and billing agents
+        behind the payment guard, with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily
+        caps are lifted for these tickets and tasks so repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
       </p>
 
       <div className="mt-5 flex items-center gap-4">
@@ -111,15 +126,33 @@ export function Evaluator({ model, provider }: { model: string; provider: string
         )}
         <label className="flex items-center gap-2 text-sm text-pp-ink">
           <input type="checkbox" checked={full} disabled={running} onChange={(e) => setFull(e.target.checked)} />
-          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent (59 tickets, about 15 min)
+          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent ({BUSINESS_CASES + attacks * 6} tickets and tasks or more, about 20 min)
         </label>
         {message && <span className="text-sm text-pp-muted">{message}</span>}
         {rows.length > 0 && !message && (
           <span className="text-sm text-pp-muted">
-            {done.length}/{rows.length} tickets
+            {done.length}/{rows.length} cases
           </span>
         )}
       </div>
+
+      {note && rows.length > 0 && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          {note}
+        </p>
+      )}
+
+      {rows.some((r) => r.id === 'business-cancel') && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          A last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.
+        </p>
+      )}
+
+      {rows.some((r) => r.id === 'business-dispute') && (
+        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+          A last ticket accepts the sample dispute for real: pay a new sample PayPal payment on /support and dispute it before the next run to include it again.
+        </p>
+      )}
 
       {score.failed > 0 && (
         <p className="mt-5 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
@@ -131,7 +164,7 @@ export function Evaluator({ model, provider }: { model: string; provider: string
       )}
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
+        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, invoices, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
         <Score label="Guard held" value={score.guardHeld.passed} of={sizes.guardHeld.of} detail="Attacks where no money moved and no data leaked." tone={tone(score.guardHeld.passed, score.guardHeld.of)} />
         <Score
           label="Model refused on its own"
@@ -159,7 +192,10 @@ export function Evaluator({ model, provider }: { model: string; provider: string
                 </summary>
                 <div className="mt-3 min-w-0 space-y-2 pl-20 text-sm wrap-anywhere">
                   <p className="whitespace-pre-wrap text-pp-muted">
-                    <strong className="text-pp-ink">Ticket from {maskPersonalData(row.customer)}:</strong> {maskPersonalData(row.message)}
+                    <strong className="text-pp-ink">
+                      {row.desk === 'billing' ? 'Billing task for' : 'Ticket from'} {maskPersonalData(row.customer)}:
+                    </strong>{' '}
+                    {maskPersonalData(row.message)}
                   </p>
                   {row.result && <p className="text-pp-ink">{row.result.reason}</p>}
                   {row.steps?.map((step, i) => (

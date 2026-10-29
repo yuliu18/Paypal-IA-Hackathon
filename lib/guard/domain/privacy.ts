@@ -1,6 +1,7 @@
-// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order.
-// An allowlist of the fields a refund needs; anything else, wherever PayPal adds it, is withheld:
-// card details, payer and payee, names, addresses, the shop's custom_id, notes and links.
+// Data minimization: what the agent (and the LLM provider behind it) may see of a PayPal order,
+// subscription, dispute or invoice. An allowlist of the fields its write needs; anything else, wherever
+// PayPal adds it, is withheld: card details, payer, payee and subscriber, names, addresses, the
+// shop's custom_id, notes and links.
 
 import { maskPersonalData } from './redact';
 
@@ -19,6 +20,43 @@ const ORDER: Shape = {
   purchase_units: [
     { reference_id: 'scalar', amount: MONEY, description: 'text', payments: { captures: [CAPTURE], refunds: [REFUND] } },
   ],
+};
+const SUBSCRIPTION: Shape = {
+  id: 'scalar',
+  status: 'scalar',
+  plan_id: 'scalar',
+  start_time: 'scalar',
+  create_time: 'scalar',
+  update_time: 'scalar',
+  billing_info: { next_billing_time: 'scalar', last_payment: { amount: MONEY, time: 'scalar' } },
+};
+
+// A dispute without the customer's messages, evidence or the buyer and seller blocks: what the
+// shop is asked to accept, for how much, and by when.
+const DISPUTE: Shape = {
+  dispute_id: 'scalar',
+  status: 'scalar',
+  reason: 'scalar',
+  dispute_amount: MONEY,
+  dispute_life_cycle_stage: 'scalar',
+  dispute_channel: 'scalar',
+  create_time: 'scalar',
+  update_time: 'scalar',
+  seller_response_due_date: 'scalar',
+  disputed_transactions: [{ seller_transaction_id: 'scalar', transaction_status: 'scalar', gross_amount: MONEY, create_time: 'scalar' }],
+};
+
+// An invoice without the invoicer, the recipients or links: what is billed, for how much, what is
+// still due and by when. Notes and item names are the shop's text, kept masked.
+const INVOICE: Shape = {
+  id: 'scalar',
+  status: 'scalar',
+  detail: { invoice_number: 'scalar', currency_code: 'scalar', invoice_date: 'scalar', note: 'text', payment_term: { due_date: 'scalar' } },
+  items: [{ name: 'text', quantity: 'scalar', unit_amount: MONEY }],
+  amount: MONEY,
+  due_amount: MONEY,
+  payments: { paid_amount: MONEY, transactions: [{ amount: MONEY, payment_date: 'scalar' }] },
+  refunds: { refund_amount: MONEY, transactions: [{ amount: MONEY, refund_date: 'scalar' }] },
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -50,6 +88,24 @@ export function minimizeOrder(order: unknown): { order: Record<string, unknown>;
   const withheld: string[] = [];
   const kept = keep(order, ORDER, '', withheld);
   return { order: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeSubscription(subscription: unknown): { subscription: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(subscription, SUBSCRIPTION, '', withheld);
+  return { subscription: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeDispute(dispute: unknown): { dispute: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(dispute, DISPUTE, '', withheld);
+  return { dispute: isRecord(kept) ? kept : {}, withheld };
+}
+
+export function minimizeInvoice(invoice: unknown): { invoice: Record<string, unknown>; withheld: string[] } {
+  const withheld: string[] = [];
+  const kept = keep(invoice, INVOICE, '', withheld);
+  return { invoice: isRecord(kept) ? kept : {}, withheld };
 }
 
 // How a read's black box entry records what was withheld, and how the dashboard counts it back.

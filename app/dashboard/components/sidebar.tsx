@@ -16,10 +16,10 @@ const TONES = {
     list: 'flex-1 space-y-1 overflow-y-auto px-3 pb-4',
     report: (active: boolean) => (active ? 'font-semibold text-pp-navy' : 'text-pp-ink hover:bg-pp-canvas'),
     reportIcon: 'text-pp-blue',
-    more: 'text-pp-muted hover:bg-white hover:text-pp-navy',
+    more: 'text-pp-muted hover:bg-pp-surface hover:text-pp-navy',
     pages: 'border-pp-border',
     page: (selected: boolean) => (selected ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-muted hover:bg-pp-canvas hover:text-pp-navy'),
-    remove: 'text-pp-muted hover:bg-white hover:text-pp-danger',
+    remove: 'text-pp-muted hover:bg-pp-surface hover:text-pp-danger',
     add: 'text-pp-blue hover:bg-pp-highlight',
     footer: 'border-t border-pp-border p-4',
     note: 'text-pp-muted',
@@ -298,7 +298,7 @@ function RenameInput({
         if (e.key === 'Enter') e.currentTarget.blur();
         if (e.key === 'Escape') onCancel();
       }}
-      className={`rounded-full border border-pp-blue bg-white px-4 font-semibold text-pp-navy outline-none ${className}`}
+      className={`rounded-full border border-pp-blue bg-pp-surface px-4 font-semibold text-pp-navy outline-none ${className}`}
     />
   );
 }
