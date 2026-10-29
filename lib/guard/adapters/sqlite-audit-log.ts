@@ -145,9 +145,10 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   // Pending entries count too: their call may have moved money even if it never settled. An
-  // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry.
+  // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry;
+  // creating an order moves no money (the buyer pays it later, in PayPal), so neither sum sees it.
   const sumSince = db.prepare(
-    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool IS NOT 'create_invoice'`,
+    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND COALESCE(tool, '') NOT IN ('create_invoice', 'create_order')`,
   );
   const billedSumSince = db.prepare(
     `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool = 'create_invoice'`,

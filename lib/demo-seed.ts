@@ -4,14 +4,17 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { chargeCard, type Charge, type Money } from './paypal.ts';
+import { priceValueOf } from './shop/catalogue.ts';
 
 type Purchase = { customerEmail: string; description: string; amount: Money };
 export type SeedCharge = Purchase & Charge;
 
+// Each customer bought one catalogue product at its catalogue price.
+const purchase = (customerEmail: string, product: string): Purchase => ({ customerEmail, description: product, amount: { value: priceValueOf(product), currency_code: 'USD' } });
 const PURCHASES: Purchase[] = [
-  { customerEmail: 'ana@example.com', description: 'Ceramic mug set', amount: { value: '49.99', currency_code: 'USD' } },
-  { customerEmail: 'ben@example.com', description: 'Linen tablecloth', amount: { value: '120.00', currency_code: 'USD' } },
-  { customerEmail: 'carla@example.com', description: 'Espresso cups (x6)', amount: { value: '35.50', currency_code: 'USD' } },
+  purchase('ana@example.com', 'Ceramic mug set'),
+  purchase('ben@example.com', 'Linen tablecloth'),
+  purchase('carla@example.com', 'Espresso cups (x6)'),
 ];
 
 export const SEED_FILE = 'data/seed.json';

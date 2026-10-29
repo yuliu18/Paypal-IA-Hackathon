@@ -5,6 +5,7 @@
 import { SUBSCRIPTION_ID } from '../domain/cancellation';
 import { DISPUTE_ID } from '../domain/dispute';
 import { INVOICE_ID, parseInvoiceDraft } from '../domain/invoice';
+import { parseOrderDraft } from '../domain/order';
 import { format } from '../domain/policy';
 import { maskEmail } from '../domain/redact';
 import type { AuditRow } from '../ports';
@@ -36,6 +37,11 @@ function heldAction(entry: AuditRow): string {
     // The total the guard computed; the recipient, item names and notes are the agent's text.
     const parsed = parseInvoiceDraft(entry.args);
     return `an invoice of ${'draft' in parsed ? format(parsed.draft.total) : 'an unreadable amount'}`;
+  }
+  if (entry.tool === 'create_order') {
+    // The total the guard computed; item names, notes and links are the agent's text.
+    const parsed = parseOrderDraft(entry.args);
+    return `an order of ${'draft' in parsed ? format({ minor: parsed.draft.totalMinor, currency: parsed.draft.currency }) : 'an unreadable amount'}`;
   }
   if (entry.tool === 'send_invoice' || entry.tool === 'send_invoice_reminder') {
     const id = entry.args.invoice_id;

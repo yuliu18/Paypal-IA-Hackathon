@@ -1,7 +1,7 @@
 // The payment guard: an MCP server that sits between an AI agent and PayPal's MCP toolkit.
 // It exposes the same tools, passes allowlisted reads through, evaluates refunds, subscription
-// cancellations, dispute acceptances and invoices against the policy and the intent judge, and
-// blocks everything else by default.
+// cancellations, dispute acceptances, invoices and orders against the policy and the intent judge,
+// and blocks everything else by default.
 // Blocked and held calls never reach PayPal; a held call waits for a person to approve it.
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -21,8 +21,10 @@ import {
   parseInvoiceSending,
   type InvoiceLimits,
 } from './domain/invoice';
+import { evaluateOrderCreation, ORDER_ID, parseOrderDraft } from './domain/order';
 import { minimizeDispute, minimizeInvoice, minimizeOrder, minimizeSubscription, withheldDetail } from './domain/privacy';
 import { maskPersonalData } from './domain/redact';
+import type { ShopCatalogue } from '../shop/catalogue';
 import { evaluateRefund, format, isMandateCustomer, mergeDecisions, refundableOf, type Decision, type Limits, type Money, type RefundRequest } from './domain/policy';
 import type {
   AgentTask,
@@ -35,6 +37,7 @@ import type {
   HeldNotifier,
   IntentJudge,
   InvoiceLookup,
+  OrderBinder,
   SubscriptionLookup,
 } from './ports';
 
@@ -57,6 +60,11 @@ function plainIdViolation(tool: string, args: Record<string, unknown>): Decision
   return typeof value === 'string' && rule.pattern.test(value) ? undefined : block('INVALID_ARGUMENTS', `${rule.arg} must be a plain ${rule.noun}`);
 }
 
+// What deciding a sales agent's create_order needs: the priced catalogue, the shop's own origin
+// (the only place PayPal may send the buyer back to) and the binder that records a new order as
+// the task customer's.
+export type OrderDeps = { catalogue: ShopCatalogue; shopOrigin: string; binder: OrderBinder };
+
 export type GuardDeps = {
   upstream: Client;
   task: AgentTask;
@@ -70,6 +78,8 @@ export type GuardDeps = {
   invoices?: InvoiceLookup;
   // Without it, every create_invoice is blocked (CUSTOMER_LOOKUP_FAILED).
   customers?: CustomerDirectory;
+  // Without it, every create_order is blocked (CATALOGUE_UNAVAILABLE).
+  orders?: OrderDeps;
   audit: AuditLog;
   limits: Limits;
   // The invoice limits, apart from the refund ones; DEFAULT_INVOICE_LIMITS when omitted.
@@ -127,6 +137,7 @@ const WRITES: Record<string, Write> = {
   create_invoice: { held: 'Invoice held for human approval', noun: 'invoice', looksUp: 'customer', lookupFailed: 'CUSTOMER_LOOKUP_FAILED', source: 'The customer directory' },
   send_invoice: { held: 'Invoice sending held for human approval', noun: 'invoice sending', looksUp: 'invoice', lookupFailed: 'INVOICE_LOOKUP_FAILED' },
   send_invoice_reminder: { held: 'Invoice reminder held for human approval', noun: 'invoice reminder', looksUp: 'invoice', lookupFailed: 'INVOICE_LOOKUP_FAILED' },
+  create_order: { held: 'Order held for human approval', noun: 'order', looksUp: 'order', lookupFailed: 'CATALOGUE_UNAVAILABLE', source: 'The shop catalogue' },
 };
 const isDecidedWrite = (tool: string) => Object.hasOwn(WRITES, tool);
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -194,6 +205,7 @@ type WriteDeps = {
   disputes?: DisputeLookup;
   invoices?: InvoiceLookup;
   customers?: CustomerDirectory;
+  orders?: OrderDeps;
   audit: AuditLog;
   limits: Limits;
   invoiceLimits: InvoiceLimits;
@@ -372,16 +384,59 @@ async function checkInvoiceSending(
   return evaluateInvoiceSending({ invoice, mandate: task.mandate, reminder, remindersThisTask: reminder ? remindersOf(parsed.invoiceId) : 0 });
 }
 
-type TaskCounts = { approvedByPerson: boolean; cancellationsThisTicket: number; remindersOf: (invoiceId: string) => number };
+// The deterministic checks of an order: catalogue products at catalogue prices, quantities, the
+// discount, shipping, the return links and one order per task. Creating an order moves no money,
+// so nothing is recorded as moved. Like an invoice, a person's approval lifts the approval
+// threshold and nothing else; `ordersThisTask` is 0 then, as the held order is the task's one.
+function checkOrderCreation({ orders }: WriteDeps, args: Record<string, unknown>, approvedByPerson: boolean, ordersThisTask: number): Decision {
+  const parsed = parseOrderDraft(args);
+  if ('invalid' in parsed) return block('INVALID_ARGUMENTS', parsed.invalid);
+  if (!orders) return block('CATALOGUE_UNAVAILABLE', 'No shop catalogue, shop origin or order binder is configured');
+  const { catalogue, shopOrigin } = orders;
+  const approvalThresholdMinor = approvedByPerson ? null : catalogue.approvalThresholdMinor;
+  return evaluateOrderCreation({ draft: parsed.draft, catalogue, shopOrigin, ordersThisTask, approvalThresholdMinor });
+}
 
-// The deterministic checks of any write the guard decides. A cancellation, an invoice sending and
-// a reminder move no money.
+// After PayPal created an order: record it as the task customer's, since create_order can't carry
+// a custom_id and get_order's owner check reads it. The order exists either way; an unbound one is
+// recorded in the audit detail and the agent is told, without the approval link, so it can't report
+// success or let the customer pay an order the shop can't attribute.
+async function bindOrder({ orders, timeoutMs }: WriteDeps, task: AgentTask, result: CallToolResult): Promise<{ result: CallToolResult; detail?: string }> {
+  let orderId: string | undefined;
+  try {
+    const id = (answerOf(result) as { id?: unknown } | null)?.id;
+    if (typeof id === 'string' && ORDER_ID.test(id)) orderId = id;
+  } catch {
+    // Not JSON: no order id to bind.
+  }
+  try {
+    if (!orderId) throw new Error('PayPal answered without a plain order id');
+    if (!orders) throw new Error('No order binder is configured');
+    await withTimeout(orders.binder.bindToCustomer(orderId, task.mandate.customerEmail), timeoutMs, 'Order binding');
+    return { result };
+  } catch (error) {
+    const order = `Order ${orderId ?? '(unreadable id)'} was created in PayPal`;
+    const told = `${order} but could not be recorded as the customer's: ${maskPersonalData(message(error))}. Do not give the customer its approval link; a person must check the order in PayPal first.`;
+    return { result: { isError: true, content: [{ type: 'text', text: told }] }, detail: `${order} but not bound to the task customer: ${message(error)}` };
+  }
+}
+
+type TaskCounts = {
+  approvedByPerson: boolean;
+  cancellationsThisTicket: number;
+  remindersOf: (invoiceId: string) => number;
+  ordersThisTask: number;
+};
+
+// The deterministic checks of any write the guard decides. A cancellation, an invoice sending, a
+// reminder and an order move no money.
 async function checkWrite(
   deps: WriteDeps,
   task: AgentTask,
   call: { tool: string; args: Record<string, unknown> },
-  { approvedByPerson, cancellationsThisTicket, remindersOf }: TaskCounts,
+  { approvedByPerson, cancellationsThisTicket, remindersOf, ordersThisTask }: TaskCounts,
 ): Promise<{ decision: Decision; moved?: Money }> {
+  if (call.tool === 'create_order') return { decision: checkOrderCreation(deps, call.args, approvedByPerson, ordersThisTask) };
   if (call.tool === 'cancel_subscription') return { decision: await checkCancellation(deps, task, call.args, cancellationsThisTicket) };
   if (call.tool === 'accept_dispute_claim') return checkDisputeAcceptance(deps, task, call.args, approvedByPerson);
   if (call.tool === 'create_invoice') return checkInvoiceCreation(deps, task, call.args, approvedByPerson);
@@ -389,11 +444,15 @@ async function checkWrite(
   return checkRefund(deps, task, call.args, approvedByPerson);
 }
 
+// What runs after a write PayPal executed (binding a new order); its detail is added to the log.
+type FollowUp = (result: CallToolResult) => Promise<{ result: CallToolResult; detail?: string }>;
+
 // Write-ahead execution: log the call with the amount it may move before it runs. If that fails,
 // the call can't be accounted for, so it doesn't run.
 async function executeWrite(
   { upstream, audit, timeoutMs }: WriteDeps,
   entry: Omit<AuditEntry, 'outcome'>,
+  followUp?: FollowUp,
 ): Promise<CallToolResult> {
   let id: string;
   try {
@@ -409,19 +468,22 @@ async function executeWrite(
     const result = await withTimeout(call, timeoutMs, `PayPal ${entry.tool}`);
     // An explicit PayPal rejection moved nothing, so it stops counting toward limits.
     await settle(result.isError ? { outcome: 'error', moved: undefined } : { outcome: 'executed' });
-    return result;
+    if (result.isError || !followUp) return result;
+    const followed = await followUp(result);
+    if (followed.detail) await settle({ detail: followed.detail });
+    return followed.result;
   } catch (error) {
     // Transport failure or timeout: PayPal may have executed the call, so the amount keeps counting.
     await settle({ outcome: 'error', detail: message(error) });
     // After a timeout the call is still in flight; when PayPal does answer, record what really
     // happened. A call that never answers keeps counting, which errs safe.
     call.then(
-      (late) =>
-        settle(
-          late.isError
-            ? { outcome: 'error', moved: undefined, detail: 'PayPal rejected the call after the guard timed out' }
-            : { outcome: 'executed', detail: 'PayPal completed the call after the guard timed out' },
-        ),
+      async (late) => {
+        if (late.isError) return settle({ outcome: 'error', moved: undefined, detail: 'PayPal rejected the call after the guard timed out' });
+        const followed = followUp ? await followUp(late) : undefined;
+        const detail = ['PayPal completed the call after the guard timed out', followed?.detail].filter(Boolean).join('; ');
+        return settle({ outcome: 'executed', detail });
+      },
       () => undefined,
     );
     // The log keeps the raw message; the agent gets it masked, like any PayPal error text.
@@ -463,6 +525,11 @@ function executedMessage(held: AuditRow, moved: Money | undefined): string {
   if (held.tool === 'cancel_subscription') return `Subscription ${id('subscription_id')} cancelled in PayPal`;
   if (held.tool === 'send_invoice') return `Invoice ${id('invoice_id')} sent`;
   if (held.tool === 'send_invoice_reminder') return `Reminder for invoice ${id('invoice_id')} sent`;
+  if (held.tool === 'create_order') {
+    const parsed = parseOrderDraft(held.args);
+    const total = 'draft' in parsed ? format({ minor: parsed.draft.totalMinor, currency: parsed.draft.currency }) : 'an unknown amount';
+    return `Order of ${total} created in PayPal and recorded as the customer's`;
+  }
   const amount = moved ? format(moved) : 'an unknown amount';
   if (held.tool === 'create_invoice') {
     // The number is the agent's text: quoted only when it is a plain one.
@@ -474,7 +541,7 @@ function executedMessage(held: AuditRow, moved: Money | undefined): string {
 }
 
 // A person approves or rejects a held refund, cancellation, dispute acceptance, invoice, invoice
-// sending or reminder. It runs in the same queue as the agents' writes, so two approvals of one
+// sending, reminder or order. It runs in the same queue as the agents' writes, so two approvals of one
 // hold can't both pass the "already decided" check, and the daily totals read here include every
 // refund and invoice made since the hold.
 export function decideHeldCall(
@@ -491,7 +558,7 @@ export function decideHeldCall(
   return serialized(async () => {
     const held = await full.audit.get(heldId);
     if (!held || held.outcome !== 'held' || !isDecidedWrite(held.tool)) {
-      return { outcome: 'refused', message: `Entry ${heldId} is not a held refund, cancellation, dispute acceptance, invoice, invoice sending or reminder` };
+      return { outcome: 'refused', message: `Entry ${heldId} is not a held refund, cancellation, dispute acceptance, invoice, invoice sending, reminder or order` };
     }
     const { noun, looksUp, lookupFailed, source = 'PayPal' } = WRITES[held.tool];
     if (await full.audit.isResolved(heldId)) return { outcome: 'refused', message: `Held ${noun} ${heldId} was already decided` };
@@ -502,9 +569,9 @@ export function decideHeldCall(
       return { outcome: 'blocked', message: `${capitalized(noun)} rejected; nothing was sent to PayPal` };
     }
 
-    // Approval lifts the approval threshold only; the ticket's one cancellation, and the task's one
-    // reminder of an invoice, is this one.
-    const { decision, moved } = await checkWrite(full, held.task, held, { approvedByPerson: true, cancellationsThisTicket: 0, remindersOf: () => 0 });
+    // Approval lifts the approval threshold only; the ticket's one cancellation, the task's one
+    // reminder of an invoice, and the task's one order, is this one.
+    const { decision, moved } = await checkWrite(full, held.task, held, { approvedByPerson: true, cancellationsThisTicket: 0, remindersOf: () => 0, ordersThisTask: 0 });
     // A lookup that failed says nothing about the call itself: leave the hold open to try again.
     if (decision.violations.some((v) => v.code === lookupFailed)) {
       return { outcome: 'error', message: `${source} could not be reached to check the ${looksUp}; the ${noun} is still held, try again` };
@@ -514,7 +581,8 @@ export function decideHeldCall(
       return { outcome: 'blocked', message: decision.violations.map((v) => `${v.code}: ${v.message}`).join('; ') };
     }
     const approved: Decision = { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON', message: `A person approved the held ${noun}` }] };
-    const result = await executeWrite(full, { ...base, decision: approved, moved });
+    const followUp = held.tool === 'create_order' ? (created: CallToolResult) => bindOrder(full, held.task, created) : undefined;
+    const result = await executeWrite(full, { ...base, decision: approved, moved }, followUp);
     if (result.isError) return { outcome: 'error', message: textOf(result) };
     return { outcome: 'executed', message: executedMessage(held, moved) };
   });
@@ -532,6 +600,7 @@ export function createPaymentGuard({
   disputes,
   invoices,
   customers,
+  orders,
   audit,
   limits,
   invoiceLimits = DEFAULT_INVOICE_LIMITS,
@@ -543,22 +612,29 @@ export function createPaymentGuard({
 
   server.setRequestHandler(ListToolsRequestSchema, (request) => upstream.listTools(request.params));
 
-  const deps: WriteDeps = { upstream, captures, subscriptions, disputes, invoices, customers, audit, limits, invoiceLimits, now, timeoutMs };
-  // Cancellations this ticket ran or held, and reminders by invoice; writes are serialized, so the
-  // counts can't race.
+  const deps: WriteDeps = { upstream, captures, subscriptions, disputes, invoices, customers, orders, audit, limits, invoiceLimits, now, timeoutMs };
+  // Cancellations this ticket ran or held, reminders by invoice, and orders; writes are serialized,
+  // so the counts can't race.
   let cancellations = 0;
+  let ordersCreated = 0;
   const reminders = new Map<string, number>();
   const remindersOf = (invoiceId: string) => reminders.get(invoiceId) ?? 0;
   // Counted when a write is held or about to run, like cancellations.
   const count = (name: string, args: Record<string, unknown>) => {
     if (name === 'cancel_subscription') cancellations++;
     if (name === 'send_invoice_reminder') reminders.set(String(args.invoice_id), remindersOf(String(args.invoice_id)) + 1);
+    if (name === 'create_order') ordersCreated++;
   };
   const callPayPal = (name: string, args: Record<string, unknown>) =>
     withTimeout(upstream.callTool({ name, arguments: args }) as Promise<CallToolResult>, timeoutMs, `PayPal ${name}`);
 
   async function decideWrite(tool: string, args: Record<string, unknown>): Promise<{ decision: Decision; moved?: Money }> {
-    const { decision: policy, moved } = await checkWrite(deps, task, { tool, args }, { approvedByPerson: false, cancellationsThisTicket: cancellations, remindersOf });
+    const { decision: policy, moved } = await checkWrite(deps, task, { tool, args }, {
+      approvedByPerson: false,
+      cancellationsThisTicket: cancellations,
+      remindersOf,
+      ordersThisTask: ordersCreated,
+    });
     // Only a policy-clean (or held) call is worth an LLM round trip; the judge can't relax a block anyway.
     if (policy.verdict === 'block') return { decision: policy };
     return { decision: mergeDecisions(policy, await judge.judge({ task, call: { tool, args } })), moved };
@@ -625,9 +701,10 @@ export function createPaymentGuard({
       }
     }
 
-    // Counted before it runs: a cancellation or reminder that may have reached PayPal is the task's one.
+    // Counted before it runs: a cancellation, reminder or order that may have reached PayPal is the task's one.
     count(name, args);
-    return executeWrite(deps, { at, tool: name, args, task, decision, moved });
+    const followUp = name === 'create_order' ? (created: CallToolResult) => bindOrder(deps, task, created) : undefined;
+    return executeWrite(deps, { at, tool: name, args, task, decision, moved }, followUp);
   }
 
   return server;

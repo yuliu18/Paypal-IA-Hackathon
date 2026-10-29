@@ -68,6 +68,14 @@ describe('sqlite audit log', () => {
     expect(await log.billedSince(since, 'GBP')).toEqual({ minor: 0, currency: 'GBP' });
   });
 
+  it('keeps orders out of both the money refunded and the money billed: creating an order moves no money', async () => {
+    await log.record(entry());
+    await log.record(entry({ tool: 'create_order', args: { currencyCode: 'USD' }, outcome: 'executed', moved: { minor: 9998, currency: 'USD' } }));
+    const since = new Date('2026-10-20T00:00:00Z');
+    expect(await log.movedSince(since, 'USD')).toEqual({ minor: 2500, currency: 'USD' });
+    expect(await log.billedSince(since, 'USD')).toEqual({ minor: 0, currency: 'USD' });
+  });
+
   it('keeps the amount when an update omits it', async () => {
     const id = await log.record(entry());
     await log.update(id, { outcome: 'executed' });
