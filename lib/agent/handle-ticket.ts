@@ -12,6 +12,7 @@ import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { payPalDisputeLookup } from '@/lib/guard/adapters/paypal-dispute-lookup';
 import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
+import { payPalOrderBinder } from '@/lib/guard/adapters/paypal-order-binder';
 import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
 import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
@@ -21,6 +22,8 @@ import { clientHeaders } from '@/lib/llm/openai-compatible';
 import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
+import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
+import { shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
 import { runSupportAgent, type AgentStep, type SupportTicket } from './support-agent';
@@ -36,7 +39,8 @@ Execute each refund the ticket asks for with create_refund (look the order up to
 
 export type AgentMode = 'careful' | 'vulnerable';
 
-// llmConfig, payPalToolkit and heldNotifier are shared with the billing agent (./handle-billing-task.ts).
+// llmConfig, payPalToolkit and heldNotifier are shared with the billing and sales agents
+// (./handle-billing-task.ts, ./handle-sales-chat.ts).
 
 // The LLM the shop chose on /settings for the agent and the judge (provider and key may come from
 // the environment); without a chosen model, the provider's newest one from the catalog.
@@ -49,8 +53,8 @@ export async function llmConfig(chosen: ShopSettings['ai']) {
 
 const SUPPORT_ACTIONS = { orders: { get: true }, payments: { createRefund: true }, subscriptions: { show: true, cancel: true }, disputes: { get: true, create: true } };
 
-// The support agent never gets the invoice tools; only a person's approval of a held invoice
-// action (decideHeld) needs them to run it.
+// The support agent never gets the invoice tools or create_order; only a person's approval of a
+// held invoice action or order (decideHeld) needs them to run it.
 export async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS) {
   return new PayPalAgentToolkit({
     accessToken: await accessToken(),
@@ -113,10 +117,17 @@ export async function handleTicket(
   return { reply: answer.reply, steps, redacted: { ticket: ticketRemoved, reply: answer.removed } };
 }
 
-// A person's decision on a refund, cancellation, dispute acceptance or invoice action the guard held. Approval re-checks the policy before PayPal runs it.
-export async function decideHeld(heldId: string, approve: boolean): Promise<HeldDecision> {
+// A person's decision on a refund, cancellation, dispute acceptance, invoice action or order the
+// guard held. Approval re-checks the policy before PayPal runs it; an order is re-checked against
+// the catalogue and `shopOrigin` (lib/shop/checkout.ts shopOrigin), and bound to its customer once
+// created. Orders are created, never captured: only the shop's return route captures them.
+export async function decideHeld(heldId: string, approve: boolean, { shopOrigin = defaultShopOrigin() }: { shopOrigin?: string } = {}): Promise<HeldDecision> {
   const { limits } = await loadSettings();
-  const paypal = await payPalToolkit({ ...SUPPORT_ACTIONS, invoices: { create: true, get: true, send: true, sendReminder: true } });
+  const paypal = await payPalToolkit({
+    ...SUPPORT_ACTIONS,
+    orders: { ...SUPPORT_ACTIONS.orders, create: true },
+    invoices: { create: true, get: true, send: true, sendReminder: true },
+  });
   return withClient(paypal, 'payment-guard-approval', (upstream) =>
     decideHeldCall(
       {
@@ -126,6 +137,7 @@ export async function decideHeld(heldId: string, approve: boolean): Promise<Held
         disputes: payPalDisputeLookup,
         invoices: payPalInvoiceLookup,
         customers: seedCustomerDirectory,
+        orders: { catalogue: SHOP_CATALOGUE, shopOrigin, binder: payPalOrderBinder },
         audit: auditLog(),
         limits,
       },
