@@ -1,6 +1,5 @@
 'use server';
 
-import { headers } from 'next/headers';
 import { refresh } from 'next/cache';
 import { decideHeld } from '@/lib/agent/handle-ticket';
 import type { HeldDecision } from '@/lib/guard/guard';
@@ -19,7 +18,7 @@ export async function decideHeldAction(_previous: DecideState, form: FormData): 
     return { outcome: 'refused', message: 'Invalid decision request' };
   }
   try {
-    const result = await decideHeld(id, decision === 'approve', { shopOrigin: shopOrigin((await headers()).get('origin')) });
+    const result = await decideHeld(id, decision === 'approve', { shopOrigin: shopOrigin() });
     refresh();
     return result;
   } catch (error) {

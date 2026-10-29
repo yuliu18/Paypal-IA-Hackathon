@@ -9,11 +9,11 @@ import { appBase, demoClient, type DemoDeps } from '@/lib/demo-paypal-client';
 export const SALES_RETURN_PATH = '/api/sales/paypal-return';
 export const SALES_CANCEL_PATH = '/sales?order=cancelled';
 
-// The shop's origin, the only place the guard lets an order send the buyer back to: the origin the
-// request came from, else APP_URL, else the local dev server, as the sample payments' return links
-// (lib/demo-paypal-client.ts appBase).
-export function shopOrigin(requestOrigin?: string | null): string {
-  return new URL(appBase(requestOrigin ?? undefined)).origin;
+// The shop's origin, the only place the guard lets an order send the buyer back to: APP_URL, else
+// the local dev server, as the sample payments' return links (lib/demo-paypal-client.ts appBase).
+// Never the request's Origin header: whoever sends the chat sets it, and could name their own site.
+export function shopOrigin(): string {
+  return new URL(appBase()).origin;
 }
 
 export function checkoutUrls(origin: string): { returnUrl: string; cancelUrl: string } {

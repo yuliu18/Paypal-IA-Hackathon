@@ -1,3 +1,4 @@
+import { shopOrigin } from '@/lib/shop/checkout';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const handleSalesChat = vi.fn();
@@ -18,14 +19,15 @@ describe('POST /api/sales/chats', () => {
     vi.restoreAllMocks();
   });
 
-  it('runs the sales agent for the customer who writes, with the shop origin the request came from', async () => {
+  it('runs the sales agent for the customer who writes, with the configured shop origin, not the one the request claims', async () => {
     handleSalesChat.mockResolvedValue({ reply: 'Pay here', steps: [] });
 
     const res = await post({ ...chat, agent: 'vulnerable' });
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reply: 'Pay here', steps: [] });
-    expect(handleSalesChat).toHaveBeenCalledWith(chat, 'vulnerable', { shopOrigin: 'https://shop.example' });
+    expect(handleSalesChat).toHaveBeenCalledWith(chat, 'vulnerable', { shopOrigin: shopOrigin() });
+    expect(shopOrigin()).not.toBe('https://shop.example');
   });
 
   it('hides internal error details from the caller and logs them on the server', async () => {

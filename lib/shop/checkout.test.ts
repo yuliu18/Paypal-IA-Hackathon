@@ -32,13 +32,11 @@ const order = (status: string, customId?: string) => ({
 const captured = () => ({ status: 201, json: { status: 'COMPLETED', purchase_units: [{ payments: { captures: [{ id: 'CAP-9', status: 'COMPLETED' }] } }] } });
 
 describe('shopOrigin', () => {
-  it('is the origin the request came from, else APP_URL, else the local dev server, without path', () => {
-    expect(shopOrigin('https://shop.example')).toBe('https://shop.example');
-    expect(shopOrigin('https://shop.example/some/page')).toBe('https://shop.example');
+  it('is APP_URL, else the local dev server, without path: never a value the caller sends', () => {
     const previous = process.env.APP_URL;
     try {
-      process.env.APP_URL = 'https://app.example/';
-      expect(shopOrigin(null)).toBe('https://app.example');
+      process.env.APP_URL = 'https://app.example/some/page';
+      expect(shopOrigin()).toBe('https://app.example');
       delete process.env.APP_URL;
       expect(shopOrigin()).toBe('http://localhost:3000');
     } finally {
