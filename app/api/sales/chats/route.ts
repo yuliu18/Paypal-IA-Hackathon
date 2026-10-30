@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // The buyer comes back to the app they started from (this request's origin), else APP_URL.
+    // The buyer comes back to the shop's own origin (APP_URL, else the local dev server), never one the request names.
     return Response.json(await handleSalesChat({ customerEmail, message }, agent, { shopOrigin: shopOrigin() }));
   } catch (cause) {
     // The cause can carry provider responses or configuration names, so it stays in the server log.
