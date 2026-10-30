@@ -29,6 +29,8 @@ const order = (status: string, customId?: string) => ({
     purchase_units: [{ reference_id: 'default', ...(customId && { custom_id: customId }), amount: { currency_code: 'USD', value: '99.98' } }],
   },
 });
+// The guard's audit log: the order it created and bound for ana.
+const records = { boundOrderCustomer: async (id: string) => (id === ORDER ? 'ana@example.com' : undefined) };
 const captured = () => ({ status: 201, json: { status: 'COMPLETED', purchase_units: [{ payments: { captures: [{ id: 'CAP-9', status: 'COMPLETED' }] } }] } });
 
 describe('shopOrigin', () => {
@@ -59,21 +61,44 @@ describe('completeSalesOrder', () => {
   it('captures an approved order the guard bound to a customer and says whose it is', async () => {
     const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => order('APPROVED', 'ana@example.com'), [`POST ${PATH}/capture`]: captured });
 
-    expect(await completeSalesOrder(ORDER, { fetch, token })).toEqual({ orderId: ORDER, captureId: 'CAP-9', customerEmail: 'ana@example.com', amount: '99.98 USD' });
+    expect(await completeSalesOrder(ORDER, records, { fetch, token })).toEqual({ orderId: ORDER, captureId: 'CAP-9', customerEmail: 'ana@example.com', amount: '99.98 USD' });
     expect(sent.map((s) => `${s.method} ${s.path}`)).toEqual([`GET ${PATH}`, `POST ${PATH}/capture`]);
   });
 
   it('captures nothing for an order no customer is bound to', async () => {
     const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => order('APPROVED'), [`POST ${PATH}/capture`]: captured });
 
-    await expect(completeSalesOrder(ORDER, { fetch, token })).rejects.toThrow(/not bound to a customer/);
+    await expect(completeSalesOrder(ORDER, records, { fetch, token })).rejects.toThrow(/not bound to a customer/);
     expect(sent.map((s) => s.method)).toEqual(['GET']);
   });
 
   it('captures nothing for an order the buyer has not approved, or that was already paid', async () => {
     for (const status of ['CREATED', 'COMPLETED', 'VOIDED']) {
       const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => order(status, 'ana@example.com'), [`POST ${PATH}/capture`]: captured });
-      await expect(completeSalesOrder(ORDER, { fetch, token })).rejects.toThrow(new RegExp(`is ${status}, not approved`));
+      await expect(completeSalesOrder(ORDER, records, { fetch, token })).rejects.toThrow(new RegExp(`is ${status}, not approved`));
+      expect(sent.map((s) => s.method)).toEqual(['GET']);
+    }
+  });
+
+  it('captures nothing for an order the guard did not create and bind, or when its log cannot be read, without calling PayPal', async () => {
+    const lookups = [{ boundOrderCustomer: async () => undefined }, { boundOrderCustomer: async () => Promise.reject(new Error('disk I/O error')) }];
+    for (const audit of lookups) {
+      const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => order('APPROVED', 'ana@example.com'), [`POST ${PATH}/capture`]: captured });
+      await expect(completeSalesOrder(ORDER, audit, { fetch, token })).rejects.toThrow(/not an order the payment guard created for a customer|could not be checked/);
+      expect(sent).toEqual([]);
+    }
+  });
+
+  it('captures nothing when PayPal names another customer than the guard bound, in any purchase unit, or carries more than one', async () => {
+    const unit = (customId: string) => ({ reference_id: customId, custom_id: customId, amount: { currency_code: 'USD', value: '99.98' } });
+    const answers = [
+      { id: ORDER, status: 'APPROVED', purchase_units: [unit('ben@example.com')] },
+      { id: ORDER, status: 'APPROVED', purchase_units: [unit('ana@example.com'), unit('ben@example.com')] },
+      { id: ORDER, status: 'APPROVED', purchase_units: [unit('ana@example.com'), unit('ana@example.com')] },
+    ];
+    for (const json of answers) {
+      const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => ({ json }), [`POST ${PATH}/capture`]: captured });
+      await expect(completeSalesOrder(ORDER, records, { fetch, token })).rejects.toThrow(/not bound to the customer the payment guard created it for/);
       expect(sent.map((s) => s.method)).toEqual(['GET']);
     }
   });
@@ -81,7 +106,7 @@ describe('completeSalesOrder', () => {
   it('refuses an id that is not a plain PayPal order id without calling PayPal', async () => {
     const { fetch, sent } = fakePayPal({});
     for (const id of ['', '../v1/payments', `${ORDER}/capture`]) {
-      await expect(completeSalesOrder(id, { fetch, token })).rejects.toThrow(/not a PayPal order id/);
+      await expect(completeSalesOrder(id, records, { fetch, token })).rejects.toThrow(/not a PayPal order id/);
     }
     expect(sent).toEqual([]);
   });

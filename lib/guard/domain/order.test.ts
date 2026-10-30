@@ -69,6 +69,21 @@ describe('parseOrderDraft', () => {
     ];
     for (const args of malformed) expect(parseOrderDraft(args)).toHaveProperty('invalid');
   });
+
+  it('refuses a JSON null in any amount, as the toolkit does: its defaults fill in only a missing value', () => {
+    const mugs = { name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98 };
+    const nulls = [
+      orderArgs({ items: [{ ...mugs, quantity: null }] }),
+      orderArgs({ items: [{ ...mugs, taxPercent: null }] }),
+      orderArgs({ items: [{ ...mugs, itemCost: null }] }),
+      orderArgs({ items: [{ ...mugs, itemTotal: null }] }),
+      orderArgs({ discount: null }),
+      orderArgs({ shippingCost: null }),
+    ];
+    for (const args of nulls) expect(parseOrderDraft(args)).toHaveProperty('invalid');
+    // A missing one still takes the toolkit's default.
+    expect(parseOrderDraft(orderArgs({ discount: undefined, shippingCost: undefined }))).toHaveProperty('draft');
+  });
 });
 
 describe('evaluateOrderCreation', () => {

@@ -83,6 +83,9 @@ export interface AuditLog {
   get(id: string): Promise<AuditRow | undefined>;
   // Whether a later entry already decides this held entry.
   isResolved(id: string): Promise<boolean>;
+  // The customer an executed create_order was bound to (its audit detail is boundOrderDetail), or
+  // undefined when the guard created and bound no such order. The shop captures only those.
+  boundOrderCustomer(orderId: string): Promise<string | undefined>;
 }
 
 // Tells a person that a held entry waits for their decision. The guard doesn't wait for it, and a

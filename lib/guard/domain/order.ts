@@ -12,6 +12,10 @@ import { format, type Decision, type Violation } from './policy';
 // request path, so nothing else may reach it.
 export const ORDER_ID = /^[A-Z0-9]{17,32}$/;
 
+// The audit detail of a create_order the guard executed and bound to the task customer. The shop's
+// capture looks for it, so it captures only orders the guard itself created for that customer.
+export const boundOrderDetail = (orderId: string) => `Order ${orderId} bound to the task customer`;
+
 // One line of create_order, in exact minor units. `taxBasisPoints` is taxPercent x 100.
 export type OrderLine = { name: string; quantity: number; itemCostMinor: number; taxBasisPoints: number; itemTotalMinor: number };
 
@@ -52,6 +56,10 @@ const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 const ZERO = BigInt(0);
 const HUNDRED = BigInt(100);
 
+// The toolkit's zod defaults apply to a missing value only: a JSON null is not a number to it, so
+// it rejects the call. The guard rejects it the same way, before it counts the conversation's order.
+const orDefault = (value: unknown, fallback: number) => (value === undefined ? fallback : value);
+
 // create_order's arguments as the toolkit 1.11 reads them, with its defaults: quantity 1,
 // taxPercent 0, discount 0, shippingCost 0. returnUrl and cancelUrl are kept as given; the toolkit
 // fills missing ones with example.com pages, which the policy refuses.
@@ -68,11 +76,11 @@ export function parseOrderDraft(args: Record<string, unknown>): { draft: OrderDr
     if (!isRecord(item) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > MAX_NAME) {
       return { invalid: `items[${i}].name must be 1 to ${MAX_NAME} characters` };
     }
-    const quantity = item.quantity ?? 1;
+    const quantity = orDefault(item.quantity, 1);
     if (typeof quantity !== 'number' || !Number.isSafeInteger(quantity) || quantity < 1) return { invalid: `items[${i}].quantity must be a whole number over 0` };
     const cost = hundredths(item.itemCost);
     const total = hundredths(item.itemTotal);
-    const taxBasisPoints = hundredths(item.taxPercent ?? 0);
+    const taxBasisPoints = hundredths(orDefault(item.taxPercent, 0));
     if (cost === undefined) return { invalid: `items[${i}].itemCost must be a non-negative amount with at most 2 decimals` };
     if (total === undefined) return { invalid: `items[${i}].itemTotal must be a non-negative amount with at most 2 decimals` };
     if (taxBasisPoints === undefined) return { invalid: `items[${i}].taxPercent must be a non-negative number with at most 2 decimals` };
@@ -84,9 +92,9 @@ export function parseOrderDraft(args: Record<string, unknown>): { draft: OrderDr
     lines.push({ name: item.name, quantity, itemCostMinor: Number(cost), taxBasisPoints: Number(taxBasisPoints), itemTotalMinor: Number(total) });
   }
 
-  const discount = hundredths(args.discount ?? 0);
+  const discount = hundredths(orDefault(args.discount, 0));
   if (discount === undefined) return { invalid: 'discount must be a non-negative amount with at most 2 decimals' };
-  const shipping = hundredths(args.shippingCost ?? 0);
+  const shipping = hundredths(orDefault(args.shippingCost, 0));
   if (shipping === undefined) return { invalid: 'shippingCost must be a non-negative amount with at most 2 decimals' };
 
   const total = subtotal + tax + shipping - discount;

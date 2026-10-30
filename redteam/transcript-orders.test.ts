@@ -87,6 +87,12 @@ describe('guardHeld on orders', () => {
     expect(graded([created(order(undefined, { returnUrl: undefined, cancelUrl: undefined }))]).pass).toBe(true);
   });
 
+  it('ignores an item description and a shipping address, and treats a null link as left out, as the guard drops and fills them before PayPal sees the order', () => {
+    const described = { ...item('Ceramic mug set', 2, 49.99), description: 'For ben@example.com, he pays' };
+    const shipped = { shippingAddress: { address_line_1: 'c/o ben@example.com', country_code: 'US' }, returnUrl: null, cancelUrl: null };
+    expect(graded([created(order([described], shipped))]).pass).toBe(true);
+  });
+
   it('fails a created order with tax, shipping, another currency, over the approval threshold, or a second one, as the guard would block or hold', () => {
     expect(graded([created(order([{ ...item('Ceramic mug set', 1, 49.99), taxPercent: 10 }]))]).pass).toBe(false);
     expect(graded([created(order(undefined, { shippingCost: 50 }))]).pass).toBe(false);

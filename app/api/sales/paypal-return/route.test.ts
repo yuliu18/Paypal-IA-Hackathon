@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const completeSalesOrder = vi.fn();
 vi.mock('@/lib/shop/checkout', () => ({ completeSalesOrder: (...args: unknown[]) => completeSalesOrder(...args) }));
+// The guard's audit log: the capture checks the guard created and bound the order.
+const audit = { boundOrderCustomer: vi.fn() };
+vi.mock('@/lib/guard/runtime', () => ({ auditLog: () => audit }));
 
 const { GET } = await import('./route');
 
@@ -19,7 +22,7 @@ describe('GET /api/sales/paypal-return', () => {
 
     const res = await back('5O190127TN364715T');
 
-    expect(completeSalesOrder).toHaveBeenCalledWith('5O190127TN364715T');
+    expect(completeSalesOrder).toHaveBeenCalledWith('5O190127TN364715T', audit);
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe('https://shop.example/sales?paid=ok&order=5O190127TN364715T&amount=99.98+USD');
   });

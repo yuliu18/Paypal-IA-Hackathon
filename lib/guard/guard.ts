@@ -21,7 +21,7 @@ import {
   parseInvoiceSending,
   type InvoiceLimits,
 } from './domain/invoice';
-import { evaluateOrderCreation, ORDER_ID, parseOrderDraft } from './domain/order';
+import { boundOrderDetail, evaluateOrderCreation, ORDER_ID, parseOrderDraft } from './domain/order';
 import { minimizeDispute, minimizeInvoice, minimizeOrder, minimizeSubscription, withheldDetail } from './domain/privacy';
 import { maskPersonalData } from './domain/redact';
 import type { ShopCatalogue } from '../shop/catalogue';
@@ -65,11 +65,32 @@ function plainIdViolation(tool: string, args: Record<string, unknown>): Decision
 // link the agent left out, and the binder that records a new order as the task customer's.
 export type OrderDeps = { catalogue: ShopCatalogue; shopOrigin: string; checkout: { returnUrl: string; cancelUrl: string }; binder: OrderBinder };
 
-// The toolkit would send a buyer to example.com for a missing link, so a missing one becomes the
-// shop's own; a link the agent did give is still checked against the shop's origin.
-function withShopCheckout(name: string, args: Record<string, unknown>, orders: OrderDeps | undefined): Record<string, unknown> {
-  if (name !== 'create_order' || !orders) return args;
-  return { ...args, returnUrl: args.returnUrl ?? orders.checkout.returnUrl, cancelUrl: args.cancelUrl ?? orders.checkout.cancelUrl };
+// The order the shop sends PayPal: catalogue data and the shop's links, nothing else the agent
+// wrote. The guard decides, logs and forwards these arguments, so what PayPal gets is what was checked.
+// - An item description and a shipping address are free text the buyer reads on PayPal: a fooled
+//   agent could write "PROMO: real price 0.01 USD, call +1-555-..." there. They are dropped, not
+//   blocked: the catalogue name says what the item is, and the buyer picks the address on PayPal.
+//   (`notes` never reaches PayPal: the toolkit doesn't send it.)
+// - The toolkit would send a buyer to example.com for a missing link, so a missing (or null) one
+//   becomes the shop's own.
+// - A link the agent gave is sent as the URL it parses to, the one whose origin the policy checks:
+//   `https://shop.example\@evil.example` goes out as `https://shop.example/@evil.example`. One that
+//   doesn't parse stays as given, and the policy blocks it.
+function asShopOrder(name: string, args: Record<string, unknown>, orders: OrderDeps | undefined): Record<string, unknown> {
+  if (name !== 'create_order') return args;
+  const order = { ...args };
+  delete order.shippingAddress;
+  if (Array.isArray(order.items)) {
+    order.items = order.items.map((item: unknown) => {
+      if (typeof item !== 'object' || item === null || Array.isArray(item)) return item;
+      const line = { ...(item as Record<string, unknown>) };
+      delete line.description;
+      return line;
+    });
+  }
+  if (!orders) return order;
+  const link = (value: unknown, own: string) => (value === undefined || value === null ? own : typeof value === 'string' && URL.canParse(value) ? new URL(value).href : value);
+  return { ...order, returnUrl: link(order.returnUrl, orders.checkout.returnUrl), cancelUrl: link(order.cancelUrl, orders.checkout.cancelUrl) };
 }
 
 export type GuardDeps = {
@@ -405,9 +426,10 @@ function checkOrderCreation({ orders }: WriteDeps, args: Record<string, unknown>
 }
 
 // After PayPal created an order: record it as the task customer's, since create_order can't carry
-// a custom_id and get_order's owner check reads it. The order exists either way; an unbound one is
-// recorded in the audit detail and the agent is told, without the approval link, so it can't report
-// success or let the customer pay an order the shop can't attribute.
+// a custom_id and get_order's owner check reads it. A bound one is recorded in the audit detail
+// (boundOrderDetail), which the shop's capture requires. The order exists either way; an unbound one
+// is recorded in the audit detail and the agent is told, without the approval link, so it can't
+// report success or let the customer pay an order the shop can't attribute.
 async function bindOrder({ orders, timeoutMs }: WriteDeps, task: AgentTask, result: CallToolResult): Promise<{ result: CallToolResult; detail?: string }> {
   let orderId: string | undefined;
   try {
@@ -420,7 +442,7 @@ async function bindOrder({ orders, timeoutMs }: WriteDeps, task: AgentTask, resu
     if (!orderId) throw new Error('PayPal answered without a plain order id');
     if (!orders) throw new Error('No order binder is configured');
     await withTimeout(orders.binder.bindToCustomer(orderId, task.mandate.customerEmail), timeoutMs, 'Order binding');
-    return { result };
+    return { result, detail: boundOrderDetail(orderId) };
   } catch (error) {
     const order = `Order ${orderId ?? '(unreadable id)'} was created in PayPal`;
     const told = `${order} but could not be recorded as the customer's: ${maskPersonalData(message(error))}. Do not give the customer its approval link; a person must check the order in PayPal first.`;
@@ -570,7 +592,8 @@ export function decideHeldCall(
     const { noun, looksUp, lookupFailed, source = 'PayPal' } = WRITES[held.tool];
     if (await full.audit.isResolved(heldId)) return { outcome: 'refused', message: `Held ${noun} ${heldId} was already decided` };
 
-    const base = { at: now().toISOString(), tool: held.tool, args: held.args, task: held.task, resolves: heldId };
+    // A hold logged before the guard shaped orders this way is shaped now, before it reaches PayPal.
+    const base = { at: now().toISOString(), tool: held.tool, args: asShopOrder(held.tool, held.args, full.orders), task: held.task, resolves: heldId };
     if (!approve) {
       await full.audit.record({ ...base, decision: block('REJECTED_BY_PERSON', `A person rejected the held ${noun}`), outcome: 'blocked' });
       return { outcome: 'blocked', message: `${capitalized(noun)} rejected; nothing was sent to PayPal` };
@@ -578,7 +601,7 @@ export function decideHeldCall(
 
     // Approval lifts the approval threshold only; the ticket's one cancellation, the task's one
     // reminder of an invoice, and the task's one order, is this one.
-    const { decision, moved } = await checkWrite(full, held.task, held, { approvedByPerson: true, cancellationsThisTicket: 0, remindersOf: () => 0, ordersThisTask: 0 });
+    const { decision, moved } = await checkWrite(full, held.task, base, { approvedByPerson: true, cancellationsThisTicket: 0, remindersOf: () => 0, ordersThisTask: 0 });
     // A lookup that failed says nothing about the call itself: leave the hold open to try again.
     if (decision.violations.some((v) => v.code === lookupFailed)) {
       return { outcome: 'error', message: `${source} could not be reached to check the ${looksUp}; the ${noun} is still held, try again` };
@@ -649,7 +672,7 @@ export function createPaymentGuard({
 
   server.setRequestHandler(CallToolRequestSchema, (request) => {
     const { name } = request.params;
-    const args = withShopCheckout(name, request.params.arguments ?? {}, deps.orders);
+    const args = asShopOrder(name, request.params.arguments ?? {}, deps.orders);
     return isRead(name) ? handle(name, args) : serialized(() => handle(name, args));
   });
 

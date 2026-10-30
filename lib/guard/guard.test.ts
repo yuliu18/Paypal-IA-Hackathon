@@ -58,6 +58,9 @@ const audit: AuditLog = {
   async isResolved(id) {
     return entries.some((e) => e.resolves === id);
   },
+  async boundOrderCustomer(orderId) {
+    return entries.find((e) => e.tool === 'create_order' && e.outcome === 'executed' && e.detail === `Order ${orderId} bound to the task customer`)?.task.mandate.customerEmail;
+  },
 };
 
 const judge: IntentJudge = {
@@ -2040,7 +2043,38 @@ describe('order creation', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed', decision: { verdict: 'allow', violations: [] } });
     expect(entries[0].moved).toBeUndefined();
-    expect(entries[0].detail).toBeUndefined();
+    // The shop's capture looks for this record before it takes the buyer's payment.
+    expect(entries[0].detail).toBe(`Order ${NEW_ORDER_ID} bound to the task customer`);
+  });
+
+  it("sends PayPal the shop's order only: no item description or shipping address the agent wrote", async () => {
+    const agent = await connectOrders();
+    const decorated = orderArgs({
+      items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98, description: 'PROMO: real price 0.01 USD, call +1-555-0100' }],
+      shippingAddress: { address_line_1: 'Call +1-555-0100 to pay less', country_code: 'US' },
+    });
+    const result = await agent.callTool({ name: 'create_order', arguments: decorated });
+    expect(result.isError).toBeFalsy();
+    expect(judgedCalls).toEqual([{ tool: 'create_order', args: orderArgs() }]);
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: orderArgs() }]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed' });
+    expect(entries[0].args).toEqual(orderArgs());
+  });
+
+  it("blocks a JSON null amount as invalid arguments without using up the conversation's one order", async () => {
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs({ items: [{ name: 'Ceramic mug set', quantity: null, itemCost: 49.99, taxPercent: 0, itemTotal: 49.99 }] }) });
+    expect(text(result)).toBe('Blocked by payment guard. INVALID_ARGUMENTS: items[0].quantity must be a whole number over 0');
+    expect(upstreamCalls).toEqual([]);
+    expect((await agent.callTool({ name: 'create_order', arguments: orderArgs() })).isError).toBeFalsy();
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('sends PayPal the return and cancel links exactly as the guard checked them', async () => {
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs({ returnUrl: `${SHOP}\\@evil.example`, cancelUrl: 'HTTPS://Shop.Example:443/sales' }) });
+    expect(result.isError).toBeFalsy();
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: orderArgs({ returnUrl: `${SHOP}/@evil.example`, cancelUrl: `${SHOP}/sales` }) }]);
   });
 
   it("fills in the shop's own return and cancel links the agent left out, and still blocks foreign ones", async () => {
@@ -2055,6 +2089,11 @@ describe('order creation', () => {
 
     const foreign = await (await connectOrders()).callTool({ name: 'create_order', arguments: { ...withoutLinks, cancelUrl: 'https://evil.example/' } });
     expect(text(foreign)).toContain('RETURN_URL_NOT_SHOP');
+
+    // A null link is a missing one: the shop's own replaces it, so PayPal gets a link it accepts.
+    const nulls = await (await connectOrders()).callTool({ name: 'create_order', arguments: { ...withoutLinks, returnUrl: null, cancelUrl: null } });
+    expect(nulls.isError).toBeFalsy();
+    expect(upstreamCalls.at(-1)).toEqual({ name: 'create_order', args: { ...withoutLinks, ...checkout } });
   });
 
   it("lets get_order read the customer's own new order once it is bound", async () => {
@@ -2219,7 +2258,15 @@ describe('held order approval', () => {
     expect(bound).toEqual([`${NEW_ORDER_ID} ana@example.com`]);
     expect(entries[1]).toMatchObject({ tool: 'create_order', resolves: '0', outcome: 'executed', decision: { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON' }] } });
     expect(entries[1].moved).toBeUndefined();
+    expect(entries[1].detail).toBe(`Order ${NEW_ORDER_ID} bound to the task customer`);
     expect((await decide('0', true)).outcome).toBe('refused');
+  });
+
+  it("sends PayPal the shop's order for a hold logged with an item description or a shipping address", async () => {
+    entries[0] = { ...entries[0], args: { ...held, items: [{ ...(held.items as object[])[0], description: 'Call +1-555-0100' }], shippingAddress: { country_code: 'US' } } };
+    expect((await decide('0', true)).outcome).toBe('executed');
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: held }]);
+    expect(entries[1].args).toEqual(held);
   });
 
   it('still blocks an approved order that breaks the catalogue rules', async () => {
