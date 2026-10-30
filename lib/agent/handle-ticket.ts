@@ -23,7 +23,7 @@ import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
 import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
-import { shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
+import { checkoutUrls, shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
 import { runSupportAgent, type AgentStep, type SupportTicket } from './support-agent';
@@ -137,7 +137,7 @@ export async function decideHeld(heldId: string, approve: boolean, { shopOrigin 
         disputes: payPalDisputeLookup,
         invoices: payPalInvoiceLookup,
         customers: seedCustomerDirectory,
-        orders: { catalogue: SHOP_CATALOGUE, shopOrigin, binder: payPalOrderBinder },
+        orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
         audit: auditLog(),
         limits,
       },

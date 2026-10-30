@@ -11,7 +11,7 @@ import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
-import { shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
+import { checkoutUrls, shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
 import { loadSettings } from '@/lib/settings/settings';
 import { heldNotifier, llmConfig, payPalToolkit, type AgentMode, type Redactions } from './handle-ticket';
 import { withClient } from './in-memory-mcp';
@@ -60,7 +60,7 @@ export async function handleSalesChat(
       task: { mandate: { customerEmail: task.customerEmail }, instructions: SALES_POLICY, untrustedInput: task.message },
       judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
       captures: payPalCaptureLookup,
-      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, binder: payPalOrderBinder },
+      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
       audit: auditLog(),
       limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
       notifier: heldNotifier(shop),

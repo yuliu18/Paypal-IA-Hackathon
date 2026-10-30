@@ -1,3 +1,4 @@
+import { checkoutUrls } from '@/lib/shop/checkout';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { payPalDisputeLookup } from '@/lib/guard/adapters/paypal-dispute-lookup';
@@ -67,6 +68,6 @@ describe('decideHeld', () => {
 
     expect(toolkitActions.mock.calls[0][0]).toMatchObject({ orders: { get: true, create: true } });
     expect(toolkitActions.mock.calls[0][0].orders).not.toHaveProperty('capture');
-    expect(deps().orders).toEqual({ catalogue: SHOP_CATALOGUE, shopOrigin: 'https://shop.example', binder: payPalOrderBinder });
+    expect(deps().orders).toEqual({ catalogue: SHOP_CATALOGUE, shopOrigin: 'https://shop.example', checkout: checkoutUrls('https://shop.example'), binder: payPalOrderBinder });
   });
 });

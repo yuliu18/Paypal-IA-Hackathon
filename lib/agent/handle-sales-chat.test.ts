@@ -1,3 +1,4 @@
+import { checkoutUrls } from '@/lib/shop/checkout';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
 import { payPalOrderBinder } from '@/lib/guard/adapters/paypal-order-binder';
@@ -60,7 +61,7 @@ describe('handleSalesChat', () => {
       task: { mandate: { customerEmail: 'ana@example.com' }, instructions: SALES_POLICY, untrustedInput: chat.message },
       judge: 'JUDGE',
       captures: payPalCaptureLookup,
-      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, binder: payPalOrderBinder },
+      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
       audit: 'AUDIT',
       limits: shop.limits,
       notifier: 'NOTIFIER',

@@ -61,9 +61,16 @@ function plainIdViolation(tool: string, args: Record<string, unknown>): Decision
 }
 
 // What deciding a sales agent's create_order needs: the priced catalogue, the shop's own origin
-// (the only place PayPal may send the buyer back to) and the binder that records a new order as
-// the task customer's.
-export type OrderDeps = { catalogue: ShopCatalogue; shopOrigin: string; binder: OrderBinder };
+// (the only place PayPal may send the buyer back to), the shop's checkout links that fill in a
+// link the agent left out, and the binder that records a new order as the task customer's.
+export type OrderDeps = { catalogue: ShopCatalogue; shopOrigin: string; checkout: { returnUrl: string; cancelUrl: string }; binder: OrderBinder };
+
+// The toolkit would send a buyer to example.com for a missing link, so a missing one becomes the
+// shop's own; a link the agent did give is still checked against the shop's origin.
+function withShopCheckout(name: string, args: Record<string, unknown>, orders: OrderDeps | undefined): Record<string, unknown> {
+  if (name !== 'create_order' || !orders) return args;
+  return { ...args, returnUrl: args.returnUrl ?? orders.checkout.returnUrl, cancelUrl: args.cancelUrl ?? orders.checkout.cancelUrl };
+}
 
 export type GuardDeps = {
   upstream: Client;
@@ -642,7 +649,7 @@ export function createPaymentGuard({
 
   server.setRequestHandler(CallToolRequestSchema, (request) => {
     const { name } = request.params;
-    const args = request.params.arguments ?? {};
+    const args = withShopCheckout(name, request.params.arguments ?? {}, deps.orders);
     return isRead(name) ? handle(name, args) : serialized(() => handle(name, args));
   });
 

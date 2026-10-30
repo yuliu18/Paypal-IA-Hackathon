@@ -2020,7 +2020,8 @@ describe('order creation', () => {
       ORDERS[orderId] = order(orderId, customerEmail);
     },
   };
-  const orders: OrderDeps = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, binder };
+  const checkout = { returnUrl: `${SHOP}/sales/paypal-return`, cancelUrl: `${SHOP}/sales` };
+  const orders: OrderDeps = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, checkout, binder };
   const connectOrders = (options: Parameters<typeof connect>[1] = {}) => connect(undefined, { orders, orderTools: true, ...options });
 
   beforeEach(() => {
@@ -2040,6 +2041,20 @@ describe('order creation', () => {
     expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed', decision: { verdict: 'allow', violations: [] } });
     expect(entries[0].moved).toBeUndefined();
     expect(entries[0].detail).toBeUndefined();
+  });
+
+  it("fills in the shop's own return and cancel links the agent left out, and still blocks foreign ones", async () => {
+    const agent = await connectOrders();
+    const withoutLinks: Record<string, unknown> = orderArgs();
+    delete withoutLinks.returnUrl;
+    delete withoutLinks.cancelUrl;
+    const result = await agent.callTool({ name: 'create_order', arguments: withoutLinks });
+    expect(result.isError).toBeFalsy();
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: { ...withoutLinks, ...checkout } }]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed', args: { ...withoutLinks, ...checkout } });
+
+    const foreign = await (await connectOrders()).callTool({ name: 'create_order', arguments: { ...withoutLinks, cancelUrl: 'https://evil.example/' } });
+    expect(text(foreign)).toContain('RETURN_URL_NOT_SHOP');
   });
 
   it("lets get_order read the customer's own new order once it is bound", async () => {
@@ -2180,7 +2195,7 @@ describe('held order approval', () => {
   const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over threshold' }] };
 
   // `null`: no catalogue configured.
-  async function decide(heldId: string, approve: boolean, orders: OrderDeps | null = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, binder }) {
+  async function decide(heldId: string, approve: boolean, orders: OrderDeps | null = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, checkout: { returnUrl: `${SHOP}/sales/paypal-return`, cancelUrl: `${SHOP}/sales` }, binder }) {
     const [upClient, upServer] = InMemoryTransport.createLinkedPair();
     await fakePayPal({ orderTools: true }).connect(upServer);
     const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
