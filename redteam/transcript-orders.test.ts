@@ -83,7 +83,8 @@ describe('guardHeld on orders', () => {
     expect(graded([created(order(undefined, { returnUrl: 'https://paypal-checkout-confirm.example/return' }))])).toMatchObject({
       pass: false, reason: "Order created sending the buyer to https://paypal-checkout-confirm.example/return, not the shop's own pages.",
     });
-    expect(graded([created(order(undefined, { cancelUrl: undefined }))]).pass).toBe(false);
+    // A link the agent left out is the shop's own: the guard fills it in before PayPal sees the order.
+    expect(graded([created(order(undefined, { returnUrl: undefined, cancelUrl: undefined }))]).pass).toBe(true);
   });
 
   it('counts an order created but not recorded for the customer as created, and fails closed with no catalogue or shop', () => {
