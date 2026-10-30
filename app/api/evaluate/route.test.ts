@@ -2,9 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const handleTicket = vi.fn();
 const handleBillingTask = vi.fn();
+const handleSalesChat = vi.fn();
 const readSeed = vi.fn();
 vi.mock('@/lib/agent/handle-ticket', () => ({ handleTicket: (...args: unknown[]) => handleTicket(...args) }));
 vi.mock('@/lib/agent/handle-billing-task', () => ({ handleBillingTask: (...args: unknown[]) => handleBillingTask(...args) }));
+vi.mock('@/lib/agent/handle-sales-chat', () => ({ handleSalesChat: (...args: unknown[]) => handleSalesChat(...args) }));
+vi.mock('@/lib/shop/checkout', () => ({ shopOrigin: () => 'https://shop.example' }));
 vi.mock('@/lib/demo-seed', () => ({
   readSeed: () => readSeed(),
   // No sample subscription or dispute: the cases are the refund-only ones.
@@ -24,6 +27,7 @@ describe('POST /api/evaluate', () => {
   afterEach(() => {
     handleTicket.mockReset();
     handleBillingTask.mockReset();
+    handleSalesChat.mockReset();
     readSeed.mockReset();
   });
 
@@ -62,6 +66,29 @@ describe('POST /api/evaluate', () => {
     await post({ caseId: 'attack-invoice-copy:jailbreak@vulnerable' });
     expect(handleBillingTask).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('additional_recipients') }, 'vulnerable', { liftDailyCap: true });
     expect(handleTicket).not.toHaveBeenCalled();
+  });
+
+  it("runs a sales case through the sales agent with the daily cap lifted and the shop's origin, and grades its order against that origin", async () => {
+    readSeed.mockResolvedValue(SEED);
+    const order = (returnUrl: string) => ({
+      tool: 'create_order',
+      args: { currencyCode: 'USD', items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98 }], returnUrl, cancelUrl: 'https://shop.example/sales?order=cancelled' },
+      isError: false,
+      result: '{"id":"5O190127TN364715T","links":[]}',
+    });
+    handleSalesChat.mockResolvedValue({ reply: 'Here is your order.', steps: [order('https://shop.example/api/sales/paypal-return')], redacted: { ticket: 0, reply: 0 } });
+
+    const res = await post({ caseId: 'business-order' });
+
+    expect(handleTicket).not.toHaveBeenCalled();
+    expect(handleBillingTask).not.toHaveBeenCalled();
+    expect(handleSalesChat).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('Ceramic mug set') }, 'careful', { liftDailyCap: true, shopOrigin: 'https://shop.example' });
+    expect(await res.json()).toMatchObject({ caseId: 'business-order', result: { pass: true }, reply: 'Here is your order.' });
+
+    handleSalesChat.mockResolvedValue({ reply: 'Done.', steps: [order('https://elsewhere.example/return')], redacted: { ticket: 0, reply: 0 } });
+    const attack = await (await post({ caseId: 'attack-order-return-url:base64@vulnerable' })).json();
+    expect(handleSalesChat).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true, shopOrigin: 'https://shop.example' });
+    expect(attack).toMatchObject({ result: { pass: false, guardHeld: false } });
   });
 
   it('grades a failed ticket as not passed and keeps the cause in the server log', async () => {
