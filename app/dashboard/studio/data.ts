@@ -356,6 +356,8 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
       total('moneyInTotal', 'Money in', 'Credits on the PayPal ledger.', 'transactions.moneyIn', 'currencyFormat'),
       total('moneyOutTotal', 'Money out', 'Debits on the PayPal ledger, as positive amounts.', 'transactions.moneyOut', 'currencyFormat'),
       total('salesTotal', 'Sales', 'Payments customers made to the shop.', 'transactions.sales', 'currencyFormat'),
+      total('outstandingTotal', 'Outstanding', 'What customers still owe on sent invoices.', 'invoices.outstanding', 'currencyFormat'),
+      total('overdueTotal', 'Overdue', 'The part of it past the due date.', 'invoices.overdueAmount', 'currencyFormat'),
       ratio('blockRate', 'Block rate', 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
     ],
   };

@@ -49,9 +49,11 @@ const AXES = {
   categoryAxis: { line: { stroke: BASELINE, width: 1 }, tick: { enabled: false }, gridLine: { enabled: false }, label: axisLabel },
   valueAxis: { line: { stroke: BASELINE, width: 0 }, tick: { enabled: false }, gridLine: { enabled: true, style: { stroke: GRIDLINE, strokeWidth: 1 } }, label: axisLabel },
 };
-// Bars of a fixed thickness (px) where the categories are few, like actions or rules. Charts over
-// days keep Studio's automatic width: a fixed one would not fit a month and would scroll.
+// Bars of a fixed thickness (px) where the categories are few, like actions, rules, customers or a
+// handful of invoice dates: left automatic, Studio stretches a lone bar across the whole chart.
+// Charts over a month of days keep the automatic width: a fixed one would not fit and would scroll.
 const BAR = 16;
+const COLUMN = 28;
 const chartStyle = (barWidth?: number, { legend = true }: { legend?: boolean } = {}) => ({
   theme: {
     common: { legend: { enabled: legend, position: 'top-left' as const } },
@@ -380,9 +382,9 @@ const receivables: AgPageState = {
       type: 'column-chart-grouped',
       dataMapping: {
         categoryKey: [{ id: 'invoices.invoiceDate' }],
-        valueKey: [sum('invoices.outstanding'), sum('invoices.overdueAmount')],
+        valueKey: [{ id: 'outstandingTotal' }, { id: 'overdueTotal' }],
       },
-      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: chartStyle() },
+      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: chartStyle(COLUMN) },
     },
     aging: {
       type: 'column-chart-stacked',
@@ -392,7 +394,7 @@ const receivables: AgPageState = {
         legendKey: [{ id: 'invoices.status' }],
       },
       sort: [{ field: sum('invoices.total'), direction: 'desc' }],
-      format: { ...titled('Receivables by customer and status', 'Largest balance first'), style: chartStyle() },
+      format: { ...titled('Receivables by customer and status', 'Largest balance first'), style: chartStyle(COLUMN) },
     },
     'open-invoices': {
       type: 'grid',

@@ -86,3 +86,10 @@ body {
   --color-pp-danger-tint: var(--pp-danger-tint);
   --font-paypal: var(--pp-font);
 }
+
+/* AG Grid sets tabular figures on number cells; in this typeface they also widen the decimal
+   point (49 . 99), so number cells use the font's own figures like the rest of the app. */
+.ag-root-wrapper .ag-right-aligned-cell,
+.ag-root-wrapper .ag-right-aligned-header {
+  font-variant-numeric: normal;
+}
