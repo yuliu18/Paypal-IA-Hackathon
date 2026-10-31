@@ -137,9 +137,10 @@ const guard: AgPageState = {
       dataMapping: {
         // The decision's own date, not the shared calendar: calendar days without a decision would
         // show up as empty columns.
-        categoryKey: [{ id: 'guardDecisions.day' }],
+        categoryKey: [{ id: 'guardDecisions.dayText' }],
         valueKey: VERDICTS,
       },
+      sort: [{ field: { id: 'guardDecisions.dayText' }, direction: 'asc' }],
       format: {
         ...titled('Decisions per day', 'Each bar is one day of calls: green passed to PayPal, amber held for you, red stopped'),
         // Thin bars, one per day with space between, so neighbouring days never read as one bar.

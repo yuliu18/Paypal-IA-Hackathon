@@ -304,7 +304,15 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           ['blocked', 'Blocked', 'integerFormat'],
           ['withheld', 'Personal Data Withheld', 'integerFormat'],
           ['decidedBy', 'Decided By', 'textFormat'],
-        ]),
+        ]).concat({
+          // The decision's day as text (2026-10-22), for charts with one bar per day: Studio draws a
+          // date field on a time axis, which labels only some days; a text field is one labelled
+          // category per day, and this form sorts in date order.
+          id: 'dayText',
+          name: 'Day',
+          format: 'textFormat',
+          accessor: 'day',
+        }),
       },
       {
         id: 'guardViolations',

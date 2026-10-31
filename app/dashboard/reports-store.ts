@@ -30,7 +30,8 @@ export const BUILT_IN_ID = 'paypal-overview';
 // 3: redesign: "AI operations" cover and "Agent activity"; cash folded into "Revenue & cash".
 // 4: control room: the cover's money figures move to the header; live feed; taller charts.
 // 6: light dashboard: "Flow through the guard" cover, one fact per widget, one question per chart.
-const BUILT_IN_VERSION = 6;
+// 7: one labelled bar per day on "Decisions per day".
+const BUILT_IN_VERSION = 7;
 
 // Sidebar titles for the built-in report's pages, keyed by page id in initial-report.ts.
 const defaultPageTitles: Record<string, string> = {
