@@ -12,7 +12,7 @@ import { HeldQueue, type HeldCall } from './held-queue';
 
 const FULL_CHECK_MS = 60_000;
 
-export const metadata: Metadata = { title: 'Payment guard log' };
+export const metadata: Metadata = { title: 'Guard log' };
 
 // The black box checked on every visit: rows added since the last full check are re-hashed and
 // linked, and the whole chain at least once a minute (FULL_CHECK_MS).
@@ -32,13 +32,34 @@ function ChainStatus({ check }: { check: ChainCheck }) {
   return (
     <span
       title={how.filter(Boolean).join(' ')}
-      className="inline-flex cursor-help items-center gap-1.5 rounded-full bg-pp-success/10 px-3 py-1 text-sm font-semibold text-pp-success"
+      className="inline-flex cursor-help items-center gap-1.5 rounded-md border border-pp-success/40 bg-pp-success-tint px-3 py-1.5 text-sm font-semibold text-pp-success"
     >
       <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current" strokeWidth={2.2} aria-hidden>
         <path d="M5 12l4 4 10-10" />
       </svg>
-      Black box intact · {check.records} {check.records === 1 ? 'row' : 'rows'}
+      Black box intact, {check.records.toLocaleString('en-US')} {check.records === 1 ? 'row' : 'rows'}
     </span>
+  );
+}
+
+// What the guard did in the decisions shown, the same three verdicts as everywhere else.
+function Tally({ entries, passed, waiting, stopped }: { entries: number; passed: number; waiting: number; stopped: number }) {
+  const figures = [
+    { n: passed, label: 'passed to PayPal', dot: 'bg-pp-success' },
+    { n: waiting, label: waiting === 1 ? 'waits for you' : 'wait for you', dot: 'bg-pp-warning' },
+    { n: stopped, label: 'stopped', dot: 'bg-pp-danger' },
+  ];
+  return (
+    <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+      <p className="text-sm text-pp-muted">In the latest {entries.toLocaleString('en-US')} decisions</p>
+      {figures.map((f) => (
+        <p key={f.label} className="flex items-baseline gap-2">
+          <span className={`size-2.5 self-center rounded-full ${f.dot}`} aria-hidden />
+          <span className="text-2xl font-semibold">{f.n.toLocaleString('en-US')}</span>
+          <span className="text-sm text-pp-muted">{f.label}</span>
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -49,7 +70,7 @@ function DownloadLink({ format }: { format: 'csv' | 'json' }) {
       href={`/api/guard/export?format=${format}`}
       download
       title="Every decision of the guard, with who decided it. Emails and cards are masked."
-      className="rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight"
+      className="rounded-md border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-ink hover:border-pp-blue"
     >
       Download {format.toUpperCase()}
     </a>
@@ -102,10 +123,12 @@ export default async function GuardLogPage() {
       };
     });
 
+  const count = (outcome: string) => entries.filter((e) => !e.resolves && e.outcome === outcome).length;
+
   return (
     <EndpointPage
-      title="Payment guard log"
-      summary={`The latest ${entries.length} decisions of the payment guard, newest first. Blocked and held calls never reached PayPal.`}
+      title="Guard log"
+      summary="Every call your agents made to PayPal and what the guard did with it. Held and stopped calls never reached PayPal."
       aside={
         <div className="flex flex-wrap items-center gap-2">
           {chain.intact && <ChainStatus check={chain} />}
@@ -143,8 +166,11 @@ export default async function GuardLogPage() {
       ]}
     >
       {!chain.intact && <ChainStatus check={chain} />}
-      <HeldQueue calls={held} />
-      <GuardAssistant />
+      <Tally entries={entries.length} passed={count('executed')} waiting={held.length} stopped={count('blocked')} />
+      <div className="mt-8 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <HeldQueue calls={held} />
+        <GuardAssistant />
+      </div>
     </EndpointPage>
   );
 }

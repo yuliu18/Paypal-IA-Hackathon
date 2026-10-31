@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import type { ColDef } from 'ag-grid-community';
+import { PageHeader } from '../ui/page-header';
 import { DataGrid, type Row } from './data-grid';
 
 // The frame of a data page (the guard log): title, one line on what the rows are, an optional
-// status at the right of the title, then the rows in an AG Grid.
+// status at the right of the title, what goes between, then the rows in an AG Grid.
 export function EndpointPage({
   title,
   summary,
@@ -23,16 +24,12 @@ export function EndpointPage({
   children?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-semibold text-pp-navy">{title}</h1>
-          <p className="mt-1 text-sm text-pp-muted">{summary}</p>
-        </div>
-        {aside}
-      </div>
+    <main className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col px-6 py-8 font-paypal text-pp-ink md:px-10">
+      <PageHeader title={title} aside={aside}>
+        {summary}
+      </PageHeader>
       {children}
-      <div className="mt-5 flex min-h-0 flex-1 flex-col">
+      <div className="mt-8 flex min-h-[28rem] flex-1 flex-col">
         <DataGrid rows={rows} columns={columns} />
       </div>
     </main>

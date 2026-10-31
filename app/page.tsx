@@ -109,7 +109,7 @@ export default async function Overview() {
                   <div className="min-w-0">
                     <p className="truncate text-[15px]">
                       <span className="font-semibold">{call.action}</span>
-                      {call.amount && <span className="tabular-nums"> of {call.amount}</span>}
+                      {call.amount && <span> of {call.amount}</span>}
                       <span className="text-pp-muted"> for {call.customer}</span>
                     </p>
                     <p className="mt-0.5 text-sm text-pp-muted">
@@ -156,7 +156,7 @@ export default async function Overview() {
         </div>
         <div>
           <h2 className="text-xl font-semibold">Your rules for {business.name}</h2>
-          <dl className="mt-3 divide-y divide-pp-gridline border-y border-pp-gridline text-[15px] tabular-nums">
+          <dl className="mt-3 divide-y divide-pp-gridline border-y border-pp-gridline text-[15px]">
             <div className="flex justify-between gap-6 py-2.5">
               <dt className="text-pp-muted">Passes on its own</dt>
               <dd className="font-semibold">up to {format(limits.approvalThreshold)}</dd>

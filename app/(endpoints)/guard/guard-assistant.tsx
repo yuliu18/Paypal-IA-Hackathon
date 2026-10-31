@@ -6,6 +6,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { ASSISTANT_MAX_QUESTION } from '@/lib/guard/assistant';
+import { Spinner } from '../../ui/desk';
 
 const SUGGESTED = ['Why was the last refund blocked?', 'Summarise today', 'What is waiting for me?', 'Which customers were stopped most?'];
 
@@ -42,8 +43,8 @@ export function GuardAssistant() {
   }
 
   return (
-    <section className="mt-5 rounded-lg border border-pp-border bg-pp-surface px-5 py-4">
-      <h2 className="text-lg font-semibold text-pp-navy">Guard assistant</h2>
+    <section className="rounded-lg border border-pp-border bg-pp-surface px-5 py-4">
+      <h2 className="text-lg font-semibold">Ask about these decisions</h2>
       <p className="mt-1 text-sm text-pp-muted">
         Ask about the guard&apos;s decisions. It reads the newest entries of the log, masked and without the tickets&apos; text, and can only explain:
         it can&apos;t approve, reject or change rules.
@@ -54,7 +55,7 @@ export function GuardAssistant() {
             key={suggestion}
             type="button"
             onClick={() => setQuestion(suggestion)}
-            className="rounded-full border border-pp-border px-3 py-1 text-xs font-semibold text-pp-blue hover:bg-pp-highlight"
+            className="rounded-md border border-pp-border px-2.5 py-1 text-left text-xs font-semibold text-pp-blue hover:border-pp-blue"
           >
             {suggestion}
           </button>
@@ -67,13 +68,14 @@ export function GuardAssistant() {
           maxLength={ASSISTANT_MAX_QUESTION}
           placeholder="Ask about the guard's decisions"
           aria-label="Question for the guard assistant"
-          className="min-w-0 flex-1 rounded border border-pp-border px-3 py-1.5 text-sm"
+          className="min-w-0 flex-1 rounded-md border border-pp-border px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
           disabled={pending || !question.trim()}
-          className="rounded bg-pp-blue px-4 py-1.5 text-sm font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-md bg-pp-blue px-4 py-1.5 text-sm font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60"
         >
+          {pending && <Spinner />}
           {pending ? 'Thinking…' : 'Ask'}
         </button>
       </form>
