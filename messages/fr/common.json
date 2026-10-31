@@ -1,0 +1,10 @@
+{
+  "appDescription": "Un pare-feu entre les agents IA d'une boutique et son compte PayPal : chaque appel de paiement est vérifié, retenu pour une personne ou bloqué.",
+  "on": "Activé",
+  "off": "Désactivé",
+  "verdicts": {
+    "passed": "Acceptée",
+    "held": "Retenue",
+    "stopped": "Bloquée"
+  }
+}
