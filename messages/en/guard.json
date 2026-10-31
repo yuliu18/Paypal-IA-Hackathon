@@ -1,0 +1,94 @@
+{
+  "title": "Guard log",
+  "summary": "Every call your agents made to PayPal and what the guard did with it. Held and stopped calls never reached PayPal.",
+  "chain": {
+    "tampered": "<strong>Black box tampered:</strong> row #{row} {reason}. Entries from there on cannot be trusted.",
+    "intact": "Black box intact, {count, plural, one {# row} other {# rows}}",
+    "howChain": "Every row carries the hash of the one before it, so an edited, reordered or deleted row breaks the chain.",
+    "howCheck": "New rows are checked on every visit, older ones in full at least once a minute.",
+    "howHead": "A log rewritten from scratch would also chain: keep a copy of the head {head}… elsewhere to catch that."
+  },
+  "tally": {
+    "latest": "In the latest {count, number} decisions",
+    "figure": "{n, number}",
+    "passed": "passed to PayPal",
+    "waiting": "{count, plural, one {waits for you} other {wait for you}}",
+    "stopped": "stopped"
+  },
+  "download": {
+    "label": "Download {format}",
+    "title": "Every decision of the guard, with who decided it. Emails and cards are masked."
+  },
+  "amount": {
+    "unreadable": "Unreadable amount",
+    "fullRemaining": "Full remaining amount"
+  },
+  "columns": {
+    "id": "#",
+    "at": "Time",
+    "tool": "Tool",
+    "outcome": "Outcome",
+    "verdict": "Verdict",
+    "amount": "Amount",
+    "customer": "Ticket customer",
+    "reasons": "Reasons",
+    "args": "Arguments",
+    "detail": "Detail",
+    "decides": "Decides held entry"
+  },
+  "grid": {
+    "search": "Search all columns…",
+    "searchLabel": "Search all columns"
+  },
+  "loading": "Loading PayPal data…",
+  "error": {
+    "title": "We couldn't load this PayPal data",
+    "detail": "Check the API credentials in <code>{file}</code>, and that the sandbox app has the features this endpoint needs.",
+    "retry": "Try again"
+  },
+  "held": {
+    "title": "Waiting for your approval",
+    "running": "Running it through the guard…",
+    "count": "{count, number} held",
+    "intro": "Approving runs the call through the guard’s checks again before PayPal sees it.",
+    "empty": "Nothing is held right now.",
+    "showFirst": "Show the first {count}",
+    "showAll": "Show all {count}",
+    "heading": "<strong>{action}</strong>{hasAmount, select, yes { of {amount}} other {}}<muted> for {customer}</muted>",
+    "why": "Why",
+    "approve": "Approve",
+    "reject": "Reject",
+    "kinds": {
+      "refund": "Refund",
+      "cancellation": "Cancel subscription",
+      "dispute": "Accept dispute claim",
+      "invoice": "Create invoice",
+      "order": "Create order",
+      "invoiceSending": "Send invoice",
+      "invoiceReminder": "Send invoice reminder"
+    },
+    "reasons": {
+      "approvalRequired": "Over the approval limit",
+      "intentUncertain": "AI judge unsure",
+      "intentJudgeUnavailable": "AI judge unavailable"
+    },
+    "invalidRequest": "Invalid decision request",
+    "failed": "The decision could not be processed; nothing was recorded."
+  },
+  "assistant": {
+    "title": "Ask about these decisions",
+    "intro": "Ask about the guard's decisions. It reads the newest entries of the log, masked and without the tickets' text, and can only explain: it can't approve, reject or change rules.",
+    "suggestions": {
+      "lastRefund": "Why was the last refund blocked?",
+      "today": "Summarise today",
+      "waiting": "What is waiting for me?",
+      "stoppedCustomers": "Which customers were stopped most?"
+    },
+    "placeholder": "Ask about the guard's decisions",
+    "inputLabel": "Question for the guard assistant",
+    "thinking": "Thinking…",
+    "ask": "Ask",
+    "failed": "The guard assistant failed.",
+    "unreachable": "The guard assistant could not be reached."
+  }
+}

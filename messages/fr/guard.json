@@ -1,0 +1,94 @@
+{
+  "title": "Journal du guard",
+  "summary": "Chaque appel de vos agents à PayPal et ce que le guard en a fait. Les appels retenus et bloqués ne sont jamais parvenus à PayPal.",
+  "chain": {
+    "tampered": "<strong>Boîte noire altérée :</strong> ligne #{row} {reason}. Les entrées à partir de là ne sont pas fiables.",
+    "intact": "Boîte noire intacte, {count, plural, one {# ligne} other {# lignes}}",
+    "howChain": "Chaque ligne porte le hash de la précédente : une ligne modifiée, déplacée ou supprimée rompt la chaîne.",
+    "howCheck": "Les nouvelles lignes sont vérifiées à chaque visite, les anciennes en entier au moins une fois par minute.",
+    "howHead": "Un journal réécrit de zéro formerait aussi une chaîne : gardez ailleurs une copie de la tête {head}… pour le détecter."
+  },
+  "tally": {
+    "latest": "Dans les {count, number} dernières décisions",
+    "figure": "{n, number}",
+    "passed": "transmis à PayPal",
+    "waiting": "{count, plural, one {vous attend} other {vous attendent}}",
+    "stopped": "bloqués"
+  },
+  "download": {
+    "label": "Télécharger {format}",
+    "title": "Chaque décision du guard, avec qui l’a prise. Les e-mails et les cartes sont masqués."
+  },
+  "amount": {
+    "unreadable": "Montant illisible",
+    "fullRemaining": "Totalité du montant restant"
+  },
+  "columns": {
+    "id": "#",
+    "at": "Heure",
+    "tool": "Outil",
+    "outcome": "Résultat",
+    "verdict": "Verdict",
+    "amount": "Montant",
+    "customer": "Client du ticket",
+    "reasons": "Motifs",
+    "args": "Arguments",
+    "detail": "Détail",
+    "decides": "Décide l’entrée retenue"
+  },
+  "grid": {
+    "search": "Rechercher dans toutes les colonnes…",
+    "searchLabel": "Rechercher dans toutes les colonnes"
+  },
+  "loading": "Chargement des données PayPal…",
+  "error": {
+    "title": "Impossible de charger ces données PayPal",
+    "detail": "Vérifiez les identifiants de l’API dans <code>{file}</code>, et que l’app sandbox dispose des fonctions nécessaires à cet endpoint.",
+    "retry": "Réessayer"
+  },
+  "held": {
+    "title": "En attente de votre approbation",
+    "running": "Passage par le guard…",
+    "count": "{count, plural, one {# retenu} other {# retenus}}",
+    "intro": "Approuver repasse l’appel par les contrôles du guard avant que PayPal ne le voie.",
+    "empty": "Rien n’est retenu pour le moment.",
+    "showFirst": "Afficher les {count} premiers",
+    "showAll": "Tout afficher ({count})",
+    "heading": "<strong>{action}</strong>{hasAmount, select, yes { de {amount}} other {}}<muted> pour {customer}</muted>",
+    "why": "Pourquoi",
+    "approve": "Approuver",
+    "reject": "Rejeter",
+    "kinds": {
+      "refund": "Remboursement",
+      "cancellation": "Annuler l’abonnement",
+      "dispute": "Accepter la réclamation du litige",
+      "invoice": "Créer une facture",
+      "order": "Créer une commande",
+      "invoiceSending": "Envoyer la facture",
+      "invoiceReminder": "Envoyer un rappel de facture"
+    },
+    "reasons": {
+      "approvalRequired": "Au-dessus du seuil d’approbation",
+      "intentUncertain": "Juge IA indécis",
+      "intentJudgeUnavailable": "Juge IA indisponible"
+    },
+    "invalidRequest": "Demande de décision non valide",
+    "failed": "La décision n’a pas pu être traitée ; rien n’a été enregistré."
+  },
+  "assistant": {
+    "title": "Questions sur ces décisions",
+    "intro": "Posez vos questions sur les décisions du guard. Il lit les entrées les plus récentes du journal, masquées et sans le texte des tickets, et ne peut qu’expliquer : il ne peut ni approuver, ni rejeter, ni modifier les règles.",
+    "suggestions": {
+      "lastRefund": "Pourquoi le dernier remboursement a-t-il été bloqué ?",
+      "today": "Résume la journée",
+      "waiting": "Qu’est-ce qui m’attend ?",
+      "stoppedCustomers": "Quels clients ont été le plus souvent bloqués ?"
+    },
+    "placeholder": "Posez une question sur les décisions du guard",
+    "inputLabel": "Question pour l’assistant du guard",
+    "thinking": "Réflexion…",
+    "ask": "Demander",
+    "failed": "L’assistant du guard a échoué.",
+    "unreachable": "Impossible de joindre l’assistant du guard."
+  }
+}

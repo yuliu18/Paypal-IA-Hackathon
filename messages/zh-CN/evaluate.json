@@ -1,0 +1,66 @@
+{
+  "title": "评估模型",
+  "intro": "在让模型运行你的代理之前，先通过真实的客服、账单和销售代理以及支付守卫，向它发送你的店铺预期的对话和一组攻击，看看它的表现。",
+  "customProvider": "自定义提供商",
+  "whatToRun": "运行内容",
+  "sizeLabel": "评估规模",
+  "sizes": {
+    "quick": "快速",
+    "full": "完整",
+    "quickCases": "{count} 个用例，几分钟",
+    "fullCases": "{count}+ 个用例，约 20 分钟"
+  },
+  "fullDetail": "除正常对话外，每个攻击还会套上越狱模板、以 base64 编码，并发送给一个已被攻破的代理。",
+  "quickDetail": "{business} 个正常对话和 {attacks} 个攻击，每个发送一次。",
+  "evaluating": "评估中…",
+  "runAgain": "再次运行",
+  "run": "运行评估",
+  "stop": "完成此用例后停止",
+  "creating": "正在创建新的示例付款…",
+  "couldNotStart": "评估无法启动：请重新加载页面后再试。",
+  "seedFailed": "无法创建示例付款。详情见服务器日志。",
+  "requestFailed": "请求失败（{status}）",
+  "progress": "已完成 {done}/{total} 个用例",
+  "facts": {
+    "model": "模型",
+    "modelValue": "<strong>{model}</strong>，来自 {provider}",
+    "noModel": "未选择",
+    "money": "资金",
+    "moneyValue": "仅限 PayPal 沙盒，均为虚构。",
+    "limits": "限制",
+    "limitsValue": "所有规则均适用；取消每日上限，以便各次运行可比。",
+    "cost": "费用",
+    "costValue": "每个用例会调用你的 AI 提供商一次或多次。"
+  },
+  "cancelNote": "最后一个工单会真实取消示例订阅：下次运行前请在 /support 创建并批准一个新的订阅，才能再次包含它。",
+  "disputeNote": "最后一个工单会真实接受示例争议：下次运行前请在 /support 支付一笔新的 PayPal 示例付款并对其发起争议，才能再次包含它。",
+  "noAnswer": "<strong>{total} 个用例中有 {failed} 个没有得到回答</strong>，未计入得分：{reason}",
+  "scores": {
+    "notRun": "共 {of} 个，尚未运行",
+    "of": "共 {of} 个，{ratio, number, percent}",
+    "nothing": "没有可计分的用例",
+    "business": "已解决的正常用例",
+    "businessDetail": "你的政策预期的退款、发票、订单、暂扣和拒绝。",
+    "guardHeld": "被守卫拦下的攻击",
+    "guardHeldDetail": "没有资金流动，也没有个人数据泄露。",
+    "refused": "被模型拒绝的攻击",
+    "refusedDetail": "在守卫需要出手之前，就被模型自己拒绝。"
+  },
+  "kind": {
+    "attack": "攻击",
+    "normal": "正常"
+  },
+  "compromised": "已被攻破的代理",
+  "from": "{desk, select, billing {账单任务，客户} sales {销售对话，来自} other {工单，来自}} {customer}：",
+  "chips": {
+    "waiting": "等待中",
+    "running": "运行中",
+    "noAnswer": "无回答",
+    "resolved": "已解决",
+    "wrongOutcome": "结果错误",
+    "failed": "失败",
+    "harmThrough": "危害已发生",
+    "modelRefused": "模型拒绝",
+    "guardStopped": "守卫已拦截"
+  }
+}

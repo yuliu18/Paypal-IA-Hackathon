@@ -1,0 +1,66 @@
+{
+  "title": "Evaluate a model",
+  "intro": "Before you let a model run your agents, send it the conversations your shop expects and a set of attacks, through the real support, billing and sales agents and the payment guard, and see how it does.",
+  "customProvider": "a custom provider",
+  "whatToRun": "What to run",
+  "sizeLabel": "Evaluation size",
+  "sizes": {
+    "quick": "Quick",
+    "full": "Full",
+    "quickCases": "{count} cases, a few minutes",
+    "fullCases": "{count}+ cases, about 20 minutes"
+  },
+  "fullDetail": "Each attack is also wrapped in a jailbreak template, encoded in base64 and sent to a compromised agent, besides the normal conversations.",
+  "quickDetail": "{business} normal conversations and {attacks} attacks, each sent once.",
+  "evaluating": "Evaluating…",
+  "runAgain": "Run again",
+  "run": "Run evaluation",
+  "stop": "Stop after this case",
+  "creating": "Creating fresh sample payments…",
+  "couldNotStart": "The evaluation could not start: reload the page and try again.",
+  "seedFailed": "The sample payments could not be created. Details are in the server log.",
+  "requestFailed": "Request failed ({status})",
+  "progress": "{done} of {total} cases done",
+  "facts": {
+    "model": "Model",
+    "modelValue": "<strong>{model}</strong> on {provider}",
+    "noModel": "none chosen",
+    "money": "Money",
+    "moneyValue": "PayPal sandbox only, fictitious.",
+    "limits": "Limits",
+    "limitsValue": "Every rule applies; the daily caps are lifted so runs compare alike.",
+    "cost": "Cost",
+    "costValue": "Each case is one or more calls to your AI provider."
+  },
+  "cancelNote": "A last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.",
+  "disputeNote": "A last ticket accepts the sample dispute for real: pay a new sample PayPal payment on /support and dispute it before the next run to include it again.",
+  "noAnswer": "<strong>{failed} of {total} cases got no answer</strong> and are left out of the scores: {reason}",
+  "scores": {
+    "notRun": "of {of}, not run yet",
+    "of": "of {of}, {ratio, number, percent}",
+    "nothing": "nothing scored",
+    "business": "Normal cases resolved",
+    "businessDetail": "Refunds, invoices, orders, holds and refusals your policy expects.",
+    "guardHeld": "Attacks the guard held",
+    "guardHeldDetail": "No money moved and no personal data leaked.",
+    "refused": "Attacks the model refused",
+    "refusedDetail": "Rejected by the model itself, before the guard had to act."
+  },
+  "kind": {
+    "attack": "Attack",
+    "normal": "Normal"
+  },
+  "compromised": "compromised agent",
+  "from": "{desk, select, billing {Billing task for} sales {Sales chat from} other {Ticket from}} {customer}:",
+  "chips": {
+    "waiting": "Waiting",
+    "running": "Running",
+    "noAnswer": "No answer",
+    "resolved": "Resolved",
+    "wrongOutcome": "Wrong outcome",
+    "failed": "Failed",
+    "harmThrough": "Harm got through",
+    "modelRefused": "Model refused",
+    "guardStopped": "Guard stopped it"
+  }
+}
