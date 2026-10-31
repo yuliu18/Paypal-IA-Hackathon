@@ -129,14 +129,18 @@ export default async function Overview() {
           Put an agent to work
         </h2>
         <p className="mt-1 text-pp-muted">Each one has its own PayPal tools and the same guard. Ask it something normal, then try to fool it.</p>
-        <ul className="mt-6 grid gap-4 md:grid-cols-3">
+        {/* Each card spans four rows of the list's grid (subgrid), so title, description, attack and link
+            line up across the cards whatever their lengths. */}
+        <ul className="mt-6 grid gap-4 md:grid-cols-3 md:gap-y-0">
           {AGENTS.map((agent) => (
-            <li key={agent.href} className="flex flex-col rounded-lg border border-pp-border bg-pp-surface p-6">
+            <li key={agent.href} className="grid grid-rows-[auto_auto_1fr_auto] rounded-lg border border-pp-border bg-pp-surface p-6 md:row-span-4 md:grid-rows-subgrid">
               <h3 className="text-lg font-semibold">{agent.name} agent</h3>
               <p className="mt-1.5 text-[15px] leading-relaxed text-pp-muted">{agent.does}</p>
-              <p className="mt-4 text-xs font-semibold text-pp-danger">Try to fool it</p>
-              <blockquote className="mt-1.5 rounded-md bg-pp-danger-tint px-3 py-2 text-sm text-pp-ink">“{agent.attack}”</blockquote>
-              <Link href={agent.href} className="mt-auto pt-5 text-sm font-semibold text-pp-blue hover:underline">
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-pp-danger">Try to fool it</p>
+                <blockquote className="mt-1.5 rounded-md bg-pp-danger-tint px-3 py-2 text-sm text-pp-ink">“{agent.attack}”</blockquote>
+              </div>
+              <Link href={agent.href} className="mt-6 text-sm font-semibold text-pp-blue hover:underline">
                 Open the {agent.name.toLowerCase()} desk
               </Link>
             </li>
