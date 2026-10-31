@@ -15,6 +15,7 @@ import {
   type Transaction,
 } from './paypal';
 import type { GuardDashboardRows } from './guard/dashboard-rows';
+import { staleWhileRevalidate } from './stale-while-revalidate';
 
 // Flat rows for the Dashboard's AG Studio data sources. Relationships between them:
 //   invoices.customerId        -> customers.id
@@ -321,6 +322,16 @@ export async function getDashboardData(asOf = new Date()) {
 }
 
 export type PayPalDashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+
+// How long a PayPal snapshot is shown before a visit loads a new one in the background.
+const DASHBOARD_FRESH_MS = 30_000;
+
+// The dashboard's PayPal snapshot: fetching it takes PayPal seconds (every invoice in full, the
+// transactions of the window), so a visit gets the last one at once and only the first visit after
+// the server starts waits. Its `asOf` says when it was taken.
+export const latestDashboardData = staleWhileRevalidate(() => getDashboardData(), DASHBOARD_FRESH_MS, Date.now, (error) =>
+  console.error('The dashboard PayPal data could not be refreshed', error),
+);
 
 // What the dashboard shows: the PayPal snapshot plus the payment guard's decisions (app/dashboard/page.tsx).
 export type DashboardData = PayPalDashboardData & GuardDashboardRows;

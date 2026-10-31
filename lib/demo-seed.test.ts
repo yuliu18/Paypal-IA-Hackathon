@@ -33,6 +33,19 @@ describe('seedSandbox', () => {
     expect(await readSeed(file)).toEqual(charges);
   });
 
+  it('charges the purchases at the same time, so the button waits for one charge, not three', async () => {
+    let inFlight = 0;
+    let most = 0;
+    const slowCharge = async () => {
+      most = Math.max(most, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight -= 1;
+      return fakeCharge();
+    };
+    await seedSandbox(slowCharge, file);
+    expect(most).toBe(3);
+  });
+
   it('keeps the previous payments when a charge fails', async () => {
     next = 0;
     const before = await seedSandbox(fakeCharge, file);
