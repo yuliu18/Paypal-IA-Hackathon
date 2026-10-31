@@ -73,6 +73,25 @@ function Badge({ row }: { row: Row }) {
 const BUSINESS_CASES = 9;
 const FIXED_ATTACKS = 17;
 
+// The two sizes of a run.
+const SIZES = [
+  { full: false, title: 'Quick', time: 'a few minutes' },
+  { full: true, title: 'Full', time: 'about 20 minutes' },
+];
+
+// What a run uses, beside the controls.
+const FACTS = (model: string, provider: string): [string, React.ReactNode][] => [
+  [
+    'Model',
+    <>
+      <strong className="font-semibold">{model || 'none chosen'}</strong> on {provider}
+    </>,
+  ],
+  ['Money', 'PayPal sandbox only, fictitious.'],
+  ['Limits', 'Every rule applies; the daily caps are lifted so runs compare alike.'],
+  ['Cost', 'Each case is one or more calls to your AI provider.'],
+];
+
 const DESK_LABEL = { support: 'Ticket from', billing: 'Billing task for', sales: 'Sales chat from' } as const;
 
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
@@ -139,62 +158,53 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
         billing and sales agents and the payment guard, and see how it does.
       </PageHeader>
 
-      <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div>
-          <h2 className="text-lg font-semibold">What to run</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Evaluation size">
-            {[
-              { value: false, title: 'Quick', cases: quickCases, time: 'a few minutes', detail: `${BUSINESS_CASES} normal conversations and ${attacks} attacks, each sent once.` },
-              { value: true, title: 'Full', cases: fullCases, time: 'about 20 minutes', detail: 'Each attack also wrapped in a jailbreak template, encoded in base64 and sent to a compromised agent.' },
-            ].map((option) => (
-              <label
-                key={option.title}
-                className={`flex cursor-pointer flex-col rounded-lg border bg-pp-surface px-4 py-3.5 ${full === option.value ? 'border-pp-blue ring-1 ring-pp-blue' : 'border-pp-border hover:border-pp-blue/50'} ${running ? 'cursor-not-allowed opacity-70' : ''}`}
-              >
-                <span className="flex items-center gap-2.5">
-                  <input type="radio" name="size" checked={full === option.value} disabled={running} onChange={() => setFull(option.value)} className="accent-pp-blue" />
-                  <span className="font-semibold">{option.title}</span>
-                  <span className="ml-auto text-sm text-pp-muted">
-                    {option.cases}
-                    {option.value ? '+' : ''} cases, {option.time}
-                  </span>
-                </span>
-                <span className="mt-1.5 pl-6 text-sm leading-relaxed text-pp-muted">{option.detail}</span>
-              </label>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-wrap items-center gap-4">
-            <button type="button" onClick={run} disabled={running || !model} className={`${primaryButton} whitespace-nowrap`}>
-              {running && <Spinner />}
-              {running ? 'Evaluating…' : rows.length ? 'Run again' : 'Run evaluation'}
-            </button>
-            {running && (
-              <button type="button" onClick={() => (stop.current = true)} className="text-sm font-semibold text-pp-blue hover:underline">
-                Stop after this case
-              </button>
-            )}
-            {message && <span className="text-sm text-pp-muted">{message}</span>}
-          </div>
-          {rows.length > 0 && !message && (
-            <div className="mt-4 max-w-md">
-              <p className="text-sm text-pp-muted">
-                {done.length} of {rows.length} cases done
-              </p>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-pp-gridline">
-                <div className="h-full rounded-full bg-pp-blue transition-[width]" style={{ width: `${(done.length / rows.length) * 100}%` }} />
-              </div>
-            </div>
-          )}
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold">What to run</h2>
+        <div className="mt-3 grid max-w-2xl gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Evaluation size">
+          {SIZES.map((option) => (
+            <label
+              key={option.title}
+              className={`flex min-h-16 items-center gap-3 rounded-lg border bg-pp-surface px-4 ${full === option.full ? 'border-pp-blue ring-1 ring-pp-blue' : 'border-pp-border hover:border-pp-blue/50'} ${running ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+            >
+              <input type="radio" name="size" checked={full === option.full} disabled={running} onChange={() => setFull(option.full)} className="accent-pp-blue" />
+              <span className="font-semibold">{option.title}</span>
+              <span className="ml-auto text-sm text-pp-muted">
+                {option.full ? `${fullCases}+` : quickCases} cases, {option.time}
+              </span>
+            </label>
+          ))}
         </div>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-pp-muted">
+          {full
+            ? 'Each attack is also wrapped in a jailbreak template, encoded in base64 and sent to a compromised agent, besides the normal conversations.'
+            : `${BUSINESS_CASES} normal conversations and ${attacks} attacks, each sent once.`}
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <button type="button" onClick={run} disabled={running || !model} className={`${primaryButton} whitespace-nowrap`}>
+            {running && <Spinner />}
+            {running ? 'Evaluating…' : rows.length ? 'Run again' : 'Run evaluation'}
+          </button>
+          {running && (
+            <button type="button" onClick={() => (stop.current = true)} className="text-sm font-semibold text-pp-blue hover:underline">
+              Stop after this case
+            </button>
+          )}
+          {message && <span className="text-sm text-pp-muted">{message}</span>}
+        </div>
+        {rows.length > 0 && !message && (
+          <div className="mt-4 max-w-md">
+            <p className="text-sm text-pp-muted">
+              {done.length} of {rows.length} cases done
+            </p>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-pp-gridline">
+              <div className="h-full rounded-full bg-pp-blue transition-[width]" style={{ width: `${(done.length / rows.length) * 100}%` }} />
+            </div>
+          </div>
+        )}
 
-        <dl className="self-start rounded-lg border border-pp-border bg-pp-surface px-5 py-2 text-sm">
-          {[
-            ['Model', <><strong className="font-semibold">{model || 'none chosen'}</strong> on {provider}</>],
-            ['Money', 'PayPal sandbox only, fictitious.'],
-            ['Limits', 'Every rule applies. The daily caps are lifted for these cases, so runs compare alike.'],
-            ['Cost', 'Each case is one or more calls to your AI provider.'],
-          ].map(([term, value]) => (
-            <div key={term as string} className="border-b border-pp-gridline py-2.5 last:border-b-0">
+        <dl className="mt-8 grid gap-x-8 gap-y-4 border-t border-pp-border pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          {FACTS(model, provider).map(([term, value]) => (
+            <div key={term}>
               <dt className="text-pp-muted">{term}</dt>
               <dd className="mt-0.5">{value}</dd>
             </div>
