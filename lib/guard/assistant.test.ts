@@ -101,6 +101,7 @@ describe('assistantRequest', () => {
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/cannot approve, reject/i);
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/don't know|do not know/i);
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/partial/i);
+    expect(ASSISTANT_SYSTEM_PROMPT).toContain('no Markdown');
     expect(user.role).toBe('user');
     expect(user.content).toContain('<question>\nWhy was the last refund blocked?\n</question>');
     expect(user.content).toContain('2026-10-31T12:00:00.000Z');
