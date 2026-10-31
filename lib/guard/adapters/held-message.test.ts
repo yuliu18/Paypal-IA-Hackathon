@@ -76,4 +76,18 @@ describe('heldMessage by tool', () => {
     const hostile: AuditRow = { ...reminder, args: { invoice_id: '<@everyone> https://evil.example/x' } };
     expect(heldMessage(hostile).split('\n')[0]).toBe('Payment guard: a reminder of invoice (unreadable id) is waiting for approval.');
   });
+
+  it('describes a held order by the total the guard computed, never its item names or links', () => {
+    const args = {
+      currencyCode: 'USD',
+      items: [{ name: '<@everyone> Linen tablecloth', quantity: 3, itemCost: 120, taxPercent: 0, itemTotal: 360 }],
+      returnUrl: 'https://evil.example/pay',
+    };
+    const entry: AuditRow = { ...held(['APPROVAL_REQUIRED']), tool: 'create_order', args };
+    expect(heldMessage(entry).split('\n')[0]).toBe('Payment guard: an order of 360.00 USD is waiting for approval.');
+    expect(heldMessage(entry)).not.toContain('everyone');
+    expect(heldMessage(entry)).not.toContain('evil');
+    const unreadable: AuditRow = { ...entry, args: { ...args, items: 'lots' } };
+    expect(heldMessage(unreadable).split('\n')[0]).toBe('Payment guard: an order of an unreadable amount is waiting for approval.');
+  });
 });

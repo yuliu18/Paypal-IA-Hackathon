@@ -1,0 +1,154 @@
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+import type { AgentStep } from '@/lib/agent/support-agent';
+import { maskPersonalData } from '@/lib/guard/domain/redact';
+import type { SalesScenario } from './scenarios';
+
+type AgentMode = SalesScenario['agent'];
+
+export type CheckoutNotice = { tone: 'ok' | 'error' | 'muted'; text: string };
+const NOTICE_STYLE = { ok: 'text-pp-success', error: 'text-pp-danger', muted: 'text-pp-muted' };
+
+type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// A held order (lib/guard/guard.ts heldResult) waits for a person on /guard: amber, not red.
+const stepStyle = (step: AgentStep) =>
+  step.isError ? 'border-pp-danger text-pp-danger' : step.result.startsWith('Order held for human approval') ? 'border-pp-warning text-pp-warning' : 'border-pp-border';
+
+// The reply with its links clickable, so the customer can open PayPal's approval page.
+// A sentence's closing punctuation isn't part of the link.
+const URL_PART = /(https:\/\/[^\s)"'<>]*[^\s)"'<>.,;:!?])/;
+const withLinks = (text: string) =>
+  text.split(URL_PART).map((part, i) =>
+    i % 2 === 1 ? (
+      <a key={i} href={part} target="_blank" rel="noreferrer" className="break-all text-pp-blue hover:underline">
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+
+// Sends one customer message to the sales agent (app/api/sales/chats) and shows each tool call it
+// made through the payment guard, blocked ones in red and held ones in amber.
+export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; notice?: CheckoutNotice }) {
+  const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
+  const [message, setMessage] = useState(scenarios[0]?.message ?? '');
+  const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
+  const [running, setRunning] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome>();
+
+  function load(scenario: SalesScenario) {
+    setCustomerEmail(scenario.customerEmail);
+    setMessage(scenario.message);
+    setAgent(scenario.agent);
+    setOutcome(undefined);
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setRunning(true);
+    setOutcome(undefined);
+    try {
+      const res = await fetch('/api/sales/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerEmail, message, agent }),
+      });
+      const body = await res.json();
+      setOutcome(res.ok ? body : { error: body.error?.message ?? `Request failed (${res.status})` });
+    } catch (error) {
+      setOutcome({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-4xl px-8 py-6 font-paypal text-pp-ink">
+      <h1 className="text-[28px] font-semibold text-pp-navy">Sales agent demo</h1>
+      <p className="mt-2 text-sm text-pp-muted">
+        An AI sales agent sells the shop&apos;s catalogue to the customer who writes, with a PayPal order the customer pays on PayPal. Every
+        call goes through the same payment guard as the other agents; decisions are listed in the{' '}
+        <Link href="/guard" className="text-pp-blue hover:underline">
+          guard log
+        </Link>
+        .
+      </p>
+      {notice && <p className={`mt-3 text-sm font-semibold ${NOTICE_STYLE[notice.tone]}`}>{notice.text}</p>}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {scenarios.map((scenario) => (
+          <button
+            key={scenario.label}
+            type="button"
+            onClick={() => load(scenario)}
+            className="rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight"
+          >
+            {scenario.label}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Customer who writes (signed in to the shop)
+          <input
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            className="rounded border border-pp-border bg-pp-surface px-3 py-2 font-normal"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Customer message (untrusted)
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={6}
+            className="rounded border border-pp-border bg-pp-surface px-3 py-2 font-normal"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={agent === 'vulnerable'} onChange={(e) => setAgent(e.target.checked ? 'vulnerable' : 'careful')} />
+          Vulnerable agent: obeys any instruction in the message, like a misconfigured or compromised one
+        </label>
+        <button
+          type="submit"
+          disabled={running}
+          className="self-start rounded bg-pp-blue px-4 py-2 text-sm font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60"
+        >
+          {running ? 'Agent working…' : 'Send message'}
+        </button>
+      </form>
+
+      {outcome && 'error' in outcome && <p className="mt-6 text-sm text-pp-danger">{outcome.error}</p>}
+      {outcome && 'reply' in outcome && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-pp-muted">Tool calls</h2>
+          <ol className="mt-2 flex flex-col gap-2">
+            {outcome.steps.map((step, i) => (
+              <li key={i} className={`rounded border px-3 py-2 text-sm ${stepStyle(step)}`}>
+                {/* Masked like the guard log: an injected message can name someone else's email. */}
+                <code className="font-semibold">{step.tool}</code> <code className="text-pp-muted">{maskPersonalData(JSON.stringify(step.args))}</code>
+                <p className="mt-1 line-clamp-3 break-all">{maskPersonalData(step.result)}</p>
+              </li>
+            ))}
+            {outcome.steps.length === 0 && <li className="text-sm text-pp-muted">No tool calls.</li>}
+          </ol>
+          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wider text-pp-muted">Reply to the customer</h2>
+          <p className="mt-2 whitespace-pre-wrap rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm">{withLinks(outcome.reply)}</p>
+          {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
+            <p className="mt-2 text-xs font-semibold text-pp-blue">
+              Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the message before the AI saw it,{' '}
+              {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+            </p>
+          )}
+        </section>
+      )}
+    </main>
+  );
+}

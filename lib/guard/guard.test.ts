@@ -7,8 +7,9 @@ import type { SubscriptionFacts } from './domain/cancellation';
 import type { DisputeFacts } from './domain/dispute';
 import type { InvoiceFacts, InvoiceLimits } from './domain/invoice';
 import type { CaptureFacts, Decision, Money } from './domain/policy';
-import { createPaymentGuard, decideHeldCall, decideHeldRefund } from './guard';
-import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, CustomerDirectory, DisputeLookup, HeldNotifier, IntentJudge, InvoiceLookup, SubscriptionLookup, ToolCall } from './ports';
+import { SHOP_CATALOGUE } from '../shop/catalogue';
+import { createPaymentGuard, decideHeldCall, decideHeldRefund, type OrderDeps } from './guard';
+import type { AuditEntry, AuditLog, AuditRow, CaptureLookup, CustomerDirectory, DisputeLookup, HeldNotifier, IntentJudge, InvoiceLookup, OrderBinder, SubscriptionLookup, ToolCall } from './ports';
 
 const usd = (minor: number): Money => ({ minor, currency: 'USD' });
 
@@ -40,9 +41,9 @@ const audit: AuditLog = {
     if (auditUpdateFails) throw new Error('disk full');
     Object.assign(entries[Number(id)], patch);
   },
-  // Like the SQLite log: an invoice's amount is money billed, never money refunded.
+  // Like the SQLite log: an invoice's amount is money billed, never money refunded, and an order moves none.
   async movedSince() {
-    return usd(entries.reduce((sum, e) => sum + (e.tool === 'create_invoice' ? 0 : (e.moved?.minor ?? 0)), 0));
+    return usd(entries.reduce((sum, e) => sum + (e.tool === 'create_invoice' || e.tool === 'create_order' ? 0 : (e.moved?.minor ?? 0)), 0));
   },
   async billedSince() {
     return usd(entries.reduce((sum, e) => sum + (e.tool === 'create_invoice' ? (e.moved?.minor ?? 0) : 0), 0));
@@ -56,6 +57,9 @@ const audit: AuditLog = {
   },
   async isResolved(id) {
     return entries.some((e) => e.resolves === id);
+  },
+  async boundOrderCustomer(orderId) {
+    return entries.find((e) => e.tool === 'create_order' && e.outcome === 'executed' && e.detail === `Order ${orderId} bound to the task customer`)?.task.mandate.customerEmail;
   },
 };
 
@@ -140,8 +144,13 @@ const INVOICES: Record<string, string> = {
   'INV2-GARBLED': 'not json',
 };
 
-// The invoice tools are registered only for the invoice tests, so the support agent's tool list stays as it was.
-function fakePayPal({ invoiceTools = false } = {}) {
+// The order PayPal's create_order answers with: CREATED, with the link the buyer approves it on.
+const NEW_ORDER_ID = '5O190127TN364715T';
+let createdOrderAnswer: string;
+let rejectOrders: boolean;
+
+// The invoice and order tools are registered only for their tests, so the support agent's tool list stays as it was.
+function fakePayPal({ invoiceTools = false, orderTools = false } = {}) {
   const server = new McpServer({ name: 'fake-paypal', version: '0.0.0' });
   const ok = (name: string) => async (args: unknown) => {
     upstreamCalls.push({ name, args });
@@ -201,6 +210,21 @@ function fakePayPal({ invoiceTools = false } = {}) {
     server.registerTool('send_invoice', { description: 'send invoice', inputSchema: sending }, ok('send_invoice'));
     server.registerTool('send_invoice_reminder', { description: 'remind', inputSchema: sending }, ok('send_invoice_reminder'));
   }
+  if (orderTools) {
+    const creation = {
+      currencyCode: z.string().optional(),
+      items: z.array(z.unknown()).optional(),
+      discount: z.number().optional(),
+      shippingCost: z.number().optional(),
+      returnUrl: z.string().optional(),
+      cancelUrl: z.string().optional(),
+    };
+    server.registerTool('create_order', { description: 'create order', inputSchema: creation }, async (args) => {
+      upstreamCalls.push({ name: 'create_order', args });
+      if (rejectOrders) return { isError: true, content: [{ type: 'text' as const, text: 'UNPROCESSABLE_ENTITY' }] };
+      return { content: [{ type: 'text' as const, text: createdOrderAnswer }] };
+    });
+  }
   return server;
 }
 
@@ -218,10 +242,12 @@ async function connect(
     customers = undefined as CustomerDirectory | undefined,
     invoiceLimits = undefined as InvoiceLimits | undefined,
     invoiceTools = false,
+    orders = undefined as OrderDeps | undefined,
+    orderTools = false,
   } = {},
 ) {
   const [upClient, upServer] = InMemoryTransport.createLinkedPair();
-  await fakePayPal({ invoiceTools }).connect(upServer);
+  await fakePayPal({ invoiceTools, orderTools }).connect(upServer);
   const upstream = new Client({ name: 'guard-upstream', version: '0.0.0' });
   await upstream.connect(upClient);
   if (upstreamThrows) {
@@ -264,6 +290,7 @@ async function connect(
     invoices,
     customers,
     invoiceLimits,
+    orders,
   });
   const [agentSide, guardSide] = InMemoryTransport.createLinkedPair();
   await guard.connect(guardSide);
@@ -284,6 +311,9 @@ beforeEach(() => {
   auditUpdateFails = false;
   rejectRefunds = false;
   approvalThreshold = usd(10000);
+  rejectOrders = false;
+  createdOrderAnswer = JSON.stringify({ id: NEW_ORDER_ID, status: 'CREATED', links: [{ rel: 'payer-action', href: `https://www.sandbox.paypal.com/checkoutnow?token=${NEW_ORDER_ID}` }] });
+  delete ORDERS[NEW_ORDER_ID];
 });
 
 describe('payment guard', () => {
@@ -1965,6 +1995,302 @@ describe('probe: get_invoice and tools outside the design', () => {
       const r = await agent.callTool({ name, arguments: { invoice_id: 'INV2-ANA' } });
       expect(text(r), name).toContain('TOOL_NOT_ALLOWED');
     }
+    expect(upstreamCalls).toEqual([]);
+  });
+});
+
+const SHOP = 'https://shop.example';
+// create_order's arguments as the toolkit takes them: 2 mug sets for 99.98 USD, back to the shop.
+const orderArgs = (overrides: Record<string, unknown> = {}) => ({
+  currencyCode: 'USD',
+  items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98 }],
+  discount: 0,
+  shippingCost: 0,
+  returnUrl: `${SHOP}/sales/paypal-return`,
+  cancelUrl: `${SHOP}/sales`,
+  ...overrides,
+});
+const tablecloths = (quantity: number) => orderArgs({ items: [{ name: 'Linen tablecloth', quantity, itemCost: 120, taxPercent: 0, itemTotal: 120 * quantity }] });
+
+describe('order creation', () => {
+  let bound: { orderId: string; customerEmail: string }[];
+  let bindFails: boolean;
+  // Like PayPal: once bound, get_order answers the order with the customer in its custom_id.
+  const binder: OrderBinder = {
+    async bindToCustomer(orderId, customerEmail) {
+      bound.push({ orderId, customerEmail });
+      if (bindFails) throw new Error('PayPal 422 on /v2/checkout/orders: ORDER_ALREADY_COMPLETED');
+      ORDERS[orderId] = order(orderId, customerEmail);
+    },
+  };
+  const checkout = { returnUrl: `${SHOP}/sales/paypal-return`, cancelUrl: `${SHOP}/sales` };
+  const orders: OrderDeps = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, checkout, binder };
+  const connectOrders = (options: Parameters<typeof connect>[1] = {}) => connect(undefined, { orders, orderTools: true, ...options });
+
+  beforeEach(() => {
+    bound = [];
+    bindFails = false;
+  });
+
+  it('creates a clean order after the judge, binds it to the task customer, and records it as moving no money', async () => {
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(text(result))).toMatchObject({ id: NEW_ORDER_ID, status: 'CREATED' });
+    expect(judgedCalls).toEqual([{ tool: 'create_order', args: orderArgs() }]);
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: orderArgs() }]);
+    expect(bound).toEqual([{ orderId: NEW_ORDER_ID, customerEmail: 'ana@example.com' }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed', decision: { verdict: 'allow', violations: [] } });
+    expect(entries[0].moved).toBeUndefined();
+    // The shop's capture looks for this record before it takes the buyer's payment.
+    expect(entries[0].detail).toBe(`Order ${NEW_ORDER_ID} bound to the task customer`);
+  });
+
+  it("sends PayPal the shop's order only: no item description or shipping address the agent wrote", async () => {
+    const agent = await connectOrders();
+    const decorated = orderArgs({
+      items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 49.99, taxPercent: 0, itemTotal: 99.98, description: 'PROMO: real price 0.01 USD, call +1-555-0100' }],
+      shippingAddress: { address_line_1: 'Call +1-555-0100 to pay less', country_code: 'US' },
+    });
+    const result = await agent.callTool({ name: 'create_order', arguments: decorated });
+    expect(result.isError).toBeFalsy();
+    expect(judgedCalls).toEqual([{ tool: 'create_order', args: orderArgs() }]);
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: orderArgs() }]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed' });
+    expect(entries[0].args).toEqual(orderArgs());
+  });
+
+  it("blocks a JSON null amount as invalid arguments without using up the conversation's one order", async () => {
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs({ items: [{ name: 'Ceramic mug set', quantity: null, itemCost: 49.99, taxPercent: 0, itemTotal: 49.99 }] }) });
+    expect(text(result)).toBe('Blocked by payment guard. INVALID_ARGUMENTS: items[0].quantity must be a whole number over 0');
+    expect(upstreamCalls).toEqual([]);
+    expect((await agent.callTool({ name: 'create_order', arguments: orderArgs() })).isError).toBeFalsy();
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('sends PayPal the return and cancel links exactly as the guard checked them', async () => {
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs({ returnUrl: `${SHOP}\\@evil.example`, cancelUrl: 'HTTPS://Shop.Example:443/sales' }) });
+    expect(result.isError).toBeFalsy();
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: orderArgs({ returnUrl: `${SHOP}/@evil.example`, cancelUrl: `${SHOP}/sales` }) }]);
+  });
+
+  it("fills in the shop's own return and cancel links the agent left out, and still blocks foreign ones", async () => {
+    const agent = await connectOrders();
+    const withoutLinks: Record<string, unknown> = orderArgs();
+    delete withoutLinks.returnUrl;
+    delete withoutLinks.cancelUrl;
+    const result = await agent.callTool({ name: 'create_order', arguments: withoutLinks });
+    expect(result.isError).toBeFalsy();
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: { ...withoutLinks, ...checkout } }]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'executed', args: { ...withoutLinks, ...checkout } });
+
+    const foreign = await (await connectOrders()).callTool({ name: 'create_order', arguments: { ...withoutLinks, cancelUrl: 'https://evil.example/' } });
+    expect(text(foreign)).toContain('RETURN_URL_NOT_SHOP');
+
+    // A null link is a missing one: the shop's own replaces it, so PayPal gets a link it accepts.
+    const nulls = await (await connectOrders()).callTool({ name: 'create_order', arguments: { ...withoutLinks, returnUrl: null, cancelUrl: null } });
+    expect(nulls.isError).toBeFalsy();
+    expect(upstreamCalls.at(-1)).toEqual({ name: 'create_order', args: { ...withoutLinks, ...checkout } });
+  });
+
+  it("lets get_order read the customer's own new order once it is bound", async () => {
+    const agent = await connectOrders();
+    await agent.callTool({ name: 'create_order', arguments: orderArgs() });
+    const read = await agent.callTool({ name: 'get_order', arguments: { id: NEW_ORDER_ID } });
+    expect(read.isError).toBeFalsy();
+    expect(JSON.parse(text(read))).toMatchObject({ id: NEW_ORDER_ID, withheld_by_guard: ['purchase_units[0].custom_id'] });
+    expect(entries.map((e) => [e.tool, e.outcome])).toEqual([['create_order', 'executed'], ['get_order', 'executed']]);
+  });
+
+  it('blocks orders that break the catalogue rules without asking the judge, PayPal or the binder', async () => {
+    const agent = await connectOrders();
+    const cases: [Record<string, unknown>, string][] = [
+      [orderArgs({ discount: 89.98 }), 'DISCOUNT_LIMIT: Discount 89.98 USD is over 10 % of the items, at most 9.99 USD'],
+      [orderArgs({ items: [{ name: 'Ceramic mug set', quantity: 2, itemCost: 0.99, taxPercent: 0, itemTotal: 1.98 }] }), 'PRICE_MISMATCH'],
+      [orderArgs({ items: [{ name: 'Gold watch', quantity: 1, itemCost: 10, taxPercent: 0, itemTotal: 10 }] }), 'NOT_IN_CATALOGUE'],
+      [tablecloths(50), 'QUANTITY_LIMIT'],
+      [orderArgs({ returnUrl: 'https://evil.example/pay' }), 'RETURN_URL_NOT_SHOP'],
+      [orderArgs({ shippingCost: 15 }), 'SHIPPING_MISMATCH'],
+    ];
+    for (const [args, reason] of cases) {
+      const result = await agent.callTool({ name: 'create_order', arguments: args });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain(`Blocked by payment guard. ${reason}`);
+    }
+    expect(entries.map((e) => e.outcome)).toEqual(cases.map(() => 'blocked'));
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+    expect(bound).toEqual([]);
+  });
+
+  it('blocks malformed orders as invalid arguments', async () => {
+    const result = await (await connectOrders()).callTool({ name: 'create_order', arguments: orderArgs({ items: [] }) });
+    expect(text(result)).toBe('Blocked by payment guard. INVALID_ARGUMENTS: create_order needs 1 to 50 items');
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('fails closed when no catalogue, shop origin and binder are configured, instead of falling through to the refund check', async () => {
+    const result = await (await connect(undefined, { orderTools: true })).callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(text(result)).toBe('Blocked by payment guard. CATALOGUE_UNAVAILABLE: No shop catalogue, shop origin or order binder is configured');
+    expect(judgeCalls).toBe(0);
+    expect(upstreamCalls).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'blocked' });
+  });
+
+  it('blocks a clean order the judge rejects', async () => {
+    judgeDecision = { verdict: 'block', violations: [{ code: 'INTENT_MISMATCH', message: 'The customer asked for one mug set' }] };
+    const result = await (await connectOrders()).callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(text(result)).toContain('INTENT_MISMATCH');
+    expect(upstreamCalls).toEqual([]);
+    expect(bound).toEqual([]);
+  });
+
+  it('creates one order per conversation, counting a held one', async () => {
+    let agent = await connectOrders();
+    expect((await agent.callTool({ name: 'create_order', arguments: orderArgs() })).isError).toBeFalsy();
+    const second = await agent.callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(text(second)).toBe('Blocked by payment guard. ORDER_LIMIT: A conversation may create at most 1 order');
+    expect(upstreamCalls).toHaveLength(1);
+
+    agent = await connectOrders();
+    expect(text(await agent.callTool({ name: 'create_order', arguments: tablecloths(3) }))).toContain('Order held for human approval');
+    expect(text(await agent.callTool({ name: 'create_order', arguments: orderArgs() }))).toContain('ORDER_LIMIT');
+    expect(upstreamCalls).toHaveLength(1);
+  });
+
+  it('holds a clean order over the approval threshold, tells a person, and creates nothing yet', async () => {
+    const notified: AuditRow[] = [];
+    const agent = await connectOrders({ notifier: { notifyHeld: async (entry) => void notified.push(entry) } });
+    const result = await agent.callTool({ name: 'create_order', arguments: tablecloths(3) });
+    expect(result.isError).toBeFalsy();
+    expect(text(result)).toBe(
+      'Order held for human approval; it has not been executed. Tell the customer a person will review it. APPROVAL_REQUIRED: Order 360.00 USD is over the approval threshold 300.00 USD',
+    );
+    expect(judgeCalls).toBe(1);
+    expect(upstreamCalls).toEqual([]);
+    expect(bound).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'held' });
+    expect(notified).toHaveLength(1);
+  });
+
+  it('tells the agent, and records, an order PayPal created but the guard could not bind to the customer', async () => {
+    bindFails = true;
+    const agent = await connectOrders();
+    const result = await agent.callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toBe(
+      `Order ${NEW_ORDER_ID} was created in PayPal but could not be recorded as the customer's: PayPal 422 on /v2/checkout/orders: ORDER_ALREADY_COMPLETED. Do not give the customer its approval link; a person must check the order in PayPal first.`,
+    );
+    expect(text(result)).not.toContain('checkoutnow');
+    expect(upstreamCalls).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      tool: 'create_order',
+      outcome: 'executed',
+      detail: `Order ${NEW_ORDER_ID} was created in PayPal but not bound to the task customer: PayPal 422 on /v2/checkout/orders: ORDER_ALREADY_COMPLETED`,
+    });
+    // Retrying would create a second unbound order.
+    expect(text(await agent.callTool({ name: 'create_order', arguments: orderArgs() }))).toContain('ORDER_LIMIT');
+  });
+
+  it('treats an answer without a readable order id as an unbound order', async () => {
+    createdOrderAnswer = JSON.stringify({ status: 'CREATED' });
+    const result = await (await connectOrders()).callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("Order (unreadable id) was created in PayPal but could not be recorded as the customer's");
+    expect(bound).toEqual([]);
+    expect(entries[0].detail).toContain('PayPal answered without a plain order id');
+  });
+
+  it('binds nothing when PayPal rejects the order', async () => {
+    rejectOrders = true;
+    const result = await (await connectOrders()).callTool({ name: 'create_order', arguments: orderArgs() });
+    expect(result.isError).toBe(true);
+    expect(bound).toEqual([]);
+    expect(entries[0]).toMatchObject({ tool: 'create_order', outcome: 'error' });
+  });
+
+  it('still checks a refund as a refund next to orders, and orders never count toward the refund daily limit', async () => {
+    entries.push({ at: '2026-10-20T11:00:00Z', tool: 'create_order', args: tablecloths(5), task, decision: { verdict: 'allow', violations: [] }, outcome: 'executed', moved: usd(19000) });
+    const agent = await connectOrders();
+    const refund = await agent.callTool({ name: 'create_refund', arguments: { capture_id: 'CAP-1', amount: { currency_code: 'USD', value: '50.00' } } });
+    expect(refund.isError).toBeFalsy();
+    expect(entries[1]).toMatchObject({ tool: 'create_refund', outcome: 'executed', moved: usd(5000) });
+  });
+});
+
+describe('held order approval', () => {
+  let bound: string[];
+  let bindFails: boolean;
+  const binder: OrderBinder = {
+    async bindToCustomer(orderId, customerEmail) {
+      bound.push(`${orderId} ${customerEmail}`);
+      if (bindFails) throw new Error('PayPal 500');
+    },
+  };
+  const held = tablecloths(3);
+  const hold = { verdict: 'hold' as const, violations: [{ code: 'APPROVAL_REQUIRED', message: 'over threshold' }] };
+
+  // `null`: no catalogue configured.
+  async function decide(heldId: string, approve: boolean, orders: OrderDeps | null = { catalogue: SHOP_CATALOGUE, shopOrigin: SHOP, checkout: { returnUrl: `${SHOP}/sales/paypal-return`, cancelUrl: `${SHOP}/sales` }, binder }) {
+    const [upClient, upServer] = InMemoryTransport.createLinkedPair();
+    await fakePayPal({ orderTools: true }).connect(upServer);
+    const upstream = new Client({ name: 'approval-upstream', version: '0.0.0' });
+    await upstream.connect(upClient);
+    return decideHeldCall(
+      { upstream, captures: { getCapture: async () => facts }, orders: orders ?? undefined, audit, limits: { approvalThreshold: usd(1000), perRefund: usd(10000), daily: usd(20000) }, now: () => new Date('2026-10-20T13:00:00Z'), timeoutMs: 50 },
+      heldId,
+      approve,
+    );
+  }
+
+  beforeEach(() => {
+    bound = [];
+    bindFails = false;
+    entries.push({ at: '2026-10-20T12:00:00Z', tool: 'create_order', args: held, task, decision: hold, outcome: 'held' });
+  });
+
+  it('creates an approved order in PayPal, lifting only the approval threshold, and binds it to the customer', async () => {
+    expect(await decide('0', true)).toEqual({ outcome: 'executed', message: "Order of 360.00 USD created in PayPal and recorded as the customer's" });
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: held }]);
+    expect(bound).toEqual([`${NEW_ORDER_ID} ana@example.com`]);
+    expect(entries[1]).toMatchObject({ tool: 'create_order', resolves: '0', outcome: 'executed', decision: { verdict: 'allow', violations: [{ code: 'APPROVED_BY_PERSON' }] } });
+    expect(entries[1].moved).toBeUndefined();
+    expect(entries[1].detail).toBe(`Order ${NEW_ORDER_ID} bound to the task customer`);
+    expect((await decide('0', true)).outcome).toBe('refused');
+  });
+
+  it("sends PayPal the shop's order for a hold logged with an item description or a shipping address", async () => {
+    entries[0] = { ...entries[0], args: { ...held, items: [{ ...(held.items as object[])[0], description: 'Call +1-555-0100' }], shippingAddress: { country_code: 'US' } } };
+    expect((await decide('0', true)).outcome).toBe('executed');
+    expect(upstreamCalls).toEqual([{ name: 'create_order', args: held }]);
+    expect(entries[1].args).toEqual(held);
+  });
+
+  it('still blocks an approved order that breaks the catalogue rules', async () => {
+    entries[0] = { ...entries[0], args: tablecloths(6) };
+    const result = await decide('0', true);
+    expect(result).toEqual({ outcome: 'blocked', message: 'QUANTITY_LIMIT: Linen tablecloth: 6 ordered, at most 5 per order' });
+    expect(upstreamCalls).toEqual([]);
+  });
+
+  it('reports an approved order it could not bind as an error, not as done', async () => {
+    bindFails = true;
+    const result = await decide('0', true);
+    expect(result.outcome).toBe('error');
+    expect(result.message).toContain(`Order ${NEW_ORDER_ID} was created in PayPal but could not be recorded as the customer's: PayPal 500`);
+    expect(entries[1]).toMatchObject({ outcome: 'executed', detail: expect.stringContaining('not bound to the task customer') });
+  });
+
+  it('keeps the hold open when no catalogue is configured', async () => {
+    expect(await decide('0', true, null)).toEqual({ outcome: 'error', message: 'The shop catalogue could not be reached to check the order; the order is still held, try again' });
+    expect(entries).toHaveLength(1);
+  });
+
+  it('records a rejection without reaching PayPal', async () => {
+    expect(await decide('0', false)).toEqual({ outcome: 'blocked', message: 'Order rejected; nothing was sent to PayPal' });
     expect(upstreamCalls).toEqual([]);
   });
 });

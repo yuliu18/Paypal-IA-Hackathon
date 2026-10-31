@@ -68,6 +68,14 @@ describe('sqlite audit log', () => {
     expect(await log.billedSince(since, 'GBP')).toEqual({ minor: 0, currency: 'GBP' });
   });
 
+  it('keeps orders out of both the money refunded and the money billed: creating an order moves no money', async () => {
+    await log.record(entry());
+    await log.record(entry({ tool: 'create_order', args: { currencyCode: 'USD' }, outcome: 'executed', moved: { minor: 9998, currency: 'USD' } }));
+    const since = new Date('2026-10-20T00:00:00Z');
+    expect(await log.movedSince(since, 'USD')).toEqual({ minor: 2500, currency: 'USD' });
+    expect(await log.billedSince(since, 'USD')).toEqual({ minor: 0, currency: 'USD' });
+  });
+
   it('keeps the amount when an update omits it', async () => {
     const id = await log.record(entry());
     await log.update(id, { outcome: 'executed' });
@@ -115,6 +123,33 @@ describe('sqlite audit log', () => {
     const approvalId = await log.record(entry({ resolves: heldId, outcome: 'executed' }));
     expect(await log.isResolved(heldId)).toBe(true);
     expect((await log.get(approvalId))?.resolves).toBe(heldId);
+  });
+
+  it('names the customer the guard bound a created order to, and nobody for any other order', async () => {
+    const ORDER = '5O190127TN364715T';
+    const created = (overrides: Partial<AuditEntry> = {}) => entry({ tool: 'create_order', args: { currencyCode: 'USD' }, moved: undefined, outcome: 'pending', ...overrides });
+    expect(await log.boundOrderCustomer(ORDER)).toBeUndefined();
+
+    const id = await log.record(created());
+    await log.update(id, { outcome: 'executed' });
+    expect(await log.boundOrderCustomer(ORDER)).toBeUndefined();
+    await log.update(id, { detail: `Order ${ORDER} bound to the task customer` });
+    expect(await log.boundOrderCustomer(ORDER)).toBe('ana@example.com');
+    expect(await log.boundOrderCustomer('9X190127TN364715T')).toBeUndefined();
+
+    // Bound after the guard's timeout: PayPal answered late and the binding followed.
+    const late = await log.record(created({ task: { ...task, mandate: { customerEmail: 'ben@example.com' } } }));
+    await log.update(late, { outcome: 'executed', detail: 'PayPal completed the call after the guard timed out; Order 7A190127TN364715T bound to the task customer' });
+    expect(await log.boundOrderCustomer('7A190127TN364715T')).toBe('ben@example.com');
+
+    // Created but not bound, failed, or not a create_order: no customer.
+    const unbound = await log.record(created({ outcome: 'executed', detail: 'Order 8B190127TN364715T was created in PayPal but not bound to the task customer: PayPal 500' }));
+    expect(unbound).toBeTruthy();
+    expect(await log.boundOrderCustomer('8B190127TN364715T')).toBeUndefined();
+    await log.record(created({ outcome: 'error', detail: 'Order 6C190127TN364715T bound to the task customer' }));
+    expect(await log.boundOrderCustomer('6C190127TN364715T')).toBeUndefined();
+    await log.record(entry({ outcome: 'executed', detail: 'Order 5D190127TN364715T bound to the task customer' }));
+    expect(await log.boundOrderCustomer('5D190127TN364715T')).toBeUndefined();
   });
 });
 

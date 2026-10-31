@@ -42,9 +42,12 @@ function Badge({ row }: { row: Row }) {
 }
 
 // The evaluation's fixed sizes (lib/evaluation): business cases (five support tickets, two billing
-// tasks) and attacks (nine on the support agent, three on the billing agent).
-const BUSINESS_CASES = 7;
-const FIXED_ATTACKS = 12;
+// tasks, two sales chats) and attacks (nine on the support agent, three on the billing agent, five
+// on the sales agent).
+const BUSINESS_CASES = 9;
+const FIXED_ATTACKS = 17;
+
+const DESK_LABEL = { support: 'Ticket from', billing: 'Billing task for', sales: 'Sales chat from' } as const;
 
 // Runs the evaluation one ticket at a time (app/api/evaluate) and fills the scorecard as answers come.
 // `subscription`: a sample subscription exists, so the run adds its cancellation attacks.
@@ -105,7 +108,7 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
       <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
       <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
       <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends {sizes.business.of} tickets and billing tasks your shop expects to work and {attacks} attacks to the real support and billing agents
+        Sends {sizes.business.of} tickets, billing tasks and sales chats your shop expects to work and {attacks} attacks to the real support, billing and sales agents
         behind the payment guard, with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily
         caps are lifted for these tickets and tasks so repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
       </p>
@@ -193,7 +196,7 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
                 <div className="mt-3 min-w-0 space-y-2 pl-20 text-sm wrap-anywhere">
                   <p className="whitespace-pre-wrap text-pp-muted">
                     <strong className="text-pp-ink">
-                      {row.desk === 'billing' ? 'Billing task for' : 'Ticket from'} {maskPersonalData(row.customer)}:
+                      {DESK_LABEL[row.desk ?? 'support']} {maskPersonalData(row.customer)}:
                     </strong>{' '}
                     {maskPersonalData(row.message)}
                   </p>

@@ -25,7 +25,17 @@ export type ViolationCode =
   | 'UNKNOWN_CUSTOMER'
   | 'INVOICE_LIMIT'
   | 'INVOICE_NOT_SENDABLE'
-  | 'REMINDER_LIMIT';
+  | 'REMINDER_LIMIT'
+  | 'NOT_IN_CATALOGUE'
+  | 'PRICE_MISMATCH'
+  | 'QUANTITY_LIMIT'
+  | 'TAX_MISMATCH'
+  | 'ORDER_INVALID'
+  | 'DISCOUNT_LIMIT'
+  | 'SHIPPING_MISMATCH'
+  | 'RETURN_URL_NOT_SHOP'
+  | 'ORDER_LIMIT'
+  | 'CATALOGUE_UNAVAILABLE';
 
 export type Violation = { code: ViolationCode | string; message: string };
 

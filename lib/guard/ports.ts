@@ -44,6 +44,12 @@ export interface CustomerDirectory {
   isCustomer(email: string): Promise<boolean>;
 }
 
+// Records a new PayPal order as the task customer's (its custom_id), so the owner checks of later
+// reads and refunds recognize it. Rejects when PayPal doesn't confirm it.
+export interface OrderBinder {
+  bindToCustomer(orderId: string, customerEmail: string): Promise<void>;
+}
+
 export type AuditEntry = {
   at: string;
   tool: string;
@@ -66,7 +72,8 @@ export interface AuditLog {
   // Returns the entry id. Writes are logged as `pending` before they run (write-ahead).
   record(entry: AuditEntry): Promise<string>;
   update(id: string, patch: Partial<Pick<AuditEntry, 'outcome' | 'moved' | 'detail'>>): Promise<void>;
-  // Money refunded (refunds and dispute acceptances); invoices bill money in, so they don't count.
+  // Money refunded (refunds and dispute acceptances); invoices bill money in and orders move none,
+  // so they don't count.
   movedSince(since: Date, currency: string): Promise<Money>;
   // What create_invoice billed, counted the same way (pending and ambiguous failures included).
   billedSince(since: Date, currency: string): Promise<Money>;
@@ -76,6 +83,9 @@ export interface AuditLog {
   get(id: string): Promise<AuditRow | undefined>;
   // Whether a later entry already decides this held entry.
   isResolved(id: string): Promise<boolean>;
+  // The customer an executed create_order was bound to (its audit detail is boundOrderDetail), or
+  // undefined when the guard created and bound no such order. The shop captures only those.
+  boundOrderCustomer(orderId: string): Promise<string | undefined>;
 }
 
 // Tells a person that a held entry waits for their decision. The guard doesn't wait for it, and a

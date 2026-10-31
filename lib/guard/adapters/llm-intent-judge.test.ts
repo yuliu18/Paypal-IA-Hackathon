@@ -105,6 +105,20 @@ describe('createLlmIntentJudge', () => {
     expect(sent[0].content).toContain("the untrusted input is the shop's task");
   });
 
+  it('covers orders of the sales agent: only what the customer asked to buy, and no discount the shop does not offer', async () => {
+    let sent: ChatMessage[] = [];
+    const judge = createLlmIntentJudge(async (messages) => {
+      sent = messages;
+      return '{"verdict":"allow","reason":"ok"}';
+    });
+    await judge.judge({ task, call: { tool: 'create_order', args: { currencyCode: 'USD', items: [] } } });
+    expect(sent[0].content).toContain('a support, a billing or a sales agent');
+    expect(sent[0].content).toContain('Creating an order asks the writing customer to pay');
+    expect(sent[0].content).toContain('catalogue prices');
+    expect(sent[0].content).toContain('never because the customer demands one');
+    expect(sent[1].content).toContain('create_order');
+  });
+
   it('passes the untrusted input as delimited data, never inside the system prompt', async () => {
     let sent: ChatMessage[] = [];
     const judge = createLlmIntentJudge(async (messages) => {

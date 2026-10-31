@@ -11,6 +11,13 @@ import { DatabaseSync } from 'node:sqlite';
 import type { Money } from '../domain/policy';
 import type { AuditEntry, AuditLog, AuditRow } from '../ports';
 
+// Type-only imports above: other processes load this file with plain Node (see the test that
+// appends from several processes), which can't resolve the app's extensionless imports. So the
+// binding detail and the order id pattern are repeated here, as domain/order.ts writes them
+// (boundOrderDetail, ORDER_ID); the guard and adapter tests pin the same text.
+const ORDER_ID = /^[A-Z0-9]{17,32}$/;
+const boundOrderDetail = (orderId: string) => `Order ${orderId} bound to the task customer`;
+
 export type { AuditRow };
 
 export type ChainCheck =
@@ -145,9 +152,10 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   // Pending entries count too: their call may have moved money even if it never settled. An
-  // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry.
+  // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry;
+  // creating an order moves no money (the buyer pays it later, in PayPal), so neither sum sees it.
   const sumSince = db.prepare(
-    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool IS NOT 'create_invoice'`,
+    `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND COALESCE(tool, '') NOT IN ('create_invoice', 'create_order')`,
   );
   const billedSumSince = db.prepare(
     `SELECT COALESCE(SUM(moved_minor), 0) AS total FROM audit_state WHERE at >= ? AND moved_currency = ? AND tool = 'create_invoice'`,
@@ -158,6 +166,12 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
   const unsettled = db.prepare(
     `SELECT 1 FROM audit_state WHERE tool = 'create_refund' AND json_extract(args, '$.capture_id') = ?
        AND moved_minor IS NOT NULL AND outcome IN ('pending', 'error') LIMIT 1`,
+  );
+  // An executed create_order whose detail records the binding, alone or after a late-answer note
+  // (executeWrite joins details with '; '). Order ids are [A-Z0-9], so they hold no LIKE wildcard.
+  const boundOrder = db.prepare(
+    `SELECT DISTINCT json_extract(task, '$.mandate.customerEmail') AS customer FROM audit_state
+       WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = ? OR detail LIKE ?)`,
   );
   const rowsAfter = db.prepare(`SELECT * FROM audit_log WHERE id > ? ORDER BY id`);
   const hashAt = db.prepare(`SELECT hash FROM audit_log WHERE id = ?`);
@@ -334,6 +348,14 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
 
     async isResolved(id) {
       return resolver.get(Number(id)) !== undefined;
+    },
+
+    async boundOrderCustomer(orderId) {
+      if (!ORDER_ID.test(orderId)) return undefined;
+      const detail = boundOrderDetail(orderId);
+      const rows = boundOrder.all(detail, `%; ${detail}`) as { customer: unknown }[];
+      // One order is created once; two customers for one id would be a log nobody can trust.
+      return rows.length === 1 && typeof rows[0].customer === 'string' ? rows[0].customer : undefined;
     },
 
     list(limit) {

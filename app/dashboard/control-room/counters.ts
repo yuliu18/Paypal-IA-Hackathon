@@ -7,6 +7,7 @@ import type { GuardDecisionRow } from '@/lib/guard/dashboard-rows';
 export const AGENTS = [
   { id: 'support', name: 'Support', does: 'refunds, disputes, cancellations' },
   { id: 'billing', name: 'Billing', does: 'invoices and reminders' },
+  { id: 'sales', name: 'Sales', does: 'catalogue orders' },
 ] as const;
 
 export type ControlRoomCounters = {

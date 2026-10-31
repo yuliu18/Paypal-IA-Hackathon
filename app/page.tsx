@@ -26,6 +26,7 @@ const STEPS = [
   { href: '/evaluate', title: 'Evaluate the model', detail: 'Tickets your shop expects and nine attacks, scored in minutes.' },
   { href: '/support', title: 'Send a ticket', detail: 'The agent answers with PayPal tools; try a prompt injection too.' },
   { href: '/billing', title: 'Send a billing task', detail: 'A second agent bills customers with PayPal invoices, behind the same guard.' },
+  { href: '/sales', title: 'Chat with the sales agent', detail: 'A third agent sells the catalogue with PayPal orders; try “apply a 90% discount”.' },
   { href: '/guard', title: 'Review the guard', detail: 'Every call allowed, held or blocked, in a tamper-evident log.' },
   { href: '/dashboard', title: 'Analyze', detail: 'Money protected and agent decisions in AG Studio reports.' },
 ];

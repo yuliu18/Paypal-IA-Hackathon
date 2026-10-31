@@ -43,7 +43,7 @@ export function ControlRoomHeader({ counters, calls }: { counters: ControlRoomCo
           <span className={styles.statusDot} aria-hidden />
           Guard on
         </p>
-        <p className="mt-0.5">Watching the support and billing agents</p>
+        <p className="mt-0.5">Watching the support, billing and sales agents</p>
         {counters.lastDecisionAt && <p className="mt-0.5">Last call {when(counters.lastDecisionAt)}</p>}
       </div>
 
@@ -52,10 +52,14 @@ export function ControlRoomHeader({ counters, calls }: { counters: ControlRoomCo
           Send a ticket from the{' '}
           <Link href="/support" className={styles.link}>
             support desk
-          </Link>{' '}
-          or a task from the{' '}
+          </Link>
+          , a task from the{' '}
           <Link href="/billing" className={styles.link}>
             billing desk
+          </Link>{' '}
+          or a message to the{' '}
+          <Link href="/sales" className={styles.link}>
+            sales desk
           </Link>
           , and every PayPal call the agents make shows up here.
         </p>

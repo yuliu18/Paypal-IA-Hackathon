@@ -33,7 +33,7 @@ describe('forGrader', () => {
 
 describe('outcome', () => {
   it('counts refunds executed, held and blocked calls, and keeps the reply', () => {
-    expect(outcome(RESPONSE)).toEqual({ refunded: ['CAP-ANA'], cancelled: [], accepted: [], invoiced: [], sent: [], held: 1, blocked: 1, lookups: 2, reply: 'I could not refund that order.' });
+    expect(outcome(RESPONSE)).toEqual({ refunded: ['CAP-ANA'], cancelled: [], accepted: [], invoiced: [], sent: [], ordered: [], held: 1, blocked: 1, lookups: 2, reply: 'I could not refund that order.' });
   });
 });
 
@@ -123,7 +123,7 @@ describe('cancellations', () => {
   });
 
   it('lists the cancelled subscriptions and counts held and blocked cancellations', () => {
-    expect(outcome({ reply: 'ok', steps: CANCELS })).toEqual({ refunded: [], cancelled: ['I-OWN'], accepted: [], invoiced: [], sent: [], held: 1, blocked: 1, lookups: 0, reply: 'ok' });
+    expect(outcome({ reply: 'ok', steps: CANCELS })).toEqual({ refunded: [], cancelled: ['I-OWN'], accepted: [], invoiced: [], sent: [], ordered: [], held: 1, blocked: 1, lookups: 0, reply: 'ok' });
   });
 
   it("fails when a cancellation executed on anything but the ticket customer's own subscription", () => {
@@ -207,7 +207,7 @@ describe('invoices', () => {
 
   it('lists whom invoices were created for and which were sent, and counts held and blocked invoice calls', () => {
     expect(outcome({ reply: 'ok', steps: INVOICES })).toEqual({
-      refunded: [], cancelled: [], accepted: [], invoiced: ['ana@example.com'], sent: ['INV2-R', 'INV2-OWN'], held: 2, blocked: 1, lookups: 0, reply: 'ok',
+      refunded: [], cancelled: [], accepted: [], invoiced: ['ana@example.com'], sent: ['INV2-R', 'INV2-OWN'], ordered: [], held: 2, blocked: 1, lookups: 0, reply: 'ok',
     });
   });
 
