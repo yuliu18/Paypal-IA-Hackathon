@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { setNavSlot } from './nav-slot';
 import { BrandMark } from './ui/brand-mark';
 
@@ -25,28 +26,29 @@ const Icons = {
   gear: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />,
 };
 
+// Labels are message keys under `nav` (messages/<locale>/nav.json).
 type Item = { href: string; label: string; icon: keyof typeof Icons };
 const SECTIONS: { title?: string; items: Item[] }[] = [
   {
     items: [
-      { href: '/', label: 'Overview', icon: 'home' },
-      { href: '/guard', label: 'Guard log', icon: 'shield' },
-      { href: '/dashboard', label: 'Dashboard', icon: 'chart' },
+      { href: '/', label: 'items.overview', icon: 'home' },
+      { href: '/guard', label: 'items.guard', icon: 'shield' },
+      { href: '/dashboard', label: 'items.dashboard', icon: 'chart' },
     ],
   },
   {
-    title: 'Agents',
+    title: 'groups.agents',
     items: [
-      { href: '/support', label: 'Support', icon: 'chat' },
-      { href: '/billing', label: 'Billing', icon: 'invoice' },
-      { href: '/sales', label: 'Sales', icon: 'cart' },
+      { href: '/support', label: 'items.support', icon: 'chat' },
+      { href: '/billing', label: 'items.billing', icon: 'invoice' },
+      { href: '/sales', label: 'items.sales', icon: 'cart' },
     ],
   },
   {
-    title: 'Test and set up',
+    title: 'groups.setup',
     items: [
-      { href: '/evaluate', label: 'Evaluate a model', icon: 'check' },
-      { href: '/settings', label: 'Settings', icon: 'gear' },
+      { href: '/evaluate', label: 'items.evaluate', icon: 'check' },
+      { href: '/settings', label: 'items.settings', icon: 'gear' },
     ],
   },
 ];
@@ -58,6 +60,7 @@ const Icon = ({ name }: { name: keyof typeof Icons }) => (
 );
 
 export function AppNav() {
+  const t = useTranslations('nav');
   const pathname = usePathname();
   const onDashboard = pathname.startsWith('/dashboard');
   // The owner's choice holds until they move between the dashboard and the other pages.
@@ -75,14 +78,14 @@ export function AppNav() {
           <BrandMark className="size-7" />
           <span className={`leading-tight ${label}`}>
             Payment Guard
-            <span className="hidden text-xs font-normal text-pp-muted md:block">Firewall for AI agents on PayPal</span>
+            <span className="hidden text-xs font-normal text-pp-muted md:block">{t('tagline')}</span>
           </span>
         </Link>
         <button
           type="button"
           onClick={() => setChoice({ onDashboard, compact: !compact })}
-          title={compact ? 'Expand menu' : 'Collapse menu'}
-          aria-label={compact ? 'Expand menu' : 'Collapse menu'}
+          title={compact ? t('expand') : t('collapse')}
+          aria-label={compact ? t('expand') : t('collapse')}
           aria-expanded={!compact}
           className={`hidden size-8 shrink-0 items-center justify-center rounded-md text-pp-muted hover:bg-pp-canvas hover:text-pp-ink md:flex ${compact ? '' : 'ml-auto'}`}
         >
@@ -92,18 +95,18 @@ export function AppNav() {
       {SECTIONS.map((section, index) => (
         <div key={index} className="flex shrink-0 gap-1 md:mb-4 md:flex-col">
           {section.title && (
-            <p className={`hidden px-2 pb-1 text-xs font-medium text-pp-muted ${compact ? '' : 'md:block'}`}>{section.title}</p>
+            <p className={`hidden px-2 pb-1 text-xs font-medium text-pp-muted ${compact ? '' : 'md:block'}`}>{t(section.title)}</p>
           )}
           {section.items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              title={compact ? item.label : undefined}
+              title={compact ? t(item.label) : undefined}
               aria-current={active(item.href) ? 'page' : undefined}
               className={`flex shrink-0 items-center gap-2.5 rounded px-2 py-1.5 ${compact ? 'md:justify-center md:py-2' : ''} ${active(item.href) ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-canvas'}`}
             >
               <Icon name={item.icon} />
-              <span className={label}>{item.label}</span>
+              <span className={label}>{t(item.label)}</span>
             </Link>
           ))}
           {section.items.some((item) => item.href === '/dashboard') && onDashboard && !compact && (

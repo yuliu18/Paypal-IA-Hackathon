@@ -1,0 +1,157 @@
+{
+  "title": "设置",
+  "intro": "让智能体及其支付守卫适应你的业务。更改将在下一次对话中生效。",
+  "locked": "只读：此服务器设置了 SETTINGS_LOCKED，因此公开演示的密钥和限额无法更改。",
+  "lockedError": "此服务器上的设置为只读（SETTINGS_LOCKED）。",
+  "sectionsLabel": "设置分区",
+  "hasError": "有错误",
+  "sections": {
+    "language": "语言",
+    "business": "业务",
+    "limits": "限额",
+    "ai": "AI 模型",
+    "paypal": "PayPal 应用",
+    "notifications": "通知"
+  },
+  "language": {
+    "title": "语言",
+    "detail": "菜单、按钮和页面所用的语言。选择后立即生效，仅作用于此浏览器，无需点击“保存设置”。",
+    "label": "界面语言",
+    "saving": "正在切换…",
+    "failed": "无法切换语言，请重试。"
+  },
+  "keyHint": {
+    "saved": "{thing, select, url {已保存的 URL} password {已保存的密码} token {已保存的令牌} other {已保存的密钥}} {hint}。留空则保持不变。",
+    "env": "正在使用服务器环境中的 {variable}（{hint}）。留空则保持不变。",
+    "unreadable": "{thing, select, url {已保存的 URL} password {已保存的密码} token {已保存的令牌} other {已保存的密钥}}已无法读取（其加密密钥已更改）。请重新输入。",
+    "none": "{thing, select, url {尚无 URL。} password {尚无密码。} token {尚无令牌。} other {尚无密钥。}}"
+  },
+  "picker": {
+    "choose": "请选择…",
+    "search": "搜索…",
+    "noMatches": "无匹配项",
+    "useCustom": "使用“{value}”"
+  },
+  "groups": {
+    "Global": "全球",
+    "China": "中国",
+    "Gateway": "网关",
+    "Local": "本地",
+    "More providers": "更多提供商",
+    "Other": "其他",
+    "listed": "由提供商列出"
+  },
+  "model": {
+    "context": "{size} 上下文",
+    "free": "免费",
+    "price": "${input} / ${output} 每百万 token",
+    "count": "{count} 个模型"
+  },
+  "testConnection": "测试连接",
+  "business": {
+    "detail": "智能体为谁工作，以及它们遵循的退款政策。守卫的 AI 裁判会依据此政策检查每一笔退款。",
+    "name": "业务名称",
+    "contactEmails": "联系邮箱",
+    "contactEmailsHint": "除客户邮箱外，回复中唯一允许出现的地址。",
+    "refundPolicy": "退款政策"
+  },
+  "limits": {
+    "detail": "无论 AI 如何决定，守卫都会强制执行：任何提示词都无法提高这些限额。",
+    "currency": "货币",
+    "noDecimals": "无小数",
+    "autoRefundUpTo": "自动退款上限",
+    "autoRefundUpToHint": "低于此金额的退款会自动执行。",
+    "approvalUpTo": "人工审批上限",
+    "approvalUpToHint": "更大的退款在 /guard 等待处理；超过此金额将被拦截。",
+    "dailyCap": "每日上限",
+    "dailyCapHint": "智能体每天可退款的总额。"
+  },
+  "ai": {
+    "detail": "运行智能体的模型，以及评判其调用的模型。任何提供 OpenAI 兼容 API 的提供商都可以：云端、国内厂商或在你自己的机器上运行。",
+    "provider": "提供商",
+    "providerHint": "来自 models.dev 目录的 {count} 个提供商，另可使用任何 OpenAI 兼容的 URL。",
+    "custom": "自定义（任何 OpenAI 兼容的 URL）",
+    "baseUrl": "基础 URL",
+    "apiKey": "API 密钥",
+    "apiKeyPlaceholder": "粘贴你的 API 密钥",
+    "removeKey": "删除已保存的密钥",
+    "agentModel": "智能体模型",
+    "agentModelHint": "回复工单并调用 PayPal 工具。仅列出支持工具调用的模型。",
+    "providerDefault": "提供商默认",
+    "providerDefaultNamed": "提供商默认（{name}）",
+    "judgeModel": "裁判模型",
+    "judgeModelHint": "依据政策检查每一笔退款。",
+    "sameAsAgent": "与智能体相同",
+    "connectedModels": "已连接：有 {count} 个模型可选。",
+    "connectedAgent": "已使用智能体模型连接。"
+  },
+  "paypal": {
+    "detail": "智能体通过你在 PayPal Developer Dashboard（developer.paypal.com，Apps & Credentials）中创建的 REST 应用访问 PayPal。在此粘贴其沙盒 client ID 和 secret。沙盒中的资金是虚拟的。",
+    "clientId": "Client ID",
+    "secret": "Secret",
+    "removeSecret": "删除已保存的 secret",
+    "connected": "已连接到 PayPal 沙盒。",
+    "needCredentials": "请先输入 client ID 和 secret。"
+  },
+  "notifications": {
+    "detail": "当守卫将某个调用暂扣待人工处理时，会通知所有已开启的渠道。消息包含金额、脱敏后的客户邮箱和触发的规则，绝不包含工单内容。",
+    "webhook": {
+      "title": "Slack 或 Discord",
+      "detail": "通过传入 webhook 在团队聊天的某个频道中发送消息。",
+      "url": "Webhook URL",
+      "remove": "删除已保存的 webhook",
+      "guide": "如何获取 Slack 或 Discord webhook",
+      "step1": "<strong>Slack：</strong>在 <link>api.slack.com/apps</link> 上，在你的工作区中从头创建一个应用，打开 <em>Incoming Webhooks</em> 并启用，点击 <em>Add New Webhook to Workspace</em>，选择频道并复制 URL。",
+      "step2": "<strong>Discord：</strong>在你的服务器中，打开频道的 <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>，然后点击 <em>Copy Webhook URL</em>。",
+      "step3": "将 URL 粘贴到上方并保存。该 URL 相当于密码：任何拥有它的人都可以向该频道发消息。"
+    },
+    "email": {
+      "title": "邮件",
+      "detail": "向“业务”中的联系邮箱发送邮件：设置了服务器、登录名和密码时通过你自己的邮件服务器（SMTP），否则通过 Resend。",
+      "from": "发件地址",
+      "fromHint": "使用 SMTP 时，留空则以登录名发送。使用 Resend 时，填写在 Resend 验证过的域名下的发件人，或用 onboarding@resend.dev 试用。",
+      "smtpHost": "SMTP 服务器",
+      "smtpPort": "SMTP 端口",
+      "smtpPortHint": "587（STARTTLS）或 465（TLS）。留空即 587。",
+      "smtpUser": "SMTP 登录名",
+      "smtpPassword": "SMTP 密码",
+      "smtpPasswordForgets": "更改服务器或登录名会清除它。",
+      "smtpPasswordPlaceholder": "应用专用密码",
+      "removeSmtpPassword": "删除已保存的 SMTP 密码",
+      "smtpGuide": "如何使用你自己的邮箱（SMTP）发送邮件",
+      "smtpStep1": "<strong>Gmail：</strong>为该账户开启两步验证，然后在 <link>myaccount.google.com/apppasswords</link> 创建应用专用密码。服务器填 <code>smtp.gmail.com</code>，端口 <code>587</code>，登录名为你的 Gmail 地址，密码为 16 位应用专用密码（不含空格）。普通密码无法使用。",
+      "smtpStep2": "<strong>Outlook 或 Microsoft 365：</strong>服务器 <code>smtp.office365.com</code>，端口 <code>587</code>，填写你的地址和密码（如果账户启用了两步登录，则使用应用专用密码）。管理员可能需要为该邮箱允许 SMTP。",
+      "smtpStep3": "<strong>主机商提供的邮箱：</strong>服务器、端口和登录名可在主机控制面板的邮件设置中找到，通常是 <code>mail.your-domain.com</code>，登录名为完整邮箱地址。",
+      "smtpStep4": "发件地址留空：大多数邮件服务器只允许从你登录的账户发信。",
+      "smtpStep5": "密码只以加密方式（TLS）传输，且只会发送给保存时对应的服务器和登录名。",
+      "resendKey": "Resend API 密钥",
+      "removeResendKey": "删除已保存的 Resend 密钥",
+      "resendGuide": "如何使用 Resend 发送邮件",
+      "resendStep1": "在 <link>resend.com</link> 注册（免费套餐即可），打开 <em>API Keys</em>，创建一个具有发送权限的密钥并粘贴到上方。",
+      "resendStep2": "<strong>试用：</strong>发件地址使用 <code>onboarding@resend.dev</code>，并将你的 Resend 账户邮箱填入“业务”中的联系邮箱。Resend 的测试发件人只会投递到该地址，且可能进入垃圾邮件。",
+      "resendStep3": "<strong>正式使用：</strong>在 Resend 中打开 <em>Domains</em>，添加你的域名和它显示的 DNS 记录，验证通过后使用该域名下的地址，例如 <code>guard@your-domain.com</code>。",
+      "resendStep4": "“业务”中的每个联系邮箱都会收到消息。"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "detail": "由你自己的 Telegram 机器人向某个聊天、群组或频道发送消息。",
+      "token": "Telegram 机器人令牌",
+      "chatId": "Telegram chat id",
+      "chatIdHint": "先给你的机器人发一条消息，然后打开 api.telegram.org/bot{token}/getUpdates 并复制 chat.id，或使用 @频道名。",
+      "removeToken": "删除已保存的机器人令牌",
+      "guide": "如何设置 Telegram",
+      "step1": "在 Telegram 中打开 <link>@BotFather</link>，发送 <code>/newbot</code>，选择一个名称和以 <code>bot</code> 结尾的用户名，然后将它给你的令牌（<code>123456789:AA…</code>）粘贴到上方。",
+      "step2": "与新机器人打开聊天，点击 <em>Start</em> 并随便发一条消息。如果是群组，将机器人加入群组并在群里发一条消息。",
+      "step3": "在浏览器中打开 <code>{url}</code>，令牌紧跟在 <code>bot</code> 之后，不要有空格或 <code>{brackets}</code>。将 <code>{chat}</code> 中的数字复制到 Telegram chat id。群组的 id 以 <code>-100</code> 开头。",
+      "step4": "如果显示 <code>{empty}</code>，说明机器人还没有收到消息：给它发一条后刷新。",
+      "step5": "在服务器上设置 <code>APP_URL</code>，消息才会链接到守卫页面；否则 Telegram 会把 <code>/guard</code> 显示为机器人命令。"
+    }
+  },
+  "save": {
+    "button": "保存设置",
+    "saving": "正在保存…",
+    "scope": "保存所有分区，而不只是当前分区。",
+    "saved": "已保存。下一个工单将使用这些设置。",
+    "checkFields": "请检查标出的字段。"
+  }
+}

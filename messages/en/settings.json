@@ -1,0 +1,157 @@
+{
+  "title": "Settings",
+  "intro": "Adapt the agents and their payment guard to your business. Changes apply to the next conversation.",
+  "locked": "Read-only: this server sets SETTINGS_LOCKED, so the public demo's keys and limits can't be changed.",
+  "lockedError": "Settings are read-only on this server (SETTINGS_LOCKED).",
+  "sectionsLabel": "Settings sections",
+  "hasError": "has an error",
+  "sections": {
+    "language": "Language",
+    "business": "Business",
+    "limits": "Limits",
+    "ai": "AI model",
+    "paypal": "PayPal app",
+    "notifications": "Notifications"
+  },
+  "language": {
+    "title": "Language",
+    "detail": "The language of the menus, buttons and pages. It applies at once, in this browser only, without Save settings.",
+    "label": "Interface language",
+    "saving": "Switching…",
+    "failed": "Could not change the language. Try again."
+  },
+  "keyHint": {
+    "saved": "{thing, select, url {Saved URL} password {Saved password} token {Saved token} other {Saved key}} {hint}. Leave blank to keep it.",
+    "env": "Using {variable} from the server environment ({hint}). Leave blank to keep it.",
+    "unreadable": "{thing, select, url {The saved URL} password {The saved password} token {The saved token} other {The saved key}} cannot be read any more (its encryption key changed). Enter it again.",
+    "none": "{thing, select, url {No URL yet.} password {No password yet.} token {No token yet.} other {No key yet.}}"
+  },
+  "picker": {
+    "choose": "Choose…",
+    "search": "Search…",
+    "noMatches": "No matches",
+    "useCustom": "Use “{value}”"
+  },
+  "groups": {
+    "Global": "Global",
+    "China": "China",
+    "Gateway": "Gateway",
+    "Local": "Local",
+    "More providers": "More providers",
+    "Other": "Other",
+    "listed": "Listed by the provider"
+  },
+  "model": {
+    "context": "{size} context",
+    "free": "free",
+    "price": "${input} / ${output} per 1M",
+    "count": "{count} models"
+  },
+  "testConnection": "Test connection",
+  "business": {
+    "detail": "Who the agents work for and the refund policy they follow. The guard's AI judge checks every refund against this policy.",
+    "name": "Business name",
+    "contactEmails": "Contact emails",
+    "contactEmailsHint": "The only addresses besides the customer's that replies may include.",
+    "refundPolicy": "Refund policy"
+  },
+  "limits": {
+    "detail": "Enforced by the guard whatever the AI decides: no prompt can raise them.",
+    "currency": "Currency",
+    "noDecimals": "no decimals",
+    "autoRefundUpTo": "Refund automatically up to",
+    "autoRefundUpToHint": "Smaller refunds run on their own.",
+    "approvalUpTo": "Ask a person up to",
+    "approvalUpToHint": "Larger refunds wait on /guard; above this they are blocked.",
+    "dailyCap": "Daily cap",
+    "dailyCapHint": "Total the agent may refund per day."
+  },
+  "ai": {
+    "detail": "The model that runs the agents and the one that judges their calls. Any provider with an OpenAI-compatible API works: cloud, Chinese or running on your own machine.",
+    "provider": "Provider",
+    "providerHint": "{count} providers from the models.dev catalog, plus any OpenAI-compatible URL.",
+    "custom": "Custom (any OpenAI-compatible URL)",
+    "baseUrl": "Base URL",
+    "apiKey": "API key",
+    "apiKeyPlaceholder": "Paste your API key",
+    "removeKey": "Remove the saved key",
+    "agentModel": "Agent model",
+    "agentModelHint": "Answers the tickets and calls PayPal tools. Only models that can call tools are listed.",
+    "providerDefault": "Provider default",
+    "providerDefaultNamed": "Provider default ({name})",
+    "judgeModel": "Judge model",
+    "judgeModelHint": "Checks each refund against the policy.",
+    "sameAsAgent": "Same as the agent",
+    "connectedModels": "Connected: {count} models to choose from.",
+    "connectedAgent": "Connected with the agent model."
+  },
+  "paypal": {
+    "detail": "The agents reach PayPal through a REST app you create in the PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials). Paste its sandbox client ID and secret here. Money in the sandbox is fictitious.",
+    "clientId": "Client ID",
+    "secret": "Secret",
+    "removeSecret": "Remove the saved secret",
+    "connected": "Connected to PayPal sandbox.",
+    "needCredentials": "Enter the client ID and secret first."
+  },
+  "notifications": {
+    "detail": "When the guard holds a call for a person, it tells every channel that is on. The message names the amount, the masked customer email and the rules, never the ticket's text.",
+    "webhook": {
+      "title": "Slack or Discord",
+      "detail": "A message in a channel of your team chat, through an incoming webhook.",
+      "url": "Webhook URL",
+      "remove": "Remove the saved webhook",
+      "guide": "How to get a Slack or Discord webhook",
+      "step1": "<strong>Slack:</strong> on <link>api.slack.com/apps</link>, create an app from scratch in your workspace, open <em>Incoming Webhooks</em>, turn them on, click <em>Add New Webhook to Workspace</em>, pick the channel and copy the URL.",
+      "step2": "<strong>Discord:</strong> in your server, open the channel's <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, then <em>Copy Webhook URL</em>.",
+      "step3": "Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel."
+    },
+    "email": {
+      "title": "Email",
+      "detail": "An email to the contact emails under Business, through your own mail server (SMTP) when its server, login and password are set, otherwise through Resend.",
+      "from": "From address",
+      "fromHint": "With SMTP, leave blank to send from the login. With Resend, a sender on a domain verified there, or onboarding@resend.dev to try it.",
+      "smtpHost": "SMTP server",
+      "smtpPort": "SMTP port",
+      "smtpPortHint": "587 (STARTTLS) or 465 (TLS). Blank means 587.",
+      "smtpUser": "SMTP login",
+      "smtpPassword": "SMTP password",
+      "smtpPasswordForgets": "Changing the server or login forgets it.",
+      "smtpPasswordPlaceholder": "App password",
+      "removeSmtpPassword": "Remove the saved SMTP password",
+      "smtpGuide": "How to set up email with your own mail (SMTP)",
+      "smtpStep1": "<strong>Gmail:</strong> turn on 2-Step Verification for the account, then create an app password on <link>myaccount.google.com/apppasswords</link>. Use server <code>smtp.gmail.com</code>, port <code>587</code>, your Gmail address as login and the 16-letter app password, without spaces. Your normal password does not work.",
+      "smtpStep2": "<strong>Outlook or Microsoft 365:</strong> server <code>smtp.office365.com</code>, port <code>587</code>, your address and password (an app password if the account uses two-step sign-in). Your administrator may need to allow SMTP for the mailbox.",
+      "smtpStep3": "<strong>Your hosting's mail:</strong> the server, port and login are in your hosting panel's email settings, often <code>mail.your-domain.com</code> with your full address as login.",
+      "smtpStep4": "Leave the from address blank: most mail servers only send from the account you log in with.",
+      "smtpStep5": "The password only travels encrypted (TLS), and is only ever sent to the server and login it was saved with.",
+      "resendKey": "Resend API key",
+      "removeResendKey": "Remove the saved Resend key",
+      "resendGuide": "How to set up email with Resend",
+      "resendStep1": "Sign up on <link>resend.com</link> (the free plan is enough), open <em>API Keys</em>, create a key with sending access and paste it above.",
+      "resendStep2": "<strong>To try it:</strong> use <code>onboarding@resend.dev</code> as the from address and put your Resend account's email in Contact emails under Business. Resend's test sender only delivers to that address, and may land in spam.",
+      "resendStep3": "<strong>For real:</strong> in Resend, open <em>Domains</em>, add your domain, add the DNS records it shows, and once it is verified use an address on it, like <code>guard@your-domain.com</code>.",
+      "resendStep4": "Every contact email under Business gets the message."
+    },
+    "telegram": {
+      "title": "Telegram",
+      "detail": "A message from your own Telegram bot to a chat, a group or a channel.",
+      "token": "Telegram bot token",
+      "chatId": "Telegram chat id",
+      "chatIdHint": "Message your bot, then open api.telegram.org/bot{token}/getUpdates and copy chat.id, or use @channelname.",
+      "removeToken": "Remove the saved bot token",
+      "guide": "How to set up Telegram",
+      "step1": "In Telegram, open <link>@BotFather</link>, send <code>/newbot</code>, choose a name and a username ending in <code>bot</code>, and paste the token it gives you (<code>123456789:AA…</code>) above.",
+      "step2": "Open a chat with your new bot, press <em>Start</em> and send it any message. For a group, add the bot to the group and send a message there.",
+      "step3": "In a browser, open <code>{url}</code>, with your token right after <code>bot</code> and no spaces or <code>{brackets}</code>. Copy the number in <code>{chat}</code> into Telegram chat id. A group's id starts with <code>-100</code>.",
+      "step4": "If it shows <code>{empty}</code>, the bot has no message yet: send it one and reload.",
+      "step5": "Set <code>APP_URL</code> on the server so the message links to the guard page; without it, Telegram shows <code>/guard</code> as a bot command."
+    }
+  },
+  "save": {
+    "button": "Save settings",
+    "saving": "Saving…",
+    "scope": "Saves every section, not only this one.",
+    "saved": "Saved. The next ticket uses these settings.",
+    "checkFields": "Check the highlighted fields."
+  }
+}

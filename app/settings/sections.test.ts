@@ -3,7 +3,7 @@ import { firstSectionWithError, SETTINGS_SECTIONS } from './sections';
 
 describe('settings sections', () => {
   it('lists the sections in the order the menu shows them', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Business', 'Limits', 'AI model', 'PayPal app', 'Notifications']);
+    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Language', 'Business', 'Limits', 'AI model', 'PayPal app', 'Notifications']);
   });
 
   it('opens the first section, in menu order, that holds a field the save rejected', () => {
@@ -17,5 +17,9 @@ describe('settings sections', () => {
   it('stays where it is when the error belongs to no field', () => {
     expect(firstSectionWithError({ form: 'Could not save' })).toBeUndefined();
     expect(firstSectionWithError({})).toBeUndefined();
+  });
+
+  it('puts the language first, which holds no field of the settings form', () => {
+    expect(SETTINGS_SECTIONS[0]).toMatchObject({ id: 'language', fields: [] });
   });
 });

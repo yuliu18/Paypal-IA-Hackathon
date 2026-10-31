@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { matchOptions, type PickerOption } from './picker-logic';
 
 export type { PickerOption };
@@ -13,7 +14,7 @@ export function Picker({
   value,
   onChange,
   options,
-  placeholder = 'Choose…',
+  placeholder,
   allowCustom = false,
   disabled = false,
   className = '',
@@ -27,6 +28,7 @@ export function Picker({
   disabled?: boolean;
   className?: string;
 }) {
+  const t = useTranslations('settings.picker');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -34,7 +36,7 @@ export function Picker({
   const listId = useId();
   const selected = options.find((o) => o.value === value);
 
-  const shown = useMemo(() => matchOptions(options, query, allowCustom), [options, query, allowCustom]);
+  const shown = useMemo(() => matchOptions(options, query, allowCustom, (value) => t('useCustom', { value })), [options, query, allowCustom, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,7 +78,7 @@ export function Picker({
         className="flex h-10 w-full items-center gap-2 rounded border border-pp-border bg-pp-surface px-3 text-left text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted"
       >
         {selected?.icon && <Logo src={selected.icon} />}
-        <span className={`min-w-0 flex-1 truncate ${value ? '' : 'text-pp-muted'}`}>{selected?.label ?? (value || placeholder)}</span>
+        <span className={`min-w-0 flex-1 truncate ${value ? '' : 'text-pp-muted'}`}>{selected?.label ?? (value || placeholder || t('choose'))}</span>
         {selected?.detail && <span className="shrink-0 truncate text-xs text-pp-muted">{selected.detail}</span>}
         <svg viewBox="0 0 24 24" className="size-4 shrink-0 fill-none stroke-pp-muted" strokeWidth={2} aria-hidden>
           <path d="M6 9l6 6 6-6" />
@@ -92,12 +94,12 @@ export function Picker({
               setActive(0);
             }}
             onKeyDown={onKeyDown}
-            placeholder="Search…"
+            placeholder={t('search')}
             aria-controls={listId}
             className="h-10 w-full border-b border-pp-border px-3 text-sm focus:outline-none"
           />
           <ul id={listId} role="listbox" className="max-h-72 overflow-y-auto py-1">
-            {shown.length === 0 && <li className="px-3 py-2 text-sm text-pp-muted">No matches</li>}
+            {shown.length === 0 && <li className="px-3 py-2 text-sm text-pp-muted">{t('noMatches')}</li>}
             {shown.map((option, index) => (
               <li key={`${option.group ?? ''}/${option.value}`}>
                 {option.group && option.group !== shown[index - 1]?.group && (

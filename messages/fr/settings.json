@@ -1,0 +1,157 @@
+{
+  "title": "Paramètres",
+  "intro": "Adaptez les agents et leur guard de paiement à votre activité. Les changements s'appliquent à la conversation suivante.",
+  "locked": "Lecture seule : ce serveur définit SETTINGS_LOCKED, les clés et les limites de la démo publique ne peuvent donc pas être modifiées.",
+  "lockedError": "Les paramètres sont en lecture seule sur ce serveur (SETTINGS_LOCKED).",
+  "sectionsLabel": "Sections des paramètres",
+  "hasError": "contient une erreur",
+  "sections": {
+    "language": "Langue",
+    "business": "Entreprise",
+    "limits": "Limites",
+    "ai": "Modèle d'IA",
+    "paypal": "App PayPal",
+    "notifications": "Notifications"
+  },
+  "language": {
+    "title": "Langue",
+    "detail": "La langue des menus, des boutons et des pages. Elle s'applique tout de suite, dans ce navigateur uniquement, sans Enregistrer les paramètres.",
+    "label": "Langue de l'interface",
+    "saving": "Changement…",
+    "failed": "Impossible de changer la langue. Réessayez."
+  },
+  "keyHint": {
+    "saved": "{thing, select, url {URL enregistrée} password {Mot de passe enregistré} token {Jeton enregistré} other {Clé enregistrée}} {hint}. Laissez vide pour la conserver.",
+    "env": "Utilise {variable} de l'environnement du serveur ({hint}). Laissez vide pour la conserver.",
+    "unreadable": "{thing, select, url {L'URL enregistrée ne peut plus être lue} password {Le mot de passe enregistré ne peut plus être lu} token {Le jeton enregistré ne peut plus être lu} other {La clé enregistrée ne peut plus être lue}} (sa clé de chiffrement a changé). Saisissez-la à nouveau.",
+    "none": "{thing, select, url {Pas encore d'URL.} password {Pas encore de mot de passe.} token {Pas encore de jeton.} other {Pas encore de clé.}}"
+  },
+  "picker": {
+    "choose": "Choisir…",
+    "search": "Rechercher…",
+    "noMatches": "Aucun résultat",
+    "useCustom": "Utiliser « {value} »"
+  },
+  "groups": {
+    "Global": "International",
+    "China": "Chine",
+    "Gateway": "Passerelle",
+    "Local": "Local",
+    "More providers": "Autres fournisseurs",
+    "Other": "Autre",
+    "listed": "Listés par le fournisseur"
+  },
+  "model": {
+    "context": "contexte de {size}",
+    "free": "gratuit",
+    "price": "{input} $ / {output} $ par 1M",
+    "count": "{count} modèles"
+  },
+  "testConnection": "Tester la connexion",
+  "business": {
+    "detail": "Pour qui travaillent les agents et la politique de remboursement qu'ils suivent. Le juge IA du guard vérifie chaque remboursement selon cette politique.",
+    "name": "Nom de l'entreprise",
+    "contactEmails": "E-mails de contact",
+    "contactEmailsHint": "Les seules adresses, en plus de celle du client, que les réponses peuvent contenir.",
+    "refundPolicy": "Politique de remboursement"
+  },
+  "limits": {
+    "detail": "Appliquées par le guard quoi que décide l'IA : aucun prompt ne peut les relever.",
+    "currency": "Devise",
+    "noDecimals": "sans décimales",
+    "autoRefundUpTo": "Rembourser automatiquement jusqu'à",
+    "autoRefundUpToHint": "Les remboursements inférieurs se font seuls.",
+    "approvalUpTo": "Demander à une personne jusqu'à",
+    "approvalUpToHint": "Les remboursements plus élevés attendent sur /guard ; au-delà, ils sont bloqués.",
+    "dailyCap": "Plafond journalier",
+    "dailyCapHint": "Total que l'agent peut rembourser par jour."
+  },
+  "ai": {
+    "detail": "Le modèle qui fait tourner les agents et celui qui juge leurs appels. Tout fournisseur avec une API compatible OpenAI convient : cloud, chinois ou sur votre propre machine.",
+    "provider": "Fournisseur",
+    "providerHint": "{count} fournisseurs du catalogue models.dev, plus toute URL compatible OpenAI.",
+    "custom": "Personnalisé (toute URL compatible OpenAI)",
+    "baseUrl": "URL de base",
+    "apiKey": "Clé d'API",
+    "apiKeyPlaceholder": "Collez votre clé d'API",
+    "removeKey": "Supprimer la clé enregistrée",
+    "agentModel": "Modèle de l'agent",
+    "agentModelHint": "Répond aux tickets et appelle les outils PayPal. Seuls les modèles capables d'appeler des outils sont listés.",
+    "providerDefault": "Par défaut du fournisseur",
+    "providerDefaultNamed": "Par défaut du fournisseur ({name})",
+    "judgeModel": "Modèle juge",
+    "judgeModelHint": "Vérifie chaque remboursement selon la politique.",
+    "sameAsAgent": "Le même que l'agent",
+    "connectedModels": "Connecté : {count} modèles au choix.",
+    "connectedAgent": "Connecté avec le modèle de l'agent."
+  },
+  "paypal": {
+    "detail": "Les agents accèdent à PayPal via une app REST que vous créez dans le PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials). Collez ici son client ID et son secret sandbox. L'argent du sandbox est fictif.",
+    "clientId": "Client ID",
+    "secret": "Secret",
+    "removeSecret": "Supprimer le secret enregistré",
+    "connected": "Connecté au sandbox PayPal.",
+    "needCredentials": "Saisissez d'abord le client ID et le secret."
+  },
+  "notifications": {
+    "detail": "Quand le guard retient un appel pour une personne, il prévient chaque canal activé. Le message indique le montant, l'e-mail masqué du client et les règles, jamais le texte du ticket.",
+    "webhook": {
+      "title": "Slack ou Discord",
+      "detail": "Un message dans un canal du chat de votre équipe, via un webhook entrant.",
+      "url": "URL du webhook",
+      "remove": "Supprimer le webhook enregistré",
+      "guide": "Comment obtenir un webhook Slack ou Discord",
+      "step1": "<strong>Slack :</strong> sur <link>api.slack.com/apps</link>, créez une app de zéro dans votre workspace, ouvrez <em>Incoming Webhooks</em>, activez-les, cliquez sur <em>Add New Webhook to Workspace</em>, choisissez le canal et copiez l'URL.",
+      "step2": "<strong>Discord :</strong> sur votre serveur, ouvrez <em>Edit Channel</em> du canal → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, puis <em>Copy Webhook URL</em>.",
+      "step3": "Collez l'URL ci-dessus et enregistrez. L'URL fonctionne comme un mot de passe : quiconque la possède peut publier dans le canal."
+    },
+    "email": {
+      "title": "E-mail",
+      "detail": "Un e-mail aux e-mails de contact d'Entreprise, via votre propre serveur de messagerie (SMTP) quand son serveur, son identifiant et son mot de passe sont définis, sinon via Resend.",
+      "from": "Adresse d'expéditeur",
+      "fromHint": "Avec SMTP, laissez vide pour envoyer depuis l'identifiant. Avec Resend, un expéditeur sur un domaine vérifié chez Resend, ou onboarding@resend.dev pour essayer.",
+      "smtpHost": "Serveur SMTP",
+      "smtpPort": "Port SMTP",
+      "smtpPortHint": "587 (STARTTLS) ou 465 (TLS). Vide signifie 587.",
+      "smtpUser": "Identifiant SMTP",
+      "smtpPassword": "Mot de passe SMTP",
+      "smtpPasswordForgets": "Changer le serveur ou l'identifiant l'efface.",
+      "smtpPasswordPlaceholder": "Mot de passe d'application",
+      "removeSmtpPassword": "Supprimer le mot de passe SMTP enregistré",
+      "smtpGuide": "Comment configurer l'e-mail avec votre propre messagerie (SMTP)",
+      "smtpStep1": "<strong>Gmail :</strong> activez la validation en deux étapes du compte, puis créez un mot de passe d'application sur <link>myaccount.google.com/apppasswords</link>. Utilisez le serveur <code>smtp.gmail.com</code>, le port <code>587</code>, votre adresse Gmail comme identifiant et le mot de passe d'application de 16 lettres, sans espaces. Votre mot de passe habituel ne fonctionne pas.",
+      "smtpStep2": "<strong>Outlook ou Microsoft 365 :</strong> serveur <code>smtp.office365.com</code>, port <code>587</code>, votre adresse et votre mot de passe (un mot de passe d'application si le compte utilise la connexion en deux étapes). Votre administrateur devra peut-être autoriser SMTP pour la boîte.",
+      "smtpStep3": "<strong>La messagerie de votre hébergeur :</strong> le serveur, le port et l'identifiant figurent dans les réglages e-mail de votre panneau d'hébergement, souvent <code>mail.your-domain.com</code> avec votre adresse complète comme identifiant.",
+      "smtpStep4": "Laissez l'adresse d'expéditeur vide : la plupart des serveurs n'envoient que depuis le compte avec lequel vous vous connectez.",
+      "smtpStep5": "Le mot de passe ne circule que chiffré (TLS) et n'est envoyé qu'au serveur et à l'identifiant avec lesquels il a été enregistré.",
+      "resendKey": "Clé d'API Resend",
+      "removeResendKey": "Supprimer la clé Resend enregistrée",
+      "resendGuide": "Comment configurer l'e-mail avec Resend",
+      "resendStep1": "Inscrivez-vous sur <link>resend.com</link> (l'offre gratuite suffit), ouvrez <em>API Keys</em>, créez une clé avec accès en envoi et collez-la ci-dessus.",
+      "resendStep2": "<strong>Pour essayer :</strong> utilisez <code>onboarding@resend.dev</code> comme expéditeur et mettez l'e-mail de votre compte Resend dans E-mails de contact d'Entreprise. L'expéditeur de test de Resend ne livre qu'à cette adresse et peut finir en spam.",
+      "resendStep3": "<strong>Pour de vrai :</strong> dans Resend, ouvrez <em>Domains</em>, ajoutez votre domaine et les enregistrements DNS affichés, puis une fois vérifié, utilisez une adresse sur ce domaine, comme <code>guard@your-domain.com</code>.",
+      "resendStep4": "Chaque e-mail de contact d'Entreprise reçoit le message."
+    },
+    "telegram": {
+      "title": "Telegram",
+      "detail": "Un message de votre propre bot Telegram vers un chat, un groupe ou un canal.",
+      "token": "Jeton du bot Telegram",
+      "chatId": "Chat id Telegram",
+      "chatIdHint": "Écrivez à votre bot, puis ouvrez api.telegram.org/bot{token}/getUpdates et copiez chat.id, ou utilisez @nomducanal.",
+      "removeToken": "Supprimer le jeton du bot enregistré",
+      "guide": "Comment configurer Telegram",
+      "step1": "Dans Telegram, ouvrez <link>@BotFather</link>, envoyez <code>/newbot</code>, choisissez un nom et un nom d'utilisateur se terminant par <code>bot</code>, et collez ci-dessus le jeton qu'il vous donne (<code>123456789:AA…</code>).",
+      "step2": "Ouvrez une discussion avec votre nouveau bot, appuyez sur <em>Start</em> et envoyez-lui un message. Pour un groupe, ajoutez le bot au groupe et envoyez-y un message.",
+      "step3": "Dans un navigateur, ouvrez <code>{url}</code>, avec votre jeton juste après <code>bot</code> et sans espaces ni <code>{brackets}</code>. Copiez le nombre de <code>{chat}</code> dans Chat id Telegram. L'id d'un groupe commence par <code>-100</code>.",
+      "step4": "S'il affiche <code>{empty}</code>, le bot n'a pas encore de message : envoyez-lui-en un et rechargez.",
+      "step5": "Définissez <code>APP_URL</code> sur le serveur pour que le message renvoie vers la page du guard ; sans elle, Telegram affiche <code>/guard</code> comme une commande du bot."
+    }
+  },
+  "save": {
+    "button": "Enregistrer les paramètres",
+    "saving": "Enregistrement…",
+    "scope": "Enregistre toutes les sections, pas seulement celle-ci.",
+    "saved": "Enregistré. Le prochain ticket utilise ces paramètres.",
+    "checkFields": "Vérifiez les champs signalés."
+  }
+}

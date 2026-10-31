@@ -1,0 +1,19 @@
+{
+  "tagline": "Pare-feu pour agents IA sur PayPal",
+  "expand": "Déplier le menu",
+  "collapse": "Replier le menu",
+  "groups": {
+    "agents": "Agents",
+    "setup": "Tester et configurer"
+  },
+  "items": {
+    "overview": "Vue d'ensemble",
+    "guard": "Journal du guard",
+    "dashboard": "Tableau de bord",
+    "support": "Support",
+    "billing": "Facturation",
+    "sales": "Ventes",
+    "evaluate": "Évaluer un modèle",
+    "settings": "Paramètres"
+  }
+}

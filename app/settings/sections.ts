@@ -1,8 +1,10 @@
 import type { SettingsForm } from '@/lib/settings/settings';
 
 // The settings page's sections, one shown at a time, and the form fields each one holds, so a
-// rejected save can open the section of the field it names.
+// rejected save can open the section of the field it names. The language is saved on its own, at
+// once, in this browser (./language-actions), so it holds no field of the form.
 export const SETTINGS_SECTIONS = [
+  { id: 'language', label: 'Language', fields: [] },
   { id: 'business', label: 'Business', fields: ['name', 'contactEmails', 'refundPolicy'] },
   { id: 'limits', label: 'Limits', fields: ['currency', 'autoRefundUpTo', 'approvalUpTo', 'dailyCap'] },
   { id: 'ai', label: 'AI model', fields: ['provider', 'baseUrl', 'agentModel', 'judgeModel', 'apiKey'] },

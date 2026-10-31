@@ -1,0 +1,19 @@
+{
+  "tagline": "Firewall for AI agents on PayPal",
+  "expand": "Expand menu",
+  "collapse": "Collapse menu",
+  "groups": {
+    "agents": "Agents",
+    "setup": "Test and set up"
+  },
+  "items": {
+    "overview": "Overview",
+    "guard": "Guard log",
+    "dashboard": "Dashboard",
+    "support": "Support",
+    "billing": "Billing",
+    "sales": "Sales",
+    "evaluate": "Evaluate a model",
+    "settings": "Settings"
+  }
+}

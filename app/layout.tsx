@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Schibsted_Grotesk } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
 import "./globals.css";
 import { AppNav } from "./app-nav";
 
@@ -14,27 +16,35 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    template: "%s · Payment Guard",
-    default: "Payment Guard",
-  },
-  description: "A firewall between a shop's AI agents and its PayPal account: every payment call is checked, held for a person or stopped.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  return {
+    title: {
+      template: "%s · Payment Guard",
+      default: "Payment Guard",
+    },
+    description: t("appDescription"),
+  };
+}
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+// The language is the browser's choice on /settings (i18n/request.ts); client components get its
+// messages through the provider.
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${ui.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full overflow-hidden">
         {/* The frame fills the window exactly and pages scroll inside it, so popups that libraries
             append to <body> can never stretch the page and leave a gap below the menu. */}
-        <div className="flex h-dvh flex-col md:flex-row">
-          <AppNav />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
-        </div>
+        <NextIntlClientProvider>
+          <div className="flex h-dvh flex-col md:flex-row">
+            <AppNav />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
+          </div>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

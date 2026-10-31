@@ -1,0 +1,19 @@
+{
+  "tagline": "PayPal 上 AI 智能体的防火墙",
+  "expand": "展开菜单",
+  "collapse": "收起菜单",
+  "groups": {
+    "agents": "智能体",
+    "setup": "测试与设置"
+  },
+  "items": {
+    "overview": "概览",
+    "guard": "守卫日志",
+    "dashboard": "仪表板",
+    "support": "客服",
+    "billing": "账单",
+    "sales": "销售",
+    "evaluate": "评估模型",
+    "settings": "设置"
+  }
+}

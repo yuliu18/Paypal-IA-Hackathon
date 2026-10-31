@@ -1,0 +1,19 @@
+{
+  "tagline": "Cortafuegos para agentes de IA en PayPal",
+  "expand": "Expandir menú",
+  "collapse": "Contraer menú",
+  "groups": {
+    "agents": "Agentes",
+    "setup": "Probar y configurar"
+  },
+  "items": {
+    "overview": "Resumen",
+    "guard": "Registro del guard",
+    "dashboard": "Panel",
+    "support": "Soporte",
+    "billing": "Facturación",
+    "sales": "Ventas",
+    "evaluate": "Evaluar un modelo",
+    "settings": "Ajustes"
+  }
+}
