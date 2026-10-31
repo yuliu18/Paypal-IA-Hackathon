@@ -142,7 +142,8 @@ const guard: AgPageState = {
       },
       format: {
         ...titled('Decisions per day', 'Each bar is one day of calls: green passed to PayPal, amber held for you, red stopped'),
-        style: chartStyle(undefined, { everyDay: true }),
+        // Thin bars, one per day with space between, so neighbouring days never read as one bar.
+        style: chartStyle(COLUMN, { everyDay: true }),
       },
     },
     'by-action': {
