@@ -15,7 +15,7 @@ A Next.js control panel that puts a payment guard between an AI support agent an
 
 - **Settings** (`/settings`): a shop adapts the agent to its business without touching code: refund policy, money limits, AI provider and models, PayPal app. See [Settings](#settings).
 
-- **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over the shop's PayPal data (invoices, transactions, balances, products, plans) and the guard's decisions, joined together, which you can edit and save in the browser.
+- **Dashboard** (`/dashboard`): an [AG Studio](https://www.ag-grid.com/studio/) report over the shop's PayPal data (invoices, transactions, balances, products, plans) and the guard's decisions, joined together, which you can edit and save in the browser. Fetching the PayPal data takes PayPal a few seconds, so the server keeps the last snapshot: a visit gets it at once, and one older than 30 seconds is replaced in the background for the next visit (the guard's decisions are always read fresh). Only the first visit after the server starts waits.
 - **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, keeps the customer's personal data from the agent, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
 - **Billing agent** (`/billing`): a second AI agent bills the shop's customers with PayPal invoices, behind the same guard. See [Billing agent](#billing-agent).
 - **Sales agent** (`/sales`): a third AI agent sells the shop's catalogue to the customer who writes with a PayPal order, behind the same guard. See [Sales agent](#sales-agent).
