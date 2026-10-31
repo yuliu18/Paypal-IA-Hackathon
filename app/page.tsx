@@ -129,13 +129,14 @@ export default async function Overview() {
           Put an agent to work
         </h2>
         <p className="mt-1 text-pp-muted">Each one has its own PayPal tools and the same guard. Ask it something normal, then try to fool it.</p>
-        <ul className="mt-6 grid border-y border-pp-border md:grid-cols-3 md:divide-x md:divide-pp-border">
+        <ul className="mt-6 grid gap-4 md:grid-cols-3">
           {AGENTS.map((agent) => (
-            <li key={agent.href} className="flex flex-col border-b border-pp-border py-6 last:border-b-0 md:border-b-0 md:px-6 md:first:pl-0 md:last:pr-0">
+            <li key={agent.href} className="flex flex-col rounded-lg border border-pp-border bg-pp-surface p-6">
               <h3 className="text-lg font-semibold">{agent.name} agent</h3>
-              <p className="mt-1.5 flex-1 text-[15px] leading-relaxed text-pp-muted">{agent.does}</p>
-              <blockquote className="mt-4 border-l-2 border-pp-danger pl-3 text-sm text-pp-ink">“{agent.attack}”</blockquote>
-              <Link href={agent.href} className="mt-4 text-sm font-semibold text-pp-blue hover:underline">
+              <p className="mt-1.5 text-[15px] leading-relaxed text-pp-muted">{agent.does}</p>
+              <p className="mt-4 text-xs font-semibold text-pp-danger">Try to fool it</p>
+              <blockquote className="mt-1.5 rounded-md bg-pp-danger-tint px-3 py-2 text-sm text-pp-ink">“{agent.attack}”</blockquote>
+              <Link href={agent.href} className="mt-auto pt-5 text-sm font-semibold text-pp-blue hover:underline">
                 Open the {agent.name.toLowerCase()} desk
               </Link>
             </li>
@@ -143,20 +144,20 @@ export default async function Overview() {
         </ul>
       </section>
 
-      <section className="mt-16 grid gap-10 md:grid-cols-2">
-        <div>
+      <section className="mt-16 grid items-start gap-4 md:grid-cols-2">
+        <div className="flex flex-col rounded-lg border border-pp-border bg-pp-surface p-6">
           <h2 className="text-xl font-semibold">Test a model before you trust it</h2>
           <p className="mt-2 max-w-md text-[15px] leading-relaxed text-pp-muted">
             The evaluation runs the tickets your shop expects and a set of attacks against the model you choose, and scores how often
             it does the job and how often only the guard kept the money in place.
           </p>
-          <Link href="/evaluate" className="mt-4 inline-block text-sm font-semibold text-pp-blue hover:underline">
+          <Link href="/evaluate" className="mt-auto pt-5 text-sm font-semibold text-pp-blue hover:underline">
             Evaluate a model
           </Link>
         </div>
-        <div>
+        <div className="flex flex-col rounded-lg border border-pp-border bg-pp-surface p-6">
           <h2 className="text-xl font-semibold">Your rules for {business.name}</h2>
-          <dl className="mt-3 divide-y divide-pp-gridline border-y border-pp-gridline text-[15px]">
+          <dl className="mt-3 divide-y divide-pp-gridline text-[15px]">
             <div className="flex justify-between gap-6 py-2.5">
               <dt className="text-pp-muted">Passes on its own</dt>
               <dd className="font-semibold">up to {format(limits.approvalThreshold)}</dd>
@@ -183,7 +184,7 @@ export default async function Overview() {
               </dd>
             </div>
           </dl>
-          <Link href="/settings" className="mt-4 inline-block text-sm font-semibold text-pp-blue hover:underline">
+          <Link href="/settings" className="mt-auto pt-5 text-sm font-semibold text-pp-blue hover:underline">
             Change the rules
           </Link>
         </div>
