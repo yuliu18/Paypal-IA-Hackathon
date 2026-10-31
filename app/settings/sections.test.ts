@@ -1,0 +1,21 @@
+import { describe, expect, it } from 'vitest';
+import { firstSectionWithError, SETTINGS_SECTIONS } from './sections';
+
+describe('settings sections', () => {
+  it('lists the sections in the order the menu shows them', () => {
+    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Business', 'Limits', 'AI model', 'PayPal app', 'Notifications']);
+  });
+
+  it('opens the first section, in menu order, that holds a field the save rejected', () => {
+    expect(firstSectionWithError({ telegramChatId: 'x', approvalUpTo: 'y' })).toBe('limits');
+    expect(firstSectionWithError({ paypalSecret: 'x' })).toBe('paypal');
+    expect(firstSectionWithError({ judgeModel: 'x' })).toBe('ai');
+    expect(firstSectionWithError({ smtpPort: 'x' })).toBe('notifications');
+    expect(firstSectionWithError({ refundPolicy: 'x' })).toBe('business');
+  });
+
+  it('stays where it is when the error belongs to no field', () => {
+    expect(firstSectionWithError({ form: 'Could not save' })).toBeUndefined();
+    expect(firstSectionWithError({})).toBeUndefined();
+  });
+});

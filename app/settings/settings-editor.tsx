@@ -7,20 +7,25 @@ import { CURRENCIES } from '@/lib/settings/currencies';
 import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
 import { Picker, type PickerOption } from './picker';
 import { latestOnly } from './picker-logic';
+import { firstSectionWithError, sectionHasError, SETTINGS_SECTIONS, type SettingsSectionId } from './sections';
+import { PageHeader } from '../ui/page-header';
+import { primaryButton, Spinner } from '../ui/desk';
 
 type Check = { ok: boolean; message: string } | null;
 
 // Every one-line field is h-10, so inputs and pickers line up.
 const input =
-  'h-10 w-full rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
+  'h-10 w-full rounded-md border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
 const button =
-  'rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight disabled:opacity-60';
+  'rounded-md border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-ink hover:border-pp-blue disabled:opacity-60';
 
-function Section({ title, detail, children }: { title: string; detail: string; children: React.ReactNode }) {
+// One section of the form. Only the open one shows; the others stay in the form, hidden, so one
+// save keeps every field.
+function Section({ id, open, title, detail, children }: { id: SettingsSectionId; open: SettingsSectionId; title: string; detail: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-pp-border bg-pp-surface p-6">
-      <h2 className="text-lg font-semibold text-pp-navy">{title}</h2>
-      <p className="mt-1 text-sm text-pp-muted">{detail}</p>
+    <section id={`settings-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} hidden={id !== open} className="rounded-lg border border-pp-border bg-pp-surface p-6">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
     </section>
   );
@@ -101,6 +106,15 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   const [testing, startTesting] = useTransition();
   const errors: Partial<Record<keyof SettingsForm | 'form', string>> = state && !state.ok ? state.errors : {};
   const defaults = view.form;
+  const [open, setOpen] = useState<SettingsSectionId>('business');
+  // A rejected save opens the first section with a field it names (set during render, when a new
+  // answer arrives, rather than in an effect).
+  const [answered, setAnswered] = useState(state);
+  if (state !== answered) {
+    setAnswered(state);
+    const withError = firstSectionWithError(errors);
+    if (withError) setOpen(withError);
+  }
 
   function chooseProvider(id: string) {
     setProvider(id);
@@ -159,18 +173,37 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl p-8 font-paypal text-pp-ink">
-      <h1 className="text-[28px] font-semibold text-pp-navy">Settings</h1>
-      <p className="mt-1 text-pp-muted">Adapt the support agent and its payment guard to your business. Changes apply to the next ticket.</p>
+    <main className="mx-auto w-full max-w-6xl px-6 py-8 font-paypal text-pp-ink md:px-10">
+      <PageHeader title="Settings">Adapt the agents and their payment guard to your business. Changes apply to the next conversation.</PageHeader>
       {view.locked && (
-        <p className="mt-4 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
+        <p className="mt-6 rounded-lg border border-pp-warning/40 bg-pp-warning-tint px-4 py-3 text-sm text-pp-warning">
           Read-only: this server sets SETTINGS_LOCKED, so the public demo&apos;s keys and limits can&apos;t be changed.
         </p>
       )}
 
-      <form ref={formRef} onSubmit={submit} className="mt-6">
-        <fieldset disabled={view.locked} className="space-y-6">
-          <Section title="Business" detail="Who the agent works for and the refund policy it follows. The guard's judge checks every refund against this policy.">
+      <form ref={formRef} onSubmit={submit} className="mt-8 grid items-start gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
+        <nav role="tablist" aria-label="Settings sections" aria-orientation="vertical" className="flex gap-1 overflow-x-auto md:sticky md:top-8 md:flex-col">
+          {SETTINGS_SECTIONS.map((section) => {
+            const current = section.id === open;
+            return (
+              <button
+                key={section.id}
+                id={`tab-${section.id}`}
+                type="button"
+                role="tab"
+                aria-selected={current}
+                aria-controls={`settings-${section.id}`}
+                onClick={() => setOpen(section.id)}
+                className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm ${current ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-surface'}`}
+              >
+                {section.label}
+                {sectionHasError(errors, section.id) && <span className="size-2 rounded-full bg-pp-danger" aria-label="has an error" />}
+              </button>
+            );
+          })}
+        </nav>
+        <fieldset disabled={view.locked} className="min-w-0 space-y-6">
+          <Section id="business" open={open} title="Business" detail="Who the agents work for and the refund policy they follow. The guard's AI judge checks every refund against this policy.">
             <Field label="Business name" error={errors.name}>
               <input name="name" defaultValue={defaults.name} className={input} />
             </Field>
@@ -182,7 +215,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </Field>
           </Section>
 
-          <Section title="Limits" detail="Enforced by the guard whatever the AI decides: no prompt can raise them.">
+          <Section id="limits" open={open} title="Limits" detail="Enforced by the guard whatever the AI decides: no prompt can raise them.">
             <Field label="Currency" error={errors.currency}>
               <Picker
                 name="currency"
@@ -203,7 +236,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </Field>
           </Section>
 
-          <Section title="AI" detail="Any provider with an OpenAI-compatible API: cloud, Chinese or running on your own machine.">
+          <Section id="ai" open={open} title="AI model" detail="The model that runs the agents and the one that judges their calls. Any provider with an OpenAI-compatible API works: cloud, Chinese or running on your own machine.">
             <Field label="Provider" hint={`${providers.length} providers from the models.dev catalog, plus any OpenAI-compatible URL.`}>
               <Picker name="provider" value={provider} onChange={chooseProvider} options={providerOptions} disabled={view.locked} />
             </Field>
@@ -246,7 +279,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </div>
           </Section>
 
-          <Section title="PayPal" detail="Sandbox REST app credentials from developer.paypal.com. Money in the sandbox is fictitious.">
+          <Section id="paypal" open={open} title="PayPal app" detail="The agents reach PayPal through a REST app you create in the PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials). Paste its sandbox client ID and secret here. Money in the sandbox is fictitious.">
             <Field label="Client ID" error={errors.paypalClientId}>
               <input name="paypalClientId" defaultValue={defaults.paypalClientId} autoComplete="off" className={input} />
             </Field>
@@ -266,7 +299,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </div>
           </Section>
 
-          <Section title="Notifications" detail="When the guard holds a refund for a person, it tells every channel set here: a Slack or Discord webhook, an email, a Telegram chat. The message names the amount, the masked customer email and the rules, never the ticket's text.">
+          <Section id="notifications" open={open} title="Notifications" detail="When the guard holds a refund for a person, it tells every channel set here: a Slack or Discord webhook, an email, a Telegram chat. The message names the amount, the masked customer email and the rules, never the ticket's text.">
             <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
               <input
                 name="webhookUrl"
@@ -412,10 +445,12 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </SetupGuide>
           </Section>
 
-          <div className="flex items-center gap-4">
-            <button type="submit" disabled={saving} className="rounded bg-pp-blue px-5 py-2 font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60">
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="submit" disabled={saving} className={primaryButton}>
+              {saving && <Spinner />}
               {saving ? 'Saving…' : 'Save settings'}
             </button>
+            <span className="text-sm text-pp-muted">Saves every section, not only this one.</span>
             {state?.ok && <span className="text-sm text-pp-success">Saved. The next ticket uses these settings.</span>}
             {errors.form && <span className="text-sm text-pp-danger">{errors.form}</span>}
             {state && !state.ok && !errors.form && <span className="text-sm text-pp-danger">Check the highlighted fields.</span>}
