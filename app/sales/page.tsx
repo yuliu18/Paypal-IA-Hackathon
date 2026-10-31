@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { SalesDesk, type CheckoutNotice } from './sales-desk';
 import { SALES_SCENARIOS } from './scenarios';
 
-export const metadata: Metadata = { title: 'Sales agent demo' };
+export const metadata: Metadata = { title: 'Sales agent' };
 
 const one = (value: string | string[] | undefined) => (typeof value === 'string' ? value : undefined);
 

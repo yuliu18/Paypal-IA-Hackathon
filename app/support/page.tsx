@@ -8,7 +8,7 @@ import type { DisputePaymentStep } from './dispute-payment-button';
 import { buildScenarios, pendingApproval, type SampleDisputeTicket } from './scenarios';
 import { SupportDesk } from './support-desk';
 
-export const metadata: Metadata = { title: 'Support agent demo' };
+export const metadata: Metadata = { title: 'Support agent' };
 
 // The sample subscription as PayPal reports it now: its owner is whoever approved it. Undefined
 // when there is none or PayPal can't be reached, which leaves its tickets out.

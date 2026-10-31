@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { secondaryButton, Spinner } from '../ui/desk';
 import { createSampleSubscriptionAction } from './actions';
 
 const linkClass = 'font-semibold text-pp-blue hover:underline';
@@ -11,12 +12,14 @@ export function SubscriptionButton({ pendingApproveUrl }: { pendingApproveUrl?: 
   const [state, action, pending] = useActionState(createSampleSubscriptionAction, null);
   const approveUrl = state?.ok ? state.approveUrl : pendingApproveUrl;
   return (
-    <form action={action} className="flex flex-wrap items-center gap-3">
+    <form action={action} className="flex flex-col items-start gap-2 px-4 py-3">
+      <p className="text-sm text-pp-muted">A subscription a sandbox buyer approves, for the cancellation tickets.</p>
       <button
         type="submit"
         disabled={pending}
-        className="rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight disabled:opacity-60"
+        className={secondaryButton}
       >
+        {pending && <Spinner className="text-pp-blue" />}
         {pending ? 'Creating subscription…' : 'Create sample subscription'}
       </button>
       {state && !state.ok && <span className="text-sm text-pp-danger">{state.message}</span>}

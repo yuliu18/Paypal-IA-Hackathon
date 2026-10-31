@@ -4,7 +4,7 @@ import { readSeed } from '@/lib/demo-seed';
 import { BillingDesk } from './billing-desk';
 import { buildBillingScenarios } from './scenarios';
 
-export const metadata: Metadata = { title: 'Billing agent demo' };
+export const metadata: Metadata = { title: 'Billing agent' };
 
 export default async function BillingPage() {
   await connection();
