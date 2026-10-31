@@ -55,12 +55,14 @@ const AXES = {
 // Charts over a month of days keep the automatic width: a fixed one would not fit and would scroll.
 const BAR = 16;
 const COLUMN = 28;
-const chartStyle = (barWidth?: number, { legend = true }: { legend?: boolean } = {}) => ({
+// `everyDay`: a date axis drawn as one category per day, so every bar has its date under it; a
+// time axis labels only some days and leaves bars unnamed. For charts over a few days only.
+const chartStyle = (barWidth?: number, { legend = true, everyDay = false }: { legend?: boolean; everyDay?: boolean } = {}) => ({
   theme: {
     common: { legend: { enabled: legend, position: 'top-left' as const } },
     ...(barWidth && { bar: { series: { width: barWidth } } }),
   },
-  custom: AXES,
+  custom: { ...AXES, ...(everyDay && { categoryAxisMode: 'categorical' as const }) },
 });
 
 // The guard's three verdicts as measures, in palette order: passed green, held amber, stopped red.
@@ -140,7 +142,7 @@ const guard: AgPageState = {
       },
       format: {
         ...titled('Decisions per day', 'Each bar is one day of calls: green passed to PayPal, amber held for you, red stopped'),
-        style: chartStyle(),
+        style: chartStyle(undefined, { everyDay: true }),
       },
     },
     'by-action': {
@@ -311,7 +313,7 @@ const receivables: AgPageState = {
         categoryKey: [{ id: 'invoices.invoiceDate' }],
         valueKey: [{ id: 'outstandingTotal' }, { id: 'overdueTotal' }],
       },
-      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: chartStyle(COLUMN) },
+      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: chartStyle(COLUMN, { everyDay: true }) },
     },
     aging: {
       type: 'column-chart-stacked',
