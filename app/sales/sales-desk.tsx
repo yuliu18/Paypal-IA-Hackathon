@@ -74,6 +74,28 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
       title="Sales agent"
       intro="An AI sales agent sells the shop’s catalogue to the customer who writes, with a PayPal order the customer approves and pays on PayPal."
       samples={<SamplePicker samples={scenarios} selected={selected} onSelect={load} />}
+      results={
+        outcome && (
+          <>
+          {'error' in outcome && <p className="text-sm text-pp-danger">{outcome.error}</p>}
+          {'reply' in outcome && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <ToolCalls steps={outcome.steps} />
+              <section>
+                <h2 className={sectionTitle}>Reply to the customer</h2>
+                <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{withLinks(outcome.reply)}</p>
+                {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-pp-blue">
+                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the message before the AI saw it,{' '}
+                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+                  </p>
+                )}
+              </section>
+            </div>
+          )}
+          </>
+        )
+      }
     >
       {notice && <p className={`mb-6 rounded-lg border px-4 py-3 text-sm font-semibold ${NOTICE_STYLE[notice.tone]}`}>{notice.text}</p>}
       <form onSubmit={submit} className="flex flex-col gap-4">
@@ -92,22 +114,6 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
         </button>
       </form>
 
-      {outcome && 'error' in outcome && <p className="mt-6 text-sm text-pp-danger">{outcome.error}</p>}
-      {outcome && 'reply' in outcome && (
-        <div className="mt-8 flex flex-col gap-8">
-          <ToolCalls steps={outcome.steps} />
-          <section>
-            <h2 className={sectionTitle}>Reply to the customer</h2>
-            <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{withLinks(outcome.reply)}</p>
-            {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
-              <p className="mt-2 text-xs font-semibold text-pp-blue">
-                Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the message before the AI saw it,{' '}
-                {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
-              </p>
-            )}
-          </section>
-        </div>
-      )}
     </DeskLayout>
   );
 }

@@ -75,19 +75,50 @@ export function SupportDesk({
     <DeskLayout
       title="Support agent"
       intro="An AI support agent answers a customer’s ticket with PayPal tools: it can refund an order, accept a dispute or cancel a subscription."
+      setup={
+        <SandboxData>
+          <SeedButton label={scenarios.length > 0 ? 'New sample payments' : 'Create sample payments'} />
+          <SubscriptionButton pendingApproveUrl={pendingApproveUrl} />
+          <DisputePaymentButton payment={disputePayment} />
+        </SandboxData>
+      }
       samples={
-        <>
-          {scenarios.length > 0 ? (
-            <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
-          ) : (
-            <p className="text-sm text-pp-warning">No sample tickets yet: create the sandbox payments they refer to.</p>
+        scenarios.length > 0 ? (
+          <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
+        ) : (
+          <p className="text-sm text-pp-warning">No sample tickets yet: create the sample payments above, which the tickets refer to.</p>
+        )
+      }
+      results={
+        outcome && (
+          <>
+          {'error' in outcome && <p className="text-sm text-pp-danger">{outcome.error}</p>}
+          {'reply' in outcome && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <ToolCalls
+                steps={outcome.steps}
+                note={(step) =>
+                  withheldFields(step as AgentStep) > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-pp-blue">
+                      Privacy: {plural(withheldFields(step as AgentStep), 'personal data field')} hidden from the agent (card, names, emails, addresses)
+                    </p>
+                  )
+                }
+              />
+              <section>
+                <h2 className={sectionTitle}>Reply to the customer</h2>
+                <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
+                {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-pp-blue">
+                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the ticket before the AI saw it,{' '}
+                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+                  </p>
+                )}
+              </section>
+            </div>
           )}
-          <SandboxData>
-            <SeedButton label={scenarios.length > 0 ? 'New sample payments' : 'Create sample payments'} />
-            <SubscriptionButton pendingApproveUrl={pendingApproveUrl} />
-            <DisputePaymentButton payment={disputePayment} />
-          </SandboxData>
-        </>
+          </>
+        )
       }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
@@ -106,31 +137,6 @@ export function SupportDesk({
         </button>
       </form>
 
-      {outcome && 'error' in outcome && <p className="mt-6 text-sm text-pp-danger">{outcome.error}</p>}
-      {outcome && 'reply' in outcome && (
-        <div className="mt-8 flex flex-col gap-8">
-          <ToolCalls
-            steps={outcome.steps}
-            note={(step) =>
-              withheldFields(step as AgentStep) > 0 && (
-                <p className="mt-1 text-xs font-semibold text-pp-blue">
-                  Privacy: {plural(withheldFields(step as AgentStep), 'personal data field')} hidden from the agent (card, names, emails, addresses)
-                </p>
-              )
-            }
-          />
-          <section>
-            <h2 className={sectionTitle}>Reply to the customer</h2>
-            <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
-            {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
-              <p className="mt-2 text-xs font-semibold text-pp-blue">
-                Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the ticket before the AI saw it,{' '}
-                {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
-              </p>
-            )}
-          </section>
-        </div>
-      )}
     </DeskLayout>
   );
 }

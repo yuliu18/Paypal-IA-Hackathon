@@ -72,6 +72,28 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
           </>
         )
       }
+      results={
+        outcome && (
+          <>
+          {'error' in outcome && <p className="text-sm text-pp-danger">{outcome.error}</p>}
+          {'reply' in outcome && (
+            <div className="grid gap-8 lg:grid-cols-2">
+              <ToolCalls steps={outcome.steps} />
+              <section>
+                <h2 className={sectionTitle}>Report to the shop</h2>
+                <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
+                {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-pp-blue">
+                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the task before the AI saw it,{' '}
+                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the report.
+                  </p>
+                )}
+              </section>
+            </div>
+          )}
+          </>
+        )
+      }
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className={labelClass}>
@@ -89,22 +111,6 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
         </button>
       </form>
 
-      {outcome && 'error' in outcome && <p className="mt-6 text-sm text-pp-danger">{outcome.error}</p>}
-      {outcome && 'reply' in outcome && (
-        <div className="mt-8 flex flex-col gap-8">
-          <ToolCalls steps={outcome.steps} />
-          <section>
-            <h2 className={sectionTitle}>Report to the shop</h2>
-            <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
-            {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
-              <p className="mt-2 text-xs font-semibold text-pp-blue">
-                Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the task before the AI saw it,{' '}
-                {plural(outcome.redacted.reply, 'item')} of personal data masked in the report.
-              </p>
-            )}
-          </section>
-        </div>
-      )}
     </DeskLayout>
   );
 }

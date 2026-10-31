@@ -29,7 +29,11 @@ export function Spinner({ className = '' }: { className?: string }) {
   );
 }
 
-export function DeskLayout({ title, intro, samples, children }: { title: string; intro: ReactNode; samples: ReactNode; children: ReactNode }) {
+// `setup`: what must exist before the samples work (support's PayPal test records), across the
+// whole width above the two columns, so the columns stay about as tall as each other.
+// `results`: what the agent did, across the whole width under both columns, so it never stretches
+// one column alone. The samples' list stretches to the form's height.
+export function DeskLayout({ title, intro, setup, samples, children, results }: { title: string; intro: ReactNode; setup?: ReactNode; samples: ReactNode; children: ReactNode; results?: ReactNode }) {
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-8 font-paypal text-pp-ink md:px-10">
       <PageHeader title={title}>
@@ -39,10 +43,12 @@ export function DeskLayout({ title, intro, samples, children }: { title: string;
         </Link>
         .
       </PageHeader>
-      <div className="mt-8 grid items-start gap-10 lg:grid-cols-[19rem_minmax(0,1fr)]">
+      {setup && <div className="mt-8">{setup}</div>}
+      <div className="mt-8 grid gap-10 lg:grid-cols-[19rem_minmax(0,1fr)]">
         <aside className="flex flex-col gap-8">{samples}</aside>
         <div className="min-w-0">{children}</div>
       </div>
+      {results && <div className="mt-10 border-t border-pp-border pt-8">{results}</div>}
     </main>
   );
 }
@@ -53,10 +59,10 @@ type Sample = { label: string; agent: 'careful' | 'vulnerable' };
 // its label drops the ", vulnerable agent" it carries and a tag says so instead.
 export function SamplePicker<T extends Sample>({ samples, selected, onSelect }: { samples: T[]; selected?: string; onSelect: (sample: T) => void }) {
   return (
-    <section>
+    <section className="flex flex-1 flex-col">
       <h2 className={sectionTitle}>Try a sample</h2>
       <p className="mt-1 text-sm text-pp-muted">Pick one to fill the form, then send it as it is or change it.</p>
-      <ul className="mt-3 overflow-hidden rounded-lg border border-pp-border bg-pp-surface">
+      <ul className="mt-3 flex-1 overflow-hidden rounded-lg border border-pp-border bg-pp-surface">
         {samples.map((sample) => {
           const active = sample.label === selected;
           const attack = sample.agent === 'vulnerable';
@@ -87,11 +93,13 @@ export function SandboxData({ children }: { children: ReactNode }) {
   return (
     <section>
       <h2 className={sectionTitle}>Test records in PayPal</h2>
-      <p className="mt-1 text-sm text-pp-muted">
+      <p className="mt-1 max-w-3xl text-sm text-pp-muted">
         The samples refund, cancel or dispute these PayPal sandbox records, so create them first and again once they are used up. The money
         is fictitious.
       </p>
-      <div className="mt-3 flex flex-col divide-y divide-pp-gridline rounded-lg border border-pp-border bg-pp-surface">{children}</div>
+      <div className="mt-3 grid rounded-lg border border-pp-border bg-pp-surface max-md:divide-y max-md:divide-pp-gridline md:grid-cols-3 md:divide-x md:divide-pp-gridline">
+        {children}
+      </div>
     </section>
   );
 }
