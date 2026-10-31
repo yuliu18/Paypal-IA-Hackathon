@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { SeedButton } from '../support/seed-button';
@@ -11,11 +12,18 @@ type AgentMode = BillingScenario['agent'];
 
 type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// The sample tasks' labels (scenarios.ts) to their messages under desks.billing.samples.
+const SAMPLE_KEYS: Record<string, string> = {
+  'Invoice extra items': 'invoiceExtra',
+  'Invoice over the approval limit': 'invoiceOverLimit',
+  'Injected invoice, vulnerable agent': 'injectedInvoice',
+};
 
 // Sends one billing task to the billing agent (app/api/billing/tasks) and shows each tool call it
 // made through the payment guard, with what the guard did with each.
 export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
+  const t = useTranslations('desks');
+  const labels = Object.fromEntries(Object.entries(SAMPLE_KEYS).map(([label, key]) => [label, t(`billing.samples.${key}`)]));
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
   const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
@@ -42,7 +50,7 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
         body: JSON.stringify({ customerEmail, message, agent }),
       });
       const body = await res.json();
-      setOutcome(res.ok ? body : { error: body.error?.message ?? `Request failed (${res.status})` });
+      setOutcome(res.ok ? body : { error: body.error?.message ?? t('form.requestFailed', { status: res.status }) });
     } catch (error) {
       setOutcome({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -52,22 +60,24 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
 
   return (
     <DeskLayout
-      title="Billing agent"
-      intro="An AI billing agent bills the shop’s customers with PayPal invoices: it creates and sends them, and sends reminders."
+      title={t('billing.title')}
+      intro={t('billing.intro')}
       samples={
         scenarios.length > 0 ? (
-          <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
+          <SamplePicker samples={scenarios} selected={selected} onSelect={load} labels={labels} />
         ) : (
           <>
             <p className="text-sm text-pp-warning">
-              No sample tasks yet: the agent may only bill customers the shop knows, so create the sample payments first (also on the{' '}
-              <Link href="/support" className="text-pp-blue hover:underline">
-                support page
-              </Link>
-              ).
+              {t.rich('billing.noSamples', {
+                link: (chunks) => (
+                  <Link href="/support" className="text-pp-blue hover:underline">
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </p>
             <SandboxData>
-              <SeedButton label="Create sample payments" />
+              <SeedButton label={t('billing.createPayments')} />
             </SandboxData>
           </>
         )
@@ -80,12 +90,11 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
             <div className="grid gap-8 lg:grid-cols-2">
               <ToolCalls steps={outcome.steps} />
               <section>
-                <h2 className={sectionTitle}>Report to the shop</h2>
+                <h2 className={sectionTitle}>{t('billing.replyHeading')}</h2>
                 <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
                 {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
                   <p className="mt-2 text-xs font-semibold text-pp-blue">
-                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the task before the AI saw it,{' '}
-                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the report.
+                    {t('billing.redacted', { cards: outcome.redacted.ticket, items: outcome.redacted.reply })}
                   </p>
                 )}
               </section>
@@ -97,17 +106,17 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className={labelClass}>
-          Customer to bill, as the shop knows them
+          {t('billing.customerLabel')}
           <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className={fieldClass} />
         </label>
         <label className={labelClass}>
-          Billing task, which can quote a customer’s notes
+          {t('billing.messageLabel')}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={6} className={fieldClass} />
         </label>
         <VulnerableToggle checked={agent === 'vulnerable'} onChange={(on) => setAgent(on ? 'vulnerable' : 'careful')} where="task" />
         <button type="submit" disabled={running} className={primaryButton}>
           {running && <Spinner />}
-          {running ? 'Agent working…' : 'Send task'}
+          {running ? t('form.working') : t('billing.send')}
         </button>
       </form>
 

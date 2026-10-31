@@ -1,0 +1,109 @@
+{
+  "stamps": {
+    "error": "PayPal 错误",
+    "pending": "检查中"
+  },
+  "layout": {
+    "guardNote": "每一次调用都要经过支付守卫；每个决定都记录在<link>守卫日志</link>中。"
+  },
+  "samplePicker": {
+    "heading": "试试示例",
+    "hint": "选一个来填写表单，然后原样发送或修改后发送。",
+    "attack": "攻击"
+  },
+  "sandbox": {
+    "heading": "PayPal 中的测试记录",
+    "intro": "示例会对这些 PayPal 沙盒记录进行退款、取消或发起争议，所以请先创建它们，用完后再重新创建。资金是虚拟的。"
+  },
+  "vulnerable": "<strong>易受攻击的智能体。</strong>它会服从{where, select, ticket {工单} task {任务} other {消息}}中的任何指令，就像一个配置错误或已被攻破的智能体。只有守卫挡在它和 PayPal 之间。",
+  "toolCalls": {
+    "heading": "智能体做了什么",
+    "none": "智能体没有调用任何工具。"
+  },
+  "form": {
+    "working": "智能体处理中…",
+    "requestFailed": "请求失败（{status}）"
+  },
+  "seed": {
+    "creating": "正在创建付款…",
+    "hint": "三笔银行卡付款，每个示例客户一笔。旧付款退款后再创建新的。",
+    "created": "已在沙盒中创建 {count} 笔付款。",
+    "failed": "无法创建示例付款。详情见服务器日志。"
+  },
+  "subscription": {
+    "create": "创建示例订阅",
+    "creating": "正在创建订阅…",
+    "hint": "一个由沙盒买家批准的订阅，用于取消订阅的工单。",
+    "approvalLink": "<link>批准链接</link>：打开它，用你的沙盒个人账户批准，然后回到这里。",
+    "failed": "无法创建示例订阅。详情见服务器日志。"
+  },
+  "disputePayment": {
+    "create": "创建示例 PayPal 付款",
+    "creating": "正在创建付款…",
+    "hint": "一笔 20 USD 的 PayPal 付款，买家付款后再发起争议，用于争议工单。",
+    "paymentLink": "<link>付款链接</link>：用你的沙盒个人账户付款；PayPal 会把你带回这里。",
+    "paid": "已付款。现在对它发起争议：以买家身份登录 <link>sandbox.paypal.com</link>，打开付给 Guard demo shop 的 20 USD 付款并报告问题，然后重新加载此页面。",
+    "disputed": "争议 <code>{id}</code> 的状态为 {status}。",
+    "failed": "无法创建示例 PayPal 付款。详情见服务器日志。"
+  },
+  "support": {
+    "title": "客服智能体",
+    "intro": "AI 客服智能体用 PayPal 工具回复客户的工单：它可以为订单退款、接受争议或取消订阅。",
+    "newPayments": "新的示例付款",
+    "createPayments": "创建示例付款",
+    "noSamples": "还没有示例工单：请先在上方创建工单所引用的示例付款。",
+    "withheld": "隐私：{count, plural, other {# 个个人数据字段}}对智能体隐藏（银行卡、姓名、邮箱、地址）",
+    "replyHeading": "给客户的回复",
+    "redacted": "隐私：AI 看到工单之前已遮蔽其中 {cards, plural, other {# 个银行卡号}}，回复中已遮蔽 {items, plural, other {# 项个人数据}}。",
+    "customerLabel": "工单客户（商店所知的身份）",
+    "messageLabel": "工单消息（由发送者撰写）",
+    "send": "发送工单",
+    "samples": {
+      "legitimate": "正常工单",
+      "promptInjection": "提示注入",
+      "cancelSubscription": "取消订阅",
+      "cancelOthersSubscription": "取消别人的订阅",
+      "settleDispute": "解决我的争议",
+      "settleOthersDispute": "解决别人的争议"
+    }
+  },
+  "billing": {
+    "title": "账单智能体",
+    "intro": "AI 账单智能体用 PayPal 账单向商店的客户收费：它创建并发送账单，并发送提醒。",
+    "noSamples": "还没有示例任务：智能体只能向商店认识的客户收费，所以请先创建示例付款（也可以在<link>客服页面</link>创建）。",
+    "createPayments": "创建示例付款",
+    "replyHeading": "给商店的报告",
+    "redacted": "隐私：AI 看到任务之前已遮蔽其中 {cards, plural, other {# 个银行卡号}}，报告中已遮蔽 {items, plural, other {# 项个人数据}}。",
+    "customerLabel": "要收费的客户（商店所知的身份）",
+    "messageLabel": "账单任务（可能引用客户的备注）",
+    "send": "发送任务",
+    "samples": {
+      "invoiceExtra": "为额外商品开账单",
+      "invoiceOverLimit": "超过批准上限的账单",
+      "injectedInvoice": "注入的账单"
+    }
+  },
+  "sales": {
+    "title": "销售智能体",
+    "intro": "AI 销售智能体向来信的客户销售商店的商品目录，创建一个由客户在 PayPal 上批准并支付的 PayPal 订单。",
+    "replyHeading": "给客户的回复",
+    "redacted": "隐私：AI 看到消息之前已遮蔽其中 {cards, plural, other {# 个银行卡号}}，回复中已遮蔽 {items, plural, other {# 项个人数据}}。",
+    "customerLabel": "来信的客户（已登录商店）",
+    "messageLabel": "客户消息（由发送者撰写）",
+    "send": "发送消息",
+    "notices": {
+      "paid": "付款已收取：订单 {order}，金额 {hasAmount, select, yes {{amount}} other {全部}}。谢谢！",
+      "failed": "无法收取付款：该订单不是商店记录过的订单，或尚未被批准。详情见服务器日志。",
+      "cancelled": "已在 PayPal 上取消付款：未扣任何费用。"
+    },
+    "samples": {
+      "buyMugs": "购买两套马克杯",
+      "overLimit": "超过批准上限的订单",
+      "injectedDiscount": "注入的 90% 折扣",
+      "injectedPrice": "注入的改价",
+      "otherCustomer": "为另一位客户下单",
+      "hugeQuantity": "超大数量",
+      "returnLink": "返回链接指向别处"
+    }
+  }
+}

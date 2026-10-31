@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { secondaryButton, Spinner } from '../ui/desk';
 import { createSampleDisputePaymentAction } from './actions';
@@ -12,6 +13,7 @@ export type DisputePaymentStep = { step: 'none' } | { step: 'unpaid'; approveUrl
 // Creates the sample PayPal payment for the dispute tickets, and says what the sandbox buyer does
 // next: pay it, then open a dispute on it in the sandbox Resolution Center.
 export function DisputePaymentButton({ payment }: { payment: DisputePaymentStep }) {
+  const t = useTranslations('desks.disputePayment');
   const [state, action, pending] = useActionState(createSampleDisputePaymentAction, null);
   const approveUrl = state?.ok ? state.approveUrl : payment.step === 'unpaid' ? payment.approveUrl : undefined;
   return (
@@ -22,28 +24,37 @@ export function DisputePaymentButton({ payment }: { payment: DisputePaymentStep 
         className={secondaryButton}
       >
         {pending && <Spinner className="text-pp-blue" />}
-        {pending ? 'Creating payment…' : 'Create sample PayPal payment'}
+        {pending ? t('creating') : t('create')}
       </button>
-      <p className="text-sm text-pp-muted">A 20 USD PayPal payment the buyer pays and then disputes, for the dispute tickets.</p>
+      <p className="text-sm text-pp-muted">{t('hint')}</p>
       {state && !state.ok && <span className="text-sm text-pp-danger">{state.message}</span>}
       {approveUrl ? (
         <span className="text-sm text-pp-ink">
-          <a href={approveUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            Payment link
-          </a>
-          : pay it with your sandbox personal account; PayPal brings you back here.
+          {t.rich('paymentLink', {
+            link: (chunks) => (
+              <a href={approveUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                {chunks}
+              </a>
+            ),
+          })}
         </span>
       ) : payment.step === 'paid' ? (
         <span className="text-sm text-pp-ink">
-          Paid. Now open a dispute on it: log in to{' '}
-          <a href="https://www.sandbox.paypal.com/myaccount/activities" target="_blank" rel="noopener noreferrer" className={linkClass}>
-            sandbox.paypal.com
-          </a>{' '}
-          as the buyer, open the 20 USD payment to Guard demo shop and report a problem, then reload this page.
+          {t.rich('paid', {
+            link: (chunks) => (
+              <a href="https://www.sandbox.paypal.com/myaccount/activities" target="_blank" rel="noopener noreferrer" className={linkClass}>
+                {chunks}
+              </a>
+            ),
+          })}
         </span>
       ) : payment.step === 'disputed' ? (
         <span className="text-sm text-pp-ink">
-          Dispute <code>{payment.disputeId}</code> is {payment.status.toLowerCase().replaceAll('_', ' ')}.
+          {t.rich('disputed', {
+            id: payment.disputeId,
+            status: payment.status.toLowerCase().replaceAll('_', ' '),
+            code: (chunks) => <code>{chunks}</code>,
+          })}
         </span>
       ) : null}
     </form>

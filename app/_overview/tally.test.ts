@@ -1,6 +1,18 @@
+import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
+import en from '@/messages/en/home.json';
+import es from '@/messages/es/home.json';
 import type { GuardDecisionRow } from '@/lib/guard/dashboard-rows';
-import { agentCalls, heroSentence, verdictShares } from './tally';
+import { agentCalls, heroSentence, verdictShares, type Translate, type VerdictTally } from './tally';
+
+// The page's translator for home.tally in one language, with keys as plain strings.
+function tallyIn(locale: string, home: typeof en): Translate {
+  const t = createTranslator({ locale, messages: { home }, namespace: 'home.tally' });
+  return (key, values) => t(key as Parameters<typeof t>[0], values);
+}
+
+const english = tallyIn('en', en);
+const sentence = (tally: VerdictTally) => heroSentence(tally, english);
 
 type Row = Pick<GuardDecisionRow, 'decidedBy' | 'allowed' | 'held' | 'blocked'>;
 
@@ -22,31 +34,38 @@ describe('agentCalls', () => {
 describe('heroSentence', () => {
   it('tells the owner what went through, what was held and what was stopped, with thousands separators', () => {
     const tally = { calls: 1090, allowed: 391, held: 35, blocked: 664 };
-    expect(heroSentence(tally)).toBe('Your agents made 1,090 PayPal calls. 391 went through, 35 were held for you and 664 were stopped.');
+    expect(sentence(tally)).toBe('Your agents made 1,090 PayPal calls. 391 went through, 35 were held for you and 664 were stopped.');
   });
 
   it('uses the singular for one call of a kind', () => {
-    expect(heroSentence({ calls: 3, allowed: 1, held: 1, blocked: 1 })).toBe(
+    expect(sentence({ calls: 3, allowed: 1, held: 1, blocked: 1 })).toBe(
       'Your agents made 3 PayPal calls. 1 went through, 1 was held for you and 1 was stopped.',
     );
   });
 
   it('leaves out a verdict that never happened', () => {
-    expect(heroSentence({ calls: 5, allowed: 2, held: 0, blocked: 3 })).toBe('Your agents made 5 PayPal calls. 2 went through and 3 were stopped.');
+    expect(sentence({ calls: 5, allowed: 2, held: 0, blocked: 3 })).toBe('Your agents made 5 PayPal calls. 2 went through and 3 were stopped.');
   });
 
   it('says so when every call went through', () => {
-    expect(heroSentence({ calls: 12, allowed: 12, held: 0, blocked: 0 })).toBe('Your agents made 12 PayPal calls and all of them went through.');
-    expect(heroSentence({ calls: 1, allowed: 1, held: 0, blocked: 0 })).toBe('Your agents made 1 PayPal call and it went through.');
+    expect(sentence({ calls: 12, allowed: 12, held: 0, blocked: 0 })).toBe('Your agents made 12 PayPal calls and all of them went through.');
+    expect(sentence({ calls: 1, allowed: 1, held: 0, blocked: 0 })).toBe('Your agents made 1 PayPal call and it went through.');
   });
 
   it('says so when the guard stopped every call', () => {
-    expect(heroSentence({ calls: 4, allowed: 0, held: 0, blocked: 4 })).toBe('Your agents made 4 PayPal calls and all of them were stopped.');
-    expect(heroSentence({ calls: 1, allowed: 0, held: 0, blocked: 1 })).toBe('Your agents made 1 PayPal call and it was stopped.');
+    expect(sentence({ calls: 4, allowed: 0, held: 0, blocked: 4 })).toBe('Your agents made 4 PayPal calls and all of them were stopped.');
+    expect(sentence({ calls: 1, allowed: 0, held: 0, blocked: 1 })).toBe('Your agents made 1 PayPal call and it was stopped.');
+  });
+
+  it('reads in the chosen language', () => {
+    const spanish = tallyIn('es', es);
+    expect(heroSentence({ calls: 1090, allowed: 391, held: 35, blocked: 664 }, spanish)).toBe(
+      'Tus agentes hicieron 1090 llamadas a PayPal. 391 se aprobaron, 35 se retuvieron para ti y 664 se bloquearon.',
+    );
   });
 
   it('says plainly that nothing happened yet when the agents made no calls', () => {
-    expect(heroSentence({ calls: 0, allowed: 0, held: 0, blocked: 0 })).toBe("Your agents haven't made a PayPal call yet.");
+    expect(sentence({ calls: 0, allowed: 0, held: 0, blocked: 0 })).toBe("Your agents haven't made a PayPal call yet.");
   });
 });
 

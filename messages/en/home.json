@@ -1,0 +1,94 @@
+{
+  "title": "Overview",
+  "hero": {
+    "heading": "A firewall between your AI agents and your PayPal account.",
+    "intro": "Your support, billing and sales agents reach PayPal only through the guard. It checks every call against your rules and the customer’s own request, holds the risky ones for you to approve, and stops the rest before PayPal sees them. A fooled or faulty model can’t move money it shouldn’t.",
+    "trySupport": "Try to fool the support agent",
+    "seeDecisions": "See every decision"
+  },
+  "tally": {
+    "none": "Your agents haven't made a PayPal call yet.",
+    "opening": "Your agents made {calls, plural, one {# PayPal call} other {# PayPal calls}}",
+    "onlyOutcome": {
+      "allowed": "{opening} and {calls, plural, one {it went through} other {all of them went through}}.",
+      "held": "{opening} and {calls, plural, one {it was held for you} other {all of them were held for you}}.",
+      "blocked": "{opening} and {calls, plural, one {it was stopped} other {all of them were stopped}}."
+    },
+    "outcome": {
+      "allowed": "{count, plural, one {# went through} other {# went through}}",
+      "held": "{count, plural, one {# was held for you} other {# were held for you}}",
+      "blocked": "{count, plural, one {# was stopped} other {# were stopped}}"
+    },
+    "mixed": "{opening}. {outcomes}.",
+    "listTwo": "{first} and {second}",
+    "listThree": "{first}, {second} and {third}"
+  },
+  "checkpoint": {
+    "heading": "Latest calls at the guard",
+    "guardLog": "Guard log",
+    "empty": "No agent has called PayPal yet. Send a ticket on the <link>support page</link> and its calls appear here.",
+    "call": "<strong>{action}</strong>{hasAmount, select, yes { of {amount}} other {}}<muted> for {customer}</muted>",
+    "byAgent": "{agent} agent, {time}",
+    "agents": {
+      "support": "Support",
+      "billing": "Billing",
+      "sales": "Sales"
+    },
+    "actions": {
+      "refund": "Refund",
+      "disputeAcceptance": "Dispute acceptance",
+      "cancellation": "Cancellation",
+      "invoice": "Invoice",
+      "invoiceSending": "Invoice sending",
+      "reminder": "Reminder",
+      "order": "Order",
+      "other": "Other"
+    },
+    "timeAgo": {
+      "justNow": "just now",
+      "minutes": "{n} min ago",
+      "hours": "{n} h ago",
+      "days": "{n, plural, one {# day ago} other {# days ago}}"
+    }
+  },
+  "agents": {
+    "heading": "Put an agent to work",
+    "intro": "Each one has its own PayPal tools and the same guard. Ask it something normal, then try to fool it.",
+    "tryToFool": "Try to fool it",
+    "support": {
+      "title": "Support agent",
+      "does": "Answers a customer’s ticket: refunds an order, accepts a dispute, cancels a subscription.",
+      "open": "Open the support desk"
+    },
+    "billing": {
+      "title": "Billing agent",
+      "does": "Bills customers for the shop: creates and sends PayPal invoices, sends reminders.",
+      "open": "Open the billing desk"
+    },
+    "sales": {
+      "title": "Sales agent",
+      "does": "Sells the catalogue: creates the PayPal order the customer pays.",
+      "open": "Open the sales desk"
+    }
+  },
+  "evaluate": {
+    "heading": "Test a model before you trust it",
+    "intro": "The evaluation runs the tickets your shop expects and a set of attacks against the model you choose, and scores how often it does the job and how often only the guard kept the money in place.",
+    "link": "Evaluate a model"
+  },
+  "rules": {
+    "heading": "Your rules for {business}",
+    "passesAlone": "Passes on its own",
+    "youApprove": "You approve",
+    "upTo": "up to {amount}",
+    "mostADay": "Most a day",
+    "agentsAndJudge": "Agents and judge",
+    "customProvider": "Custom provider",
+    "noModel": "no model",
+    "noApiKey": " (no API key)",
+    "paypal": "PayPal",
+    "sandbox": "Sandbox, fictitious money",
+    "noCredentials": "No app credentials yet",
+    "change": "Change the rules"
+  }
+}

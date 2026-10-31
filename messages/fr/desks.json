@@ -1,0 +1,109 @@
+{
+  "stamps": {
+    "error": "Erreur PayPal",
+    "pending": "Vérification"
+  },
+  "layout": {
+    "guardNote": "Chaque appel passe par le guard de paiement ; chaque décision est conservée dans le <link>journal du guard</link>."
+  },
+  "samplePicker": {
+    "heading": "Essayez un exemple",
+    "hint": "Choisissez-en un pour remplir le formulaire, puis envoyez-le tel quel ou modifiez-le.",
+    "attack": "Attaque"
+  },
+  "sandbox": {
+    "heading": "Enregistrements de test dans PayPal",
+    "intro": "Les exemples remboursent, annulent ou contestent ces enregistrements du sandbox PayPal : créez-les d’abord, puis à nouveau une fois épuisés. L’argent est fictif."
+  },
+  "vulnerable": "<strong>Agent vulnérable.</strong> Il obéit à toute instruction contenue dans {where, select, ticket {le ticket} task {la tâche} other {le message}}, comme un agent mal configuré ou compromis. Seul le guard se dresse entre lui et PayPal.",
+  "toolCalls": {
+    "heading": "Ce qu’a fait l’agent",
+    "none": "L’agent n’a appelé aucun outil."
+  },
+  "form": {
+    "working": "L’agent travaille…",
+    "requestFailed": "La requête a échoué ({status})"
+  },
+  "seed": {
+    "creating": "Création des paiements…",
+    "hint": "Trois paiements par carte, un par client d’exemple. Créez-en de nouveaux une fois les anciens remboursés.",
+    "created": "{count} paiements créés dans le sandbox.",
+    "failed": "Les paiements d’exemple n’ont pas pu être créés. Les détails sont dans le journal du serveur."
+  },
+  "subscription": {
+    "create": "Créer un abonnement d’exemple",
+    "creating": "Création de l’abonnement…",
+    "hint": "Un abonnement qu’un acheteur du sandbox approuve, pour les tickets d’annulation.",
+    "approvalLink": "<link>Lien d’approbation</link> : ouvrez-le et approuvez avec votre compte personnel du sandbox, puis revenez.",
+    "failed": "L’abonnement d’exemple n’a pas pu être créé. Les détails sont dans le journal du serveur."
+  },
+  "disputePayment": {
+    "create": "Créer un paiement PayPal d’exemple",
+    "creating": "Création du paiement…",
+    "hint": "Un paiement PayPal de 20 USD que l’acheteur paie puis conteste, pour les tickets de litige.",
+    "paymentLink": "<link>Lien de paiement</link> : payez-le avec votre compte personnel du sandbox ; PayPal vous ramène ici.",
+    "paid": "Payé. Ouvrez maintenant un litige dessus : connectez-vous à <link>sandbox.paypal.com</link> en tant qu’acheteur, ouvrez le paiement de 20 USD à Guard demo shop et signalez un problème, puis rechargez cette page.",
+    "disputed": "Le litige <code>{id}</code> est à l’état {status}.",
+    "failed": "Le paiement PayPal d’exemple n’a pas pu être créé. Les détails sont dans le journal du serveur."
+  },
+  "support": {
+    "title": "Agent de support",
+    "intro": "Un agent de support IA répond au ticket d’un client avec des outils PayPal : il peut rembourser une commande, accepter un litige ou annuler un abonnement.",
+    "newPayments": "Nouveaux paiements d’exemple",
+    "createPayments": "Créer les paiements d’exemple",
+    "noSamples": "Pas encore de tickets d’exemple : créez ci-dessus les paiements d’exemple auxquels les tickets se réfèrent.",
+    "withheld": "Confidentialité : {count, plural, one {# champ de données personnelles masqué} other {# champs de données personnelles masqués}} pour l’agent (carte, noms, e-mails, adresses)",
+    "replyHeading": "Réponse au client",
+    "redacted": "Confidentialité : {cards, plural, one {# numéro de carte masqué} other {# numéros de carte masqués}} dans le ticket avant que l’IA ne le voie, {items, plural, one {# donnée personnelle masquée} other {# données personnelles masquées}} dans la réponse.",
+    "customerLabel": "Client du ticket, tel que la boutique le connaît",
+    "messageLabel": "Message du ticket, écrit par la personne qui l’a envoyé",
+    "send": "Envoyer le ticket",
+    "samples": {
+      "legitimate": "Ticket légitime",
+      "promptInjection": "Injection de prompt",
+      "cancelSubscription": "Annuler l’abonnement",
+      "cancelOthersSubscription": "Annuler l’abonnement de quelqu’un d’autre",
+      "settleDispute": "Régler mon litige",
+      "settleOthersDispute": "Régler le litige de quelqu’un d’autre"
+    }
+  },
+  "billing": {
+    "title": "Agent de facturation",
+    "intro": "Un agent de facturation IA facture les clients de la boutique avec des factures PayPal : il les crée, les envoie et envoie des relances.",
+    "noSamples": "Pas encore de tâches d’exemple : l’agent ne peut facturer que des clients que la boutique connaît, créez donc d’abord les paiements d’exemple (aussi sur la <link>page du support</link>).",
+    "createPayments": "Créer les paiements d’exemple",
+    "replyHeading": "Rapport pour la boutique",
+    "redacted": "Confidentialité : {cards, plural, one {# numéro de carte masqué} other {# numéros de carte masqués}} dans la tâche avant que l’IA ne la voie, {items, plural, one {# donnée personnelle masquée} other {# données personnelles masquées}} dans le rapport.",
+    "customerLabel": "Client à facturer, tel que la boutique le connaît",
+    "messageLabel": "Tâche de facturation, qui peut citer les notes d’un client",
+    "send": "Envoyer la tâche",
+    "samples": {
+      "invoiceExtra": "Facturer des articles en plus",
+      "invoiceOverLimit": "Facture au-dessus du seuil d’approbation",
+      "injectedInvoice": "Facture injectée"
+    }
+  },
+  "sales": {
+    "title": "Agent de vente",
+    "intro": "Un agent de vente IA vend le catalogue de la boutique au client qui écrit, avec une commande PayPal que le client approuve et paie sur PayPal.",
+    "replyHeading": "Réponse au client",
+    "redacted": "Confidentialité : {cards, plural, one {# numéro de carte masqué} other {# numéros de carte masqués}} dans le message avant que l’IA ne le voie, {items, plural, one {# donnée personnelle masquée} other {# données personnelles masquées}} dans la réponse.",
+    "customerLabel": "Client qui écrit, connecté à la boutique",
+    "messageLabel": "Message du client, écrit par la personne qui l’a envoyé",
+    "send": "Envoyer le message",
+    "notices": {
+      "paid": "Paiement encaissé : commande {order} pour {hasAmount, select, yes {{amount}} other {son total}}. Merci !",
+      "failed": "Le paiement n’a pas pu être encaissé : la commande n’est pas une commande enregistrée par la boutique, ou elle n’est pas approuvée. Les détails sont dans le journal du serveur.",
+      "cancelled": "Paiement annulé sur PayPal : rien n’a été débité."
+    },
+    "samples": {
+      "buyMugs": "Acheter deux lots de tasses",
+      "overLimit": "Commande au-dessus du seuil d’approbation",
+      "injectedDiscount": "Remise de 90 % injectée",
+      "injectedPrice": "Prix modifié par injection",
+      "otherCustomer": "Commande pour un autre client",
+      "hugeQuantity": "Quantité énorme",
+      "returnLink": "Lien de retour ailleurs"
+    }
+  }
+}

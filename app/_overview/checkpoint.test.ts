@@ -1,6 +1,11 @@
+import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
+import en from '@/messages/en/home.json';
 import type { GuardDecisionRow, GuardViolationRow } from '@/lib/guard/dashboard-rows';
-import { checkpointCalls, timeAgo } from './checkpoint';
+import { checkpointCalls, timeAgo as timeAgoIn } from './checkpoint';
+
+const english = createTranslator({ locale: 'en', messages: { home: en }, namespace: 'home.checkpoint.timeAgo' });
+const timeAgo = (at: string, now: Date) => timeAgoIn(at, now, (key, values) => english(key as Parameters<typeof english>[0], values));
 
 const row = (overrides: Partial<GuardDecisionRow> & { id: string }): GuardDecisionRow => ({
   at: '2026-10-31T10:00:00.000Z',

@@ -1,0 +1,109 @@
+{
+  "stamps": {
+    "error": "PayPal error",
+    "pending": "Checking"
+  },
+  "layout": {
+    "guardNote": "Every call goes through the payment guard; each decision is kept in the <link>guard log</link>."
+  },
+  "samplePicker": {
+    "heading": "Try a sample",
+    "hint": "Pick one to fill the form, then send it as it is or change it.",
+    "attack": "Attack"
+  },
+  "sandbox": {
+    "heading": "Test records in PayPal",
+    "intro": "The samples refund, cancel or dispute these PayPal sandbox records, so create them first and again once they are used up. The money is fictitious."
+  },
+  "vulnerable": "<strong>Vulnerable agent.</strong> It obeys any instruction in the {where, select, ticket {ticket} task {task} other {message}}, like a misconfigured or compromised agent. Only the guard stands between it and PayPal.",
+  "toolCalls": {
+    "heading": "What the agent did",
+    "none": "The agent called no tool."
+  },
+  "form": {
+    "working": "Agent working…",
+    "requestFailed": "Request failed ({status})"
+  },
+  "seed": {
+    "creating": "Creating payments…",
+    "hint": "Three card payments, one per sample customer. Make new ones once the old ones are refunded.",
+    "created": "Created {count} sandbox payments.",
+    "failed": "The sample payments could not be created. Details are in the server log."
+  },
+  "subscription": {
+    "create": "Create sample subscription",
+    "creating": "Creating subscription…",
+    "hint": "A subscription a sandbox buyer approves, for the cancellation tickets.",
+    "approvalLink": "<link>Approval link</link>: open it and approve with your sandbox personal account, then come back.",
+    "failed": "The sample subscription could not be created. Details are in the server log."
+  },
+  "disputePayment": {
+    "create": "Create sample PayPal payment",
+    "creating": "Creating payment…",
+    "hint": "A 20 USD PayPal payment the buyer pays and then disputes, for the dispute tickets.",
+    "paymentLink": "<link>Payment link</link>: pay it with your sandbox personal account; PayPal brings you back here.",
+    "paid": "Paid. Now open a dispute on it: log in to <link>sandbox.paypal.com</link> as the buyer, open the 20 USD payment to Guard demo shop and report a problem, then reload this page.",
+    "disputed": "Dispute <code>{id}</code> is {status}.",
+    "failed": "The sample PayPal payment could not be created. Details are in the server log."
+  },
+  "support": {
+    "title": "Support agent",
+    "intro": "An AI support agent answers a customer’s ticket with PayPal tools: it can refund an order, accept a dispute or cancel a subscription.",
+    "newPayments": "New sample payments",
+    "createPayments": "Create sample payments",
+    "noSamples": "No sample tickets yet: create the sample payments above, which the tickets refer to.",
+    "withheld": "Privacy: {count, plural, one {# personal data field} other {# personal data fields}} hidden from the agent (card, names, emails, addresses)",
+    "replyHeading": "Reply to the customer",
+    "redacted": "Privacy: {cards, plural, one {# card number} other {# card numbers}} masked in the ticket before the AI saw it, {items, plural, one {# item} other {# items}} of personal data masked in the reply.",
+    "customerLabel": "Ticket customer, as the shop knows them",
+    "messageLabel": "Ticket message, written by whoever sent it",
+    "send": "Send ticket",
+    "samples": {
+      "legitimate": "Legitimate ticket",
+      "promptInjection": "Prompt injection",
+      "cancelSubscription": "Cancel subscription",
+      "cancelOthersSubscription": "Cancel someone else's subscription",
+      "settleDispute": "Settle my dispute",
+      "settleOthersDispute": "Settle someone else's dispute"
+    }
+  },
+  "billing": {
+    "title": "Billing agent",
+    "intro": "An AI billing agent bills the shop’s customers with PayPal invoices: it creates and sends them, and sends reminders.",
+    "noSamples": "No sample tasks yet: the agent may only bill customers the shop knows, so create the sample payments first (also on the <link>support page</link>).",
+    "createPayments": "Create sample payments",
+    "replyHeading": "Report to the shop",
+    "redacted": "Privacy: {cards, plural, one {# card number} other {# card numbers}} masked in the task before the AI saw it, {items, plural, one {# item} other {# items}} of personal data masked in the report.",
+    "customerLabel": "Customer to bill, as the shop knows them",
+    "messageLabel": "Billing task, which can quote a customer’s notes",
+    "send": "Send task",
+    "samples": {
+      "invoiceExtra": "Invoice extra items",
+      "invoiceOverLimit": "Invoice over the approval limit",
+      "injectedInvoice": "Injected invoice"
+    }
+  },
+  "sales": {
+    "title": "Sales agent",
+    "intro": "An AI sales agent sells the shop’s catalogue to the customer who writes, with a PayPal order the customer approves and pays on PayPal.",
+    "replyHeading": "Reply to the customer",
+    "redacted": "Privacy: {cards, plural, one {# card number} other {# card numbers}} masked in the message before the AI saw it, {items, plural, one {# item} other {# items}} of personal data masked in the reply.",
+    "customerLabel": "Customer who writes, signed in to the shop",
+    "messageLabel": "Customer message, written by whoever sent it",
+    "send": "Send message",
+    "notices": {
+      "paid": "Payment captured: order {order} for {hasAmount, select, yes {{amount}} other {its total}}. Thank you!",
+      "failed": "The payment could not be captured: the order is not one the shop recorded, or it is not approved. Details are in the server log.",
+      "cancelled": "Payment cancelled on PayPal: nothing was charged."
+    },
+    "samples": {
+      "buyMugs": "Buy two mug sets",
+      "overLimit": "Order over the approval limit",
+      "injectedDiscount": "Injected 90% discount",
+      "injectedPrice": "Injected price override",
+      "otherCustomer": "Order for another customer",
+      "hugeQuantity": "Huge quantity",
+      "returnLink": "Return link elsewhere"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
+import { getTranslations } from 'next-intl/server';
 import { findSampleDispute } from '@/lib/demo-dispute-payment';
 import { readSeed, readSeedDisputePayment, readSeedSubscription, type SeedDisputePayment } from '@/lib/demo-seed';
 import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
@@ -8,7 +9,9 @@ import type { DisputePaymentStep } from './dispute-payment-button';
 import { buildScenarios, pendingApproval, type SampleDisputeTicket } from './scenarios';
 import { SupportDesk } from './support-desk';
 
-export const metadata: Metadata = { title: 'Support agent' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getTranslations('desks'))('support.title') };
+}
 
 // The sample subscription as PayPal reports it now: its owner is whoever approved it. Undefined
 // when there is none or PayPal can't be reached, which leaves its tickets out.

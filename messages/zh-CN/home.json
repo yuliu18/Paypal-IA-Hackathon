@@ -1,0 +1,94 @@
+{
+  "title": "概览",
+  "hero": {
+    "heading": "在你的 AI 智能体和 PayPal 账户之间的一道防火墙。",
+    "intro": "你的客服、账单和销售智能体只能通过守卫访问 PayPal。守卫会根据你的规则和客户本人的请求检查每一次调用，把有风险的调用暂扣下来等你批准，其余的则在 PayPal 看到之前拦截。被欺骗或出错的模型无法动用不该动的钱。",
+    "trySupport": "试着骗过客服智能体",
+    "seeDecisions": "查看所有决定"
+  },
+  "tally": {
+    "none": "你的智能体还没有调用过 PayPal。",
+    "opening": "你的智能体调用了 PayPal {calls, plural, other {# 次}}",
+    "onlyOutcome": {
+      "allowed": "{opening}，{calls, plural, one {已通过} other {全部已通过}}。",
+      "held": "{opening}，{calls, plural, one {已暂扣等你处理} other {全部已暂扣等你处理}}。",
+      "blocked": "{opening}，{calls, plural, one {已被拦截} other {全部已被拦截}}。"
+    },
+    "outcome": {
+      "allowed": "{count, plural, other {# 次已通过}}",
+      "held": "{count, plural, other {# 次已暂扣等你处理}}",
+      "blocked": "{count, plural, other {# 次已被拦截}}"
+    },
+    "mixed": "{opening}。{outcomes}。",
+    "listTwo": "{first}，{second}",
+    "listThree": "{first}，{second}，{third}"
+  },
+  "checkpoint": {
+    "heading": "守卫处的最新调用",
+    "guardLog": "守卫日志",
+    "empty": "还没有智能体调用过 PayPal。在<link>客服页面</link>发送一个工单，它的调用就会显示在这里。",
+    "call": "<strong>{action}</strong>{hasAmount, select, yes { {amount}} other {}}<muted>，客户 {customer}</muted>",
+    "byAgent": "{agent}智能体，{time}",
+    "agents": {
+      "support": "客服",
+      "billing": "账单",
+      "sales": "销售"
+    },
+    "actions": {
+      "refund": "退款",
+      "disputeAcceptance": "接受争议",
+      "cancellation": "取消订阅",
+      "invoice": "账单",
+      "invoiceSending": "发送账单",
+      "reminder": "提醒",
+      "order": "订单",
+      "other": "其他"
+    },
+    "timeAgo": {
+      "justNow": "刚刚",
+      "minutes": "{n} 分钟前",
+      "hours": "{n} 小时前",
+      "days": "{n, plural, other {# 天前}}"
+    }
+  },
+  "agents": {
+    "heading": "让一个智能体开始工作",
+    "intro": "每个智能体都有自己的 PayPal 工具和同一个守卫。先问它一些正常的问题，再试着骗它。",
+    "tryToFool": "试着骗它",
+    "support": {
+      "title": "客服智能体",
+      "does": "回复客户的工单：为订单退款、接受争议、取消订阅。",
+      "open": "打开客服工作台"
+    },
+    "billing": {
+      "title": "账单智能体",
+      "does": "为商店向客户收费：创建并发送 PayPal 账单，发送提醒。",
+      "open": "打开账单工作台"
+    },
+    "sales": {
+      "title": "销售智能体",
+      "does": "销售商品目录：创建客户支付的 PayPal 订单。",
+      "open": "打开销售工作台"
+    }
+  },
+  "evaluate": {
+    "heading": "先测试模型，再信任它",
+    "intro": "评估会用你商店预期的工单和一组攻击来测试你选择的模型，并统计它完成任务的频率，以及有多少次只靠守卫才保住了钱。",
+    "link": "评估模型"
+  },
+  "rules": {
+    "heading": "你为 {business} 设定的规则",
+    "passesAlone": "自动通过",
+    "youApprove": "由你批准",
+    "upTo": "最多 {amount}",
+    "mostADay": "每日上限",
+    "agentsAndJudge": "智能体和评判模型",
+    "customProvider": "自定义服务商",
+    "noModel": "未选模型",
+    "noApiKey": "（无 API 密钥）",
+    "paypal": "PayPal",
+    "sandbox": "沙盒，虚拟资金",
+    "noCredentials": "尚无应用凭据",
+    "change": "修改规则"
+  }
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { DeskLayout, fieldClass, labelClass, primaryButton, SamplePicker, SandboxData, sectionTitle, Spinner, ToolCalls, VulnerableToggle } from '../ui/desk';
@@ -22,7 +23,15 @@ function withheldFields(step: AgentStep): number {
   }
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// The sample tickets' labels (scenarios.ts) to their messages under desks.support.samples.
+const SAMPLE_KEYS: Record<string, string> = {
+  'Legitimate ticket': 'legitimate',
+  'Prompt injection, vulnerable agent': 'promptInjection',
+  'Cancel subscription': 'cancelSubscription',
+  "Cancel someone else's subscription, vulnerable agent": 'cancelOthersSubscription',
+  'Settle my dispute': 'settleDispute',
+  "Settle someone else's dispute, vulnerable agent": 'settleOthersDispute',
+};
 
 // Sends one ticket to the support agent (app/api/support/tickets) and shows each tool call it
 // made through the payment guard, with what the guard did with each.
@@ -37,6 +46,8 @@ export function SupportDesk({
   pendingApproveUrl?: string;
   disputePayment: DisputePaymentStep;
 }) {
+  const t = useTranslations('desks');
+  const labels = Object.fromEntries(Object.entries(SAMPLE_KEYS).map(([label, key]) => [label, t(`support.samples.${key}`)]));
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
   const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
@@ -63,7 +74,7 @@ export function SupportDesk({
         body: JSON.stringify({ customerEmail, message, agent }),
       });
       const body = await res.json();
-      setOutcome(res.ok ? body : { error: body.error?.message ?? `Request failed (${res.status})` });
+      setOutcome(res.ok ? body : { error: body.error?.message ?? t('form.requestFailed', { status: res.status }) });
     } catch (error) {
       setOutcome({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -73,20 +84,20 @@ export function SupportDesk({
 
   return (
     <DeskLayout
-      title="Support agent"
-      intro="An AI support agent answers a customer’s ticket with PayPal tools: it can refund an order, accept a dispute or cancel a subscription."
+      title={t('support.title')}
+      intro={t('support.intro')}
       setup={
         <SandboxData>
-          <SeedButton label={scenarios.length > 0 ? 'New sample payments' : 'Create sample payments'} />
+          <SeedButton label={scenarios.length > 0 ? t('support.newPayments') : t('support.createPayments')} />
           <SubscriptionButton pendingApproveUrl={pendingApproveUrl} />
           <DisputePaymentButton payment={disputePayment} />
         </SandboxData>
       }
       samples={
         scenarios.length > 0 ? (
-          <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
+          <SamplePicker samples={scenarios} selected={selected} onSelect={load} labels={labels} />
         ) : (
-          <p className="text-sm text-pp-warning">No sample tickets yet: create the sample payments above, which the tickets refer to.</p>
+          <p className="text-sm text-pp-warning">{t('support.noSamples')}</p>
         )
       }
       results={
@@ -100,18 +111,17 @@ export function SupportDesk({
                 note={(step) =>
                   withheldFields(step as AgentStep) > 0 && (
                     <p className="mt-1 text-xs font-semibold text-pp-blue">
-                      Privacy: {plural(withheldFields(step as AgentStep), 'personal data field')} hidden from the agent (card, names, emails, addresses)
+                      {t('support.withheld', { count: withheldFields(step as AgentStep) })}
                     </p>
                   )
                 }
               />
               <section>
-                <h2 className={sectionTitle}>Reply to the customer</h2>
+                <h2 className={sectionTitle}>{t('support.replyHeading')}</h2>
                 <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{outcome.reply}</p>
                 {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
                   <p className="mt-2 text-xs font-semibold text-pp-blue">
-                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the ticket before the AI saw it,{' '}
-                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+                    {t('support.redacted', { cards: outcome.redacted.ticket, items: outcome.redacted.reply })}
                   </p>
                 )}
               </section>
@@ -123,17 +133,17 @@ export function SupportDesk({
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className={labelClass}>
-          Ticket customer, as the shop knows them
+          {t('support.customerLabel')}
           <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className={fieldClass} />
         </label>
         <label className={labelClass}>
-          Ticket message, written by whoever sent it
+          {t('support.messageLabel')}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={6} className={fieldClass} />
         </label>
         <VulnerableToggle checked={agent === 'vulnerable'} onChange={(on) => setAgent(on ? 'vulnerable' : 'careful')} where="ticket" />
         <button type="submit" disabled={running} className={primaryButton}>
           {running && <Spinner />}
-          {running ? 'Agent working…' : 'Send ticket'}
+          {running ? t('form.working') : t('support.send')}
         </button>
       </form>
 

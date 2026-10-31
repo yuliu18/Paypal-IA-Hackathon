@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { DeskLayout, fieldClass, labelClass, primaryButton, SamplePicker, sectionTitle, Spinner, ToolCalls, VulnerableToggle } from '../ui/desk';
@@ -16,7 +17,16 @@ const NOTICE_STYLE = {
 
 type Outcome = { reply: string; steps: AgentStep[]; redacted?: { ticket: number; reply: number } } | { error: string };
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// The sample chats' labels (scenarios.ts) to their messages under desks.sales.samples.
+const SAMPLE_KEYS: Record<string, string> = {
+  'Buy two mug sets': 'buyMugs',
+  'Order over the approval limit': 'overLimit',
+  'Injected 90% discount': 'injectedDiscount',
+  'Injected price override': 'injectedPrice',
+  'Order for another customer': 'otherCustomer',
+  'Huge quantity': 'hugeQuantity',
+  'Return link elsewhere': 'returnLink',
+};
 
 // The reply with its links clickable, so the customer can open PayPal's approval page.
 // A sentence's closing punctuation isn't part of the link.
@@ -35,6 +45,8 @@ const withLinks = (text: string) =>
 // Sends one customer message to the sales agent (app/api/sales/chats) and shows each tool call it
 // made through the payment guard, with what the guard did with each.
 export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; notice?: CheckoutNotice }) {
+  const t = useTranslations('desks');
+  const labels = Object.fromEntries(Object.entries(SAMPLE_KEYS).map(([label, key]) => [label, t(`sales.samples.${key}`)]));
   const [customerEmail, setCustomerEmail] = useState(scenarios[0]?.customerEmail ?? '');
   const [message, setMessage] = useState(scenarios[0]?.message ?? '');
   const [agent, setAgent] = useState<AgentMode>(scenarios[0]?.agent ?? 'careful');
@@ -61,7 +73,7 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
         body: JSON.stringify({ customerEmail, message, agent }),
       });
       const body = await res.json();
-      setOutcome(res.ok ? body : { error: body.error?.message ?? `Request failed (${res.status})` });
+      setOutcome(res.ok ? body : { error: body.error?.message ?? t('form.requestFailed', { status: res.status }) });
     } catch (error) {
       setOutcome({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -71,9 +83,9 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
 
   return (
     <DeskLayout
-      title="Sales agent"
-      intro="An AI sales agent sells the shop’s catalogue to the customer who writes, with a PayPal order the customer approves and pays on PayPal."
-      samples={<SamplePicker samples={scenarios} selected={selected} onSelect={load} />}
+      title={t('sales.title')}
+      intro={t('sales.intro')}
+      samples={<SamplePicker samples={scenarios} selected={selected} onSelect={load} labels={labels} />}
       results={
         outcome && (
           <>
@@ -82,12 +94,11 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
             <div className="grid gap-8 lg:grid-cols-2">
               <ToolCalls steps={outcome.steps} />
               <section>
-                <h2 className={sectionTitle}>Reply to the customer</h2>
+                <h2 className={sectionTitle}>{t('sales.replyHeading')}</h2>
                 <p className="mt-3 whitespace-pre-wrap rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-[15px] leading-relaxed">{withLinks(outcome.reply)}</p>
                 {outcome.redacted && outcome.redacted.ticket + outcome.redacted.reply > 0 && (
                   <p className="mt-2 text-xs font-semibold text-pp-blue">
-                    Privacy: {plural(outcome.redacted.ticket, 'card number')} masked in the message before the AI saw it,{' '}
-                    {plural(outcome.redacted.reply, 'item')} of personal data masked in the reply.
+                    {t('sales.redacted', { cards: outcome.redacted.ticket, items: outcome.redacted.reply })}
                   </p>
                 )}
               </section>
@@ -100,17 +111,17 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
       {notice && <p className={`mb-6 rounded-lg border px-4 py-3 text-sm font-semibold ${NOTICE_STYLE[notice.tone]}`}>{notice.text}</p>}
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className={labelClass}>
-          Customer who writes, signed in to the shop
+          {t('sales.customerLabel')}
           <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className={fieldClass} />
         </label>
         <label className={labelClass}>
-          Customer message, written by whoever sent it
+          {t('sales.messageLabel')}
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={6} className={fieldClass} />
         </label>
         <VulnerableToggle checked={agent === 'vulnerable'} onChange={(on) => setAgent(on ? 'vulnerable' : 'careful')} where="message" />
         <button type="submit" disabled={running} className={primaryButton}>
           {running && <Spinner />}
-          {running ? 'Agent working…' : 'Send message'}
+          {running ? t('form.working') : t('sales.send')}
         </button>
       </form>
 

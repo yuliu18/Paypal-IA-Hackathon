@@ -20,27 +20,26 @@ export function agentCalls(rows: TalliedRow[]): VerdictTally {
   return tally;
 }
 
-const count = (n: number) => n.toLocaleString('en-US');
+// The home page's messages under `tally` (messages/<locale>/home.json), as next-intl's translator
+// reads them: getTranslations('home.tally') on the page, createTranslator in the tests.
+export type Translate = (key: string, values?: Record<string, string | number>) => string;
 
-// What happened to the calls of each verdict, in the strip's order.
-const OUTCOMES = [
-  { key: 'allowed', one: 'went through', many: 'went through' },
-  { key: 'held', one: 'was held for you', many: 'were held for you' },
-  { key: 'blocked', one: 'was stopped', many: 'were stopped' },
-] as const;
+// The verdicts in the strip's order.
+const OUTCOMES = ['allowed', 'held', 'blocked'] as const;
 
-const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
+function list(t: Translate, parts: string[]): string {
+  if (parts.length === 3) return t('listThree', { first: parts[0], second: parts[1], third: parts[2] });
+  if (parts.length === 2) return t('listTwo', { first: parts[0], second: parts[1] });
+  return parts.join('');
+}
 
-export function heroSentence(tally: VerdictTally): string {
-  if (tally.calls === 0) return "Your agents haven't made a PayPal call yet.";
-  const opening = `Your agents made ${count(tally.calls)} PayPal ${tally.calls === 1 ? 'call' : 'calls'}`;
-  const happened = OUTCOMES.filter((o) => tally[o.key] > 0);
+export function heroSentence(tally: VerdictTally, t: Translate): string {
+  if (tally.calls === 0) return t('none');
+  const opening = t('opening', { calls: tally.calls });
+  const happened = OUTCOMES.filter((key) => tally[key] > 0);
   // One verdict for every call: say it once instead of repeating the total.
-  if (happened.length === 1) {
-    const [only] = happened;
-    return tally.calls === 1 ? `${opening} and it ${only.one}.` : `${opening} and all of them ${only.many}.`;
-  }
-  return `${opening}. ${list(happened.map((o) => `${count(tally[o.key])} ${tally[o.key] === 1 ? o.one : o.many}`))}.`;
+  if (happened.length === 1) return t(`onlyOutcome.${happened[0]}`, { opening, calls: tally.calls });
+  return t('mixed', { opening, outcomes: list(t, happened.map((key) => t(`outcome.${key}`, { count: tally[key] }))) });
 }
 
 export type VerdictShares = { allowed: number; held: number; blocked: number };
@@ -52,7 +51,7 @@ export function verdictShares(tally: VerdictTally): VerdictShares {
   const total = tally.allowed + tally.held + tally.blocked;
   const shares: VerdictShares = { allowed: 0, held: 0, blocked: 0 };
   if (total === 0) return shares;
-  const keys = OUTCOMES.map((o) => o.key);
+  const keys = OUTCOMES;
   const exact = keys.map((key) => (tally[key] / total) * 100);
   keys.forEach((key, i) => (shares[key] = Math.floor(exact[i])));
   let left = 100 - keys.reduce((sum, key) => sum + shares[key], 0);

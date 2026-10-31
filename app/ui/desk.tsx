@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
 import { PageHeader } from './page-header';
@@ -34,14 +35,18 @@ export function Spinner({ className = '' }: { className?: string }) {
 // `results`: what the agent did, across the whole width under both columns, so it never stretches
 // one column alone.
 export function DeskLayout({ title, intro, setup, samples, children, results }: { title: string; intro: ReactNode; setup?: ReactNode; samples: ReactNode; children: ReactNode; results?: ReactNode }) {
+  const t = useTranslations('desks');
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-8 font-paypal text-pp-ink md:px-10">
       <PageHeader title={title}>
-        {intro} Every call goes through the payment guard; each decision is kept in the{' '}
-        <Link href="/guard" className="text-pp-blue hover:underline">
-          guard log
-        </Link>
-        .
+        {intro}{' '}
+        {t.rich('layout.guardNote', {
+          link: (chunks) => (
+            <Link href="/guard" className="text-pp-blue hover:underline">
+              {chunks}
+            </Link>
+          ),
+        })}
       </PageHeader>
       {setup && <div className="mt-8">{setup}</div>}
       <div className="mt-8 grid items-start gap-10 lg:grid-cols-[19rem_minmax(0,1fr)]">
@@ -57,11 +62,23 @@ type Sample = { label: string; agent: 'careful' | 'vulnerable' };
 
 // The sample conversations, one chosen at a time. An attack runs against the vulnerable agent, so
 // its label drops the ", vulnerable agent" it carries and a tag says so instead.
-export function SamplePicker<T extends Sample>({ samples, selected, onSelect }: { samples: T[]; selected?: string; onSelect: (sample: T) => void }) {
+// `labels`: each sample's label (as scenarios.ts names it) in the reader's language, without that suffix.
+export function SamplePicker<T extends Sample>({
+  samples,
+  selected,
+  onSelect,
+  labels = {},
+}: {
+  samples: T[];
+  selected?: string;
+  onSelect: (sample: T) => void;
+  labels?: Record<string, string>;
+}) {
+  const t = useTranslations('desks.samplePicker');
   return (
     <section>
-      <h2 className={sectionTitle}>Try a sample</h2>
-      <p className="mt-1 text-sm text-pp-muted">Pick one to fill the form, then send it as it is or change it.</p>
+      <h2 className={sectionTitle}>{t('heading')}</h2>
+      <p className="mt-1 text-sm text-pp-muted">{t('hint')}</p>
       <ul className="mt-3 overflow-hidden rounded-lg border border-pp-border bg-pp-surface">
         {samples.map((sample) => {
           const active = sample.label === selected;
@@ -76,8 +93,8 @@ export function SamplePicker<T extends Sample>({ samples, selected, onSelect }: 
                   active ? 'border-l-pp-blue bg-pp-highlight font-semibold' : 'border-l-transparent hover:bg-pp-canvas'
                 }`}
               >
-                <span>{sample.label.replace(/, vulnerable agent$/, '')}</span>
-                {attack && <span className="mt-px shrink-0 text-xs font-semibold text-pp-danger">Attack</span>}
+                <span>{labels[sample.label] ?? sample.label.replace(/, vulnerable agent$/, '')}</span>
+                {attack && <span className="mt-px shrink-0 text-xs font-semibold text-pp-danger">{t('attack')}</span>}
               </button>
             </li>
           );
@@ -90,13 +107,11 @@ export function SamplePicker<T extends Sample>({ samples, selected, onSelect }: 
 // The PayPal test records the samples act on, apart from the conversation itself: a refund needs a
 // payment to refund, a cancellation a subscription to cancel.
 export function SandboxData({ children }: { children: ReactNode }) {
+  const t = useTranslations('desks.sandbox');
   return (
     <section>
-      <h2 className={sectionTitle}>Test records in PayPal</h2>
-      <p className="mt-1 max-w-3xl text-sm text-pp-muted">
-        The samples refund, cancel or dispute these PayPal sandbox records, so create them first and again once they are used up. The money
-        is fictitious.
-      </p>
+      <h2 className={sectionTitle}>{t('heading')}</h2>
+      <p className="mt-1 max-w-3xl text-sm text-pp-muted">{t('intro')}</p>
       <div className="mt-3 grid rounded-lg border border-pp-border bg-pp-surface max-md:divide-y max-md:divide-pp-gridline md:grid-cols-3 md:divide-x md:divide-pp-gridline">
         {children}
       </div>
@@ -104,14 +119,12 @@ export function SandboxData({ children }: { children: ReactNode }) {
   );
 }
 
-export function VulnerableToggle({ checked, onChange, where }: { checked: boolean; onChange: (checked: boolean) => void; where: string }) {
+export function VulnerableToggle({ checked, onChange, where }: { checked: boolean; onChange: (checked: boolean) => void; where: 'ticket' | 'task' | 'message' }) {
+  const t = useTranslations('desks');
   return (
     <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm ${checked ? 'border-pp-danger/40 bg-pp-danger-tint' : 'border-pp-border bg-pp-surface'}`}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 accent-pp-danger" />
-      <span>
-        <span className="font-semibold">Vulnerable agent.</span> It obeys any instruction in the {where}, like a misconfigured or compromised
-        agent. Only the guard stands between it and PayPal.
-      </span>
+      <span>{t.rich('vulnerable', { where, strong: (chunks) => <span className="font-semibold">{chunks}</span> })}</span>
     </label>
   );
 }
@@ -121,9 +134,10 @@ type Step = { tool: string; args: unknown; result: string; isError?: boolean };
 // Each tool call with what the guard did with it. Masked like the guard log: a call can quote the
 // customer's or someone else's email.
 export function ToolCalls({ steps, note }: { steps: Step[]; note?: (step: Step) => ReactNode }) {
+  const t = useTranslations('desks.toolCalls');
   return (
     <section>
-      <h2 className={sectionTitle}>What the agent did</h2>
+      <h2 className={sectionTitle}>{t('heading')}</h2>
       <ol className="mt-3 flex flex-col gap-2">
         {steps.map((step, i) => (
           <li key={i} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-sm">
@@ -138,7 +152,7 @@ export function ToolCalls({ steps, note }: { steps: Step[]; note?: (step: Step) 
             </div>
           </li>
         ))}
-        {steps.length === 0 && <li className="text-sm text-pp-muted">The agent called no tool.</li>}
+        {steps.length === 0 && <li className="text-sm text-pp-muted">{t('none')}</li>}
       </ol>
     </section>
   );
