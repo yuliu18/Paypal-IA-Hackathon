@@ -18,15 +18,13 @@ export const secondaryButton =
   'inline-flex shrink-0 items-center gap-2 rounded-md border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-ink hover:border-pp-blue disabled:cursor-wait disabled:text-pp-muted';
 export const sectionTitle = 'text-base font-semibold';
 
-// A ring of dots turning while something runs at PayPal or the AI provider; still for people who
-// asked their system for less motion, where the label beside it says what is happening.
+// The usual turning ring of an app at work, while something runs at PayPal or the AI provider: a
+// faint track with a quarter of it turning. The label beside it says what is happening.
 export function Spinner({ className = '' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={`size-4 shrink-0 motion-safe:animate-spin ${className}`} aria-hidden>
-      {Array.from({ length: 8 }, (_, i) => {
-        const angle = (i * Math.PI) / 4;
-        return <circle key={i} cx={12 + 8 * Math.sin(angle)} cy={12 - 8 * Math.cos(angle)} r={2} fill="currentColor" opacity={0.25 + (i / 7) * 0.75} />;
-      })}
+    <svg viewBox="0 0 24 24" fill="none" className={`size-4 shrink-0 animate-spin ${className}`} aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity={0.25} strokeWidth={3} />
+      <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeWidth={3} strokeLinecap="round" />
     </svg>
   );
 }
@@ -53,10 +51,11 @@ type Sample = { label: string; agent: 'careful' | 'vulnerable' };
 
 // The sample conversations, one chosen at a time. An attack runs against the vulnerable agent, so
 // its label drops the ", vulnerable agent" it carries and a tag says so instead.
-export function SamplePicker<T extends Sample>({ title, samples, selected, onSelect }: { title: string; samples: T[]; selected?: string; onSelect: (sample: T) => void }) {
+export function SamplePicker<T extends Sample>({ samples, selected, onSelect }: { samples: T[]; selected?: string; onSelect: (sample: T) => void }) {
   return (
     <section>
-      <h2 className={sectionTitle}>{title}</h2>
+      <h2 className={sectionTitle}>Try a sample</h2>
+      <p className="mt-1 text-sm text-pp-muted">Pick one to fill the form, then send it as it is or change it.</p>
       <ul className="mt-3 overflow-hidden rounded-lg border border-pp-border bg-pp-surface">
         {samples.map((sample) => {
           const active = sample.label === selected;
@@ -82,12 +81,16 @@ export function SamplePicker<T extends Sample>({ title, samples, selected, onSel
   );
 }
 
-// The sandbox data the samples refer to, apart from the conversation itself.
+// The PayPal test records the samples act on, apart from the conversation itself: a refund needs a
+// payment to refund, a cancellation a subscription to cancel.
 export function SandboxData({ children }: { children: ReactNode }) {
   return (
     <section>
-      <h2 className={sectionTitle}>Sandbox data</h2>
-      <p className="mt-1 text-sm text-pp-muted">The samples refer to these PayPal sandbox records. Money here is fictitious.</p>
+      <h2 className={sectionTitle}>Test records in PayPal</h2>
+      <p className="mt-1 text-sm text-pp-muted">
+        The samples refund, cancel or dispute these PayPal sandbox records, so create them first and again once they are used up. The money
+        is fictitious.
+      </p>
       <div className="mt-3 flex flex-col divide-y divide-pp-gridline rounded-lg border border-pp-border bg-pp-surface">{children}</div>
     </section>
   );

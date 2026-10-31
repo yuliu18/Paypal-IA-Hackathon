@@ -56,7 +56,7 @@ export function BillingDesk({ scenarios }: { scenarios: BillingScenario[] }) {
       intro="An AI billing agent bills the shop’s customers with PayPal invoices: it creates and sends them, and sends reminders."
       samples={
         scenarios.length > 0 ? (
-          <SamplePicker title="Sample tasks" samples={scenarios} selected={selected} onSelect={load} />
+          <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
         ) : (
           <>
             <p className="text-sm text-pp-warning">

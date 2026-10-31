@@ -78,7 +78,7 @@ export function SupportDesk({
       samples={
         <>
           {scenarios.length > 0 ? (
-            <SamplePicker title="Sample tickets" samples={scenarios} selected={selected} onSelect={load} />
+            <SamplePicker samples={scenarios} selected={selected} onSelect={load} />
           ) : (
             <p className="text-sm text-pp-warning">No sample tickets yet: create the sandbox payments they refer to.</p>
           )}

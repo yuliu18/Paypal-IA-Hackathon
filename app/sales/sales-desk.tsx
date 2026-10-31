@@ -73,7 +73,7 @@ export function SalesDesk({ scenarios, notice }: { scenarios: SalesScenario[]; n
     <DeskLayout
       title="Sales agent"
       intro="An AI sales agent sells the shop’s catalogue to the customer who writes, with a PayPal order the customer approves and pays on PayPal."
-      samples={<SamplePicker title="Sample chats" samples={scenarios} selected={selected} onSelect={load} />}
+      samples={<SamplePicker samples={scenarios} selected={selected} onSelect={load} />}
     >
       {notice && <p className={`mb-6 rounded-lg border px-4 py-3 text-sm font-semibold ${NOTICE_STYLE[notice.tone]}`}>{notice.text}</p>}
       <form onSubmit={submit} className="flex flex-col gap-4">

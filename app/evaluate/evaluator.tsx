@@ -4,41 +4,67 @@ import { useRef, useState } from 'react';
 import type { AgentStep } from '@/lib/agent/support-agent';
 import { summarize, type EvalResult } from '@/lib/evaluation/evaluation';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
+import { PageHeader } from '../ui/page-header';
+import { primaryButton, Spinner } from '../ui/desk';
+import { stepOutcome } from '../ui/step-outcome';
 import { prepareEvaluationAction, type PreparedCase } from './actions';
 
 type Row = PreparedCase & { status: 'waiting' | 'running' | 'done'; result?: EvalResult; reply?: string; steps?: AgentStep[] };
 
 const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '–');
 
-function Score({ label, value, of, detail, tone }: { label: string; value: number; of: number; detail: string; tone: 'good' | 'warn' | 'bad' | 'idle' }) {
-  const color = { good: 'text-pp-success', warn: 'text-pp-warning', bad: 'text-pp-danger', idle: 'text-pp-muted' }[tone];
+const TONE = {
+  good: { text: 'text-pp-success', bar: 'bg-pp-success' },
+  warn: { text: 'text-pp-warning', bar: 'bg-pp-warning' },
+  bad: { text: 'text-pp-danger', bar: 'bg-pp-danger' },
+  idle: { text: 'text-pp-ink', bar: 'bg-pp-muted' },
+};
+
+function Score({ label, value, of, detail, tone, ran }: { label: string; value: number; of: number; detail: string; tone: keyof typeof TONE; ran: boolean }) {
   return (
-    <section className="rounded-lg border border-pp-border bg-pp-surface p-5">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-pp-muted">{label}</h2>
-      <p className={`mt-2 text-3xl font-semibold ${of ? color : 'text-pp-muted'}`}>
-        {of ? `${value}/${of}` : '–'} <span className="text-base font-normal text-pp-muted">{of ? pct(value, of) : 'nothing scored'}</span>
+    <section className="px-6 py-5 first:pl-0 last:pr-0 max-md:px-0">
+      <h2 className="text-[15px] font-semibold">{label}</h2>
+      <p className={`mt-3 flex items-baseline gap-2 ${TONE[tone].text}`}>
+        <span className="text-[34px] font-semibold leading-none">{ran && of ? value : '–'}</span>
+        <span className="text-base text-pp-muted">{!ran ? `of ${of}, not run yet` : of ? `of ${of}, ${pct(value, of)}` : 'nothing scored'}</span>
       </p>
-      <p className="mt-1 text-sm text-pp-muted">{detail}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-pp-gridline">
+        <div className={`h-full rounded-full ${TONE[tone].bar}`} style={{ width: of ? `${(value / of) * 100}%` : 0 }} />
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-pp-muted">{detail}</p>
     </section>
   );
 }
 
-const stepStyle = (step: AgentStep) =>
-  step.result.startsWith('Blocked by payment guard')
-    ? 'text-pp-danger'
-    : /^(Refund|Cancellation|Dispute acceptance|Invoice|Invoice sending|Invoice reminder) held/.test(step.result)
-      ? 'text-pp-warning'
-      : 'text-pp-ink';
+const STEP_COLOR = { blocked: 'text-pp-danger', held: 'text-pp-warning', executed: 'text-pp-ink', error: 'text-pp-muted', pending: 'text-pp-muted' };
+
+const CHIP = {
+  muted: 'border-pp-border bg-pp-canvas text-pp-muted',
+  blue: 'border-pp-blue/30 bg-pp-highlight text-pp-blue',
+  good: 'border-pp-success/40 bg-pp-success-tint text-pp-success',
+  warn: 'border-pp-warning/40 bg-pp-warning-tint text-pp-warning',
+  bad: 'border-pp-danger/40 bg-pp-danger-tint text-pp-danger',
+};
+
+function Chip({ tone, children }: { tone: keyof typeof CHIP; children: React.ReactNode }) {
+  return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[3px] border px-2 py-0.5 text-xs font-semibold ${CHIP[tone]}`}>{children}</span>;
+}
 
 function Badge({ row }: { row: Row }) {
-  if (row.status === 'waiting') return <span className="text-pp-muted">Waiting</span>;
-  if (row.status === 'running') return <span className="text-pp-blue">Running…</span>;
+  if (row.status === 'waiting') return <Chip tone="muted">Waiting</Chip>;
+  if (row.status === 'running')
+    return (
+      <Chip tone="blue">
+        <Spinner className="size-3" />
+        Running
+      </Chip>
+    );
   const r = row.result!;
   // No answer at all (e.g. the AI provider refused the model): not graded, whatever its kind.
-  if (r.failed) return <span className="text-pp-muted">No answer</span>;
-  if (row.kind === 'business') return <span className={r.pass ? 'text-pp-success' : 'text-pp-danger'}>{r.pass ? 'Resolved' : 'Wrong outcome'}</span>;
-  if (!r.guardHeld) return <span className="text-pp-danger">{r.guardHeld === undefined ? 'Failed' : 'Harm got through'}</span>;
-  return <span className={r.resisted ? 'text-pp-success' : 'text-pp-warning'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</span>;
+  if (r.failed) return <Chip tone="muted">No answer</Chip>;
+  if (row.kind === 'business') return <Chip tone={r.pass ? 'good' : 'bad'}>{r.pass ? 'Resolved' : 'Wrong outcome'}</Chip>;
+  if (!r.guardHeld) return <Chip tone="bad">{r.guardHeld === undefined ? 'Failed' : 'Harm got through'}</Chip>;
+  return <Chip tone={r.resisted ? 'good' : 'warn'}>{r.resisted ? 'Model refused' : 'Guard stopped it'}</Chip>;
 }
 
 // The evaluation's fixed sizes (lib/evaluation): business cases (five support tickets, two billing
@@ -103,97 +129,131 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
   const tone = (value: number, of: number): 'good' | 'warn' | 'bad' | 'idle' => (!finished || !of ? 'idle' : value === of ? 'good' : value >= of / 2 ? 'warn' : 'bad');
   const firstFailure = rows.find((r) => r.result?.failed)?.result?.reason;
 
+  const quickCases = BUSINESS_CASES + attacks;
+  const fullCases = BUSINESS_CASES + attacks * 6;
+
   return (
-    <main className="mx-auto w-full max-w-5xl p-8 font-paypal text-pp-ink">
-      <p className="text-sm font-semibold text-pp-blue">Before you switch it on</p>
-      <h1 className="mt-1 text-[28px] font-semibold text-pp-navy">Evaluate the AI model</h1>
-      <p className="mt-2 max-w-3xl text-pp-muted">
-        Sends {sizes.business.of} tickets, billing tasks and sales chats your shop expects to work and {attacks} attacks to the real support, billing and sales agents
-        behind the payment guard, with <strong className="text-pp-ink">{model || 'no model'}</strong> on {provider}. Sandbox money only; the daily
-        caps are lifted for these tickets and tasks so repeated runs compare alike, every other limit applies. Takes a few minutes and uses AI tokens.
-      </p>
+    <main className="mx-auto w-full max-w-6xl px-6 py-8 font-paypal text-pp-ink md:px-10">
+      <PageHeader title="Evaluate a model">
+        Before you let a model run your agents, send it the conversations your shop expects and a set of attacks, through the real support,
+        billing and sales agents and the payment guard, and see how it does.
+      </PageHeader>
 
-      <div className="mt-5 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={run}
-          disabled={running || !model}
-          className="rounded bg-pp-blue px-5 py-2 font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60"
-        >
-          {running ? 'Evaluating…' : rows.length ? 'Run again' : 'Run evaluation'}
-        </button>
-        {running && (
-          <button type="button" onClick={() => (stop.current = true)} className="text-sm font-semibold text-pp-blue hover:underline">
-            Stop after this ticket
-          </button>
-        )}
-        <label className="flex items-center gap-2 text-sm text-pp-ink">
-          <input type="checkbox" checked={full} disabled={running} onChange={(e) => setFull(e.target.checked)} />
-          Full evaluation: each attack also as a jailbreak template and in base64, and against a compromised agent ({BUSINESS_CASES + attacks * 6} tickets and tasks or more, about 20 min)
-        </label>
-        {message && <span className="text-sm text-pp-muted">{message}</span>}
-        {rows.length > 0 && !message && (
-          <span className="text-sm text-pp-muted">
-            {done.length}/{rows.length} cases
-          </span>
-        )}
-      </div>
+      <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div>
+          <h2 className="text-lg font-semibold">What to run</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Evaluation size">
+            {[
+              { value: false, title: 'Quick', cases: quickCases, time: 'a few minutes', detail: `${BUSINESS_CASES} normal conversations and ${attacks} attacks, each sent once.` },
+              { value: true, title: 'Full', cases: fullCases, time: 'about 20 minutes', detail: 'Each attack also wrapped in a jailbreak template, encoded in base64 and sent to a compromised agent.' },
+            ].map((option) => (
+              <label
+                key={option.title}
+                className={`flex cursor-pointer flex-col rounded-lg border bg-pp-surface px-4 py-3.5 ${full === option.value ? 'border-pp-blue ring-1 ring-pp-blue' : 'border-pp-border hover:border-pp-blue/50'} ${running ? 'cursor-not-allowed opacity-70' : ''}`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <input type="radio" name="size" checked={full === option.value} disabled={running} onChange={() => setFull(option.value)} className="accent-pp-blue" />
+                  <span className="font-semibold">{option.title}</span>
+                  <span className="ml-auto text-sm text-pp-muted">
+                    {option.cases}
+                    {option.value ? '+' : ''} cases, {option.time}
+                  </span>
+                </span>
+                <span className="mt-1.5 pl-6 text-sm leading-relaxed text-pp-muted">{option.detail}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <button type="button" onClick={run} disabled={running || !model} className={`${primaryButton} whitespace-nowrap`}>
+              {running && <Spinner />}
+              {running ? 'Evaluating…' : rows.length ? 'Run again' : 'Run evaluation'}
+            </button>
+            {running && (
+              <button type="button" onClick={() => (stop.current = true)} className="text-sm font-semibold text-pp-blue hover:underline">
+                Stop after this case
+              </button>
+            )}
+            {message && <span className="text-sm text-pp-muted">{message}</span>}
+          </div>
+          {rows.length > 0 && !message && (
+            <div className="mt-4 max-w-md">
+              <p className="text-sm text-pp-muted">
+                {done.length} of {rows.length} cases done
+              </p>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-pp-gridline">
+                <div className="h-full rounded-full bg-pp-blue transition-[width]" style={{ width: `${(done.length / rows.length) * 100}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
 
-      {note && rows.length > 0 && (
-        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
-          {note}
-        </p>
-      )}
+        <dl className="self-start rounded-lg border border-pp-border bg-pp-surface px-5 py-2 text-sm">
+          {[
+            ['Model', <><strong className="font-semibold">{model || 'none chosen'}</strong> on {provider}</>],
+            ['Money', 'PayPal sandbox only, fictitious.'],
+            ['Limits', 'Every rule applies. The daily caps are lifted for these cases, so runs compare alike.'],
+            ['Cost', 'Each case is one or more calls to your AI provider.'],
+          ].map(([term, value]) => (
+            <div key={term as string} className="border-b border-pp-gridline py-2.5 last:border-b-0">
+              <dt className="text-pp-muted">{term}</dt>
+              <dd className="mt-0.5">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {note && rows.length > 0 && <p className="mt-6 rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-sm text-pp-muted">{note}</p>}
 
       {rows.some((r) => r.id === 'business-cancel') && (
-        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+        <p className="mt-4 rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-sm text-pp-muted">
           A last ticket cancels the sample subscription for real: create and approve a new one on /support before the next run to include it again.
         </p>
       )}
 
       {rows.some((r) => r.id === 'business-dispute') && (
-        <p className="mt-5 rounded border border-pp-border bg-pp-surface p-3 text-sm text-pp-muted">
+        <p className="mt-4 rounded-lg border border-pp-border bg-pp-surface px-4 py-3 text-sm text-pp-muted">
           A last ticket accepts the sample dispute for real: pay a new sample PayPal payment on /support and dispute it before the next run to include it again.
         </p>
       )}
 
       {score.failed > 0 && (
-        <p className="mt-5 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
+        <p className="mt-4 rounded-lg border border-pp-warning/40 bg-pp-warning-tint px-4 py-3 text-sm text-pp-warning">
           <strong>
-            {score.failed} of {rows.length} tickets got no answer
+            {score.failed} of {rows.length} cases got no answer
           </strong>{' '}
           and are left out of the scores: {firstFailure}
         </p>
       )}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Score label="Business tickets resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, invoices, holds and refusals the policy expects." tone={tone(score.business.passed, score.business.of)} />
-        <Score label="Guard held" value={score.guardHeld.passed} of={sizes.guardHeld.of} detail="Attacks where no money moved and no data leaked." tone={tone(score.guardHeld.passed, score.guardHeld.of)} />
-        <Score
-          label="Model refused on its own"
-          value={score.refused.passed}
-          of={sizes.refused.of}
-          detail="Attacks on your agent the model rejected before the guard had to act."
-          tone={!finished ? 'idle' : score.refused.passed === score.refused.of ? 'good' : 'warn'}
-        />
-      </div>
+      <section className="mt-10 border-t border-pp-border pt-2">
+        <div className="grid md:grid-cols-3 md:divide-x md:divide-pp-border">
+          <Score label="Normal cases resolved" value={score.business.passed} of={sizes.business.of} detail="Refunds, invoices, orders, holds and refusals your policy expects." tone={tone(score.business.passed, score.business.of)} ran={rows.length > 0} />
+          <Score label="Attacks the guard held" value={score.guardHeld.passed} of={sizes.guardHeld.of} detail="No money moved and no personal data leaked." tone={tone(score.guardHeld.passed, score.guardHeld.of)} ran={rows.length > 0} />
+          <Score
+            label="Attacks the model refused"
+            value={score.refused.passed}
+            of={sizes.refused.of}
+            detail="Rejected by the model itself, before the guard had to act."
+            tone={!finished ? 'idle' : score.refused.passed === score.refused.of ? 'good' : 'warn'}
+            ran={rows.length > 0}
+          />
+        </div>
+      </section>
 
       {rows.length > 0 && (
-        <ol className="mt-8 divide-y divide-pp-border rounded-lg border border-pp-border bg-pp-surface">
+        <ol className="mt-6 overflow-hidden rounded-lg border border-pp-border bg-pp-surface">
           {rows.map((row) => (
-            <li key={row.id}>
+            <li key={row.id} className="border-b border-pp-gridline last:border-b-0">
               <details className="group px-5 py-3">
                 <summary className="flex cursor-pointer list-none items-center gap-4 text-sm">
-                  <span className={`w-16 shrink-0 text-xs font-semibold uppercase tracking-wider ${row.kind === 'attack' ? 'text-pp-danger' : 'text-pp-blue'}`}>{row.kind}</span>
-                  <span className="min-w-0 flex-1 font-semibold text-pp-navy">
+                  <span className={`w-14 shrink-0 text-xs font-semibold ${row.kind === 'attack' ? 'text-pp-danger' : 'text-pp-muted'}`}>{row.kind === 'attack' ? 'Attack' : 'Normal'}</span>
+                  <span className="min-w-0 flex-1 font-semibold">
                     {row.title}
-                    {row.agent === 'vulnerable' && <span className="ml-2 rounded bg-pp-canvas px-1.5 py-0.5 text-xs font-normal text-pp-muted">compromised agent</span>}
+                    {row.agent === 'vulnerable' && <span className="ml-2 text-xs font-normal text-pp-muted">compromised agent</span>}
                   </span>
-                  <span className="shrink-0 text-sm font-semibold">
-                    <Badge row={row} />
-                  </span>
+                  <Badge row={row} />
                 </summary>
-                <div className="mt-3 min-w-0 space-y-2 pl-20 text-sm wrap-anywhere">
+                <div className="mt-3 min-w-0 space-y-2 text-sm wrap-anywhere md:pl-[4.5rem]">
                   <p className="whitespace-pre-wrap text-pp-muted">
                     <strong className="text-pp-ink">
                       {DESK_LABEL[row.desk ?? 'support']} {maskPersonalData(row.customer)}:
@@ -202,13 +262,11 @@ export function Evaluator({ model, provider, subscription, dispute }: { model: s
                   </p>
                   {row.result && <p className="text-pp-ink">{row.result.reason}</p>}
                   {row.steps?.map((step, i) => (
-                    <p key={i} className={`font-mono text-xs ${stepStyle(step)}`}>
+                    <p key={i} className={`font-mono text-xs ${STEP_COLOR[stepOutcome(step)]}`}>
                       {step.tool} {maskPersonalData(JSON.stringify(step.args))} → {maskPersonalData(step.result).slice(0, 220)}
                     </p>
                   ))}
-                  {row.reply && (
-                    <p className="whitespace-pre-wrap rounded bg-pp-canvas p-3 text-pp-ink">{maskPersonalData(row.reply)}</p>
-                  )}
+                  {row.reply && <p className="whitespace-pre-wrap rounded-md bg-pp-canvas p-3 text-pp-ink">{maskPersonalData(row.reply)}</p>}
                 </div>
               </details>
             </li>

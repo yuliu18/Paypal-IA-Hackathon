@@ -5,7 +5,7 @@ import { loadCatalog, withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings } from '@/lib/settings/settings';
 import { Evaluator } from './evaluator';
 
-export const metadata: Metadata = { title: 'Evaluate model' };
+export const metadata: Metadata = { title: 'Evaluate a model' };
 
 export default async function EvaluatePage() {
   await connection();
