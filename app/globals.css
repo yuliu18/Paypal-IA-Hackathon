@@ -10,27 +10,37 @@ body {
   font-family: var(--pp-font);
 }
 
+:focus-visible {
+  outline: 2px solid var(--pp-blue);
+  outline-offset: 2px;
+}
+
 /*
  * PayPal design tokens: the single source of truth for the dashboard shell (through the
  * Tailwind colours below, e.g. bg-pp-blue), for AG Studio (app/dashboard/studio/theme.ts)
  * and for AG Grid (app/(endpoints)/data-grid.tsx), whose themes reference these variables directly.
  */
 :root {
-  --pp-navy: #001c64;
+  /* Ink and frame: cool paper, deep PayPal ink. Blue is kept for what can be clicked. */
+  --pp-navy: #0b1f44;
   --pp-blue: #0070e0;
   --pp-blue-dark: #003087;
   --pp-sky: #009cde;
-  --pp-highlight: #e6f0fc;
-  --pp-canvas: #f5f7fa;
+  --pp-highlight: #e8f1fd;
+  --pp-canvas: #f6f8fb;
   --pp-surface: #ffffff;
-  --pp-border: #dbe1e8;
-  --pp-gridline: #e9edf2;
-  --pp-ink: #001435;
-  --pp-muted: #545d68;
-  --pp-success: #00875a;
-  --pp-warning: #b45309;
-  --pp-danger: #c4122f;
-  --pp-font: "PayPal Open", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --pp-border: #dce3ec;
+  --pp-gridline: #eaeef3;
+  --pp-ink: #0b1f44;
+  --pp-muted: #56627a;
+  /* The guard's three verdicts, the same on every page: passed, held for a person, stopped. */
+  --pp-success: #1f7a52;
+  --pp-success-tint: #e7f4ed;
+  --pp-warning: #a86412;
+  --pp-warning-tint: #fbf1e2;
+  --pp-danger: #b4302c;
+  --pp-danger-tint: #fbeae9;
+  --pp-font: var(--font-ui), "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   /* Chart series, PayPal blue and navy first. */
   --pp-chart-1: #0070e0;
@@ -54,10 +64,14 @@ body {
   --color-pp-canvas: var(--pp-canvas);
   --color-pp-surface: var(--pp-surface);
   --color-pp-border: var(--pp-border);
+  --color-pp-gridline: var(--pp-gridline);
   --color-pp-ink: var(--pp-ink);
   --color-pp-muted: var(--pp-muted);
   --color-pp-success: var(--pp-success);
   --color-pp-warning: var(--pp-warning);
   --color-pp-danger: var(--pp-danger);
+  --color-pp-success-tint: var(--pp-success-tint);
+  --color-pp-warning-tint: var(--pp-warning-tint);
+  --color-pp-danger-tint: var(--pp-danger-tint);
   --font-paypal: var(--pp-font);
 }

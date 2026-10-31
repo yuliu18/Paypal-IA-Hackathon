@@ -8,10 +8,10 @@ import { Button, Menu, MenuItem } from './ui/ui';
 
 // Reports, each listing its pages. The open report shows its live pages (including unsaved
 // ones); the others show their saved pages. Double-click a report or page to rename it.
-// `tone`: light in the dashboard's own panel, dark inside the app's navy side menu.
+// `tone`: `panel` in the dashboard's own panel, `menu` nested inside the app's side menu.
 
 const TONES = {
-  light: {
+  panel: {
     title: 'px-6 pb-2 pt-6 text-xs font-semibold uppercase tracking-wider text-pp-muted',
     list: 'flex-1 space-y-1 overflow-y-auto px-3 pb-4',
     report: (active: boolean) => (active ? 'font-semibold text-pp-navy' : 'text-pp-ink hover:bg-pp-canvas'),
@@ -25,19 +25,19 @@ const TONES = {
     note: 'text-pp-muted',
     reset: 'text-pp-blue',
   },
-  dark: {
+  menu: {
     title: 'sr-only',
     list: 'space-y-0.5 pb-1 pl-3',
-    report: (active: boolean) => (active ? 'font-semibold text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'),
-    reportIcon: '',
-    more: 'text-white/60 hover:bg-white/10 hover:text-white',
-    pages: 'border-white/15',
-    page: (selected: boolean) => (selected ? 'bg-white/15 font-semibold text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'),
-    remove: 'text-white/60 hover:bg-white/10 hover:text-white',
-    add: 'text-white/75 hover:bg-white/10 hover:text-white',
+    report: (active: boolean) => (active ? 'font-semibold text-pp-ink' : 'text-pp-muted hover:bg-pp-canvas hover:text-pp-ink'),
+    reportIcon: 'text-pp-blue',
+    more: 'text-pp-muted hover:bg-pp-canvas hover:text-pp-ink',
+    pages: 'border-pp-border',
+    page: (selected: boolean) => (selected ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-muted hover:bg-pp-canvas hover:text-pp-ink'),
+    remove: 'text-pp-muted hover:bg-pp-canvas hover:text-pp-danger',
+    add: 'text-pp-muted hover:bg-pp-canvas hover:text-pp-ink',
     footer: 'space-y-0.5 pb-2 pl-3',
-    note: 'text-white/50',
-    reset: 'text-white/75',
+    note: 'text-pp-muted',
+    reset: 'text-pp-muted',
   },
 };
 export function ReportsSidebar({
@@ -57,7 +57,7 @@ export function ReportsSidebar({
   onDuplicate,
   onDelete,
   onReset,
-  tone = 'light',
+  tone = 'panel',
 }: {
   tone?: keyof typeof TONES;
   reports: SavedReport[];
@@ -121,10 +121,10 @@ export function ReportsSidebar({
                     onDoubleClick={() => setRenaming(report.id)}
                     aria-expanded={open}
                     className={`flex w-full items-center pr-10 text-left transition-colors ${
-                      tone === 'dark' ? 'gap-2.5 rounded px-2 py-1.5 text-sm' : 'gap-3 rounded-full py-2.5 pl-4 text-[15px]'
+                      tone === 'menu' ? 'gap-2.5 rounded px-2 py-1.5 text-sm' : 'gap-3 rounded-full py-2.5 pl-4 text-[15px]'
                     } ${t.report(active)}`}
                   >
-                    <ReportIcon className={`${tone === 'dark' ? 'size-4' : 'size-5'} shrink-0 ${active ? t.reportIcon : ''}`} />
+                    <ReportIcon className={`${tone === 'menu' ? 'size-4' : 'size-5'} shrink-0 ${active ? t.reportIcon : ''}`} />
                     <span className="truncate">{report.name}</span>
                   </button>
                 )}
@@ -172,7 +172,7 @@ export function ReportsSidebar({
               </div>
 
               {open && (
-                <ul className={`mb-2 mt-1 space-y-0.5 border-l ${tone === 'dark' ? 'ml-4 pl-2' : 'ml-[26px] pl-3'} ${t.pages}`} aria-label={`${report.name} pages`}>
+                <ul className={`mb-2 mt-1 space-y-0.5 border-l ${tone === 'menu' ? 'ml-4 pl-2' : 'ml-[26px] pl-3'} ${t.pages}`} aria-label={`${report.name} pages`}>
                   {pages.map((page) => {
                     const selected = active && page.id === selectedPageId;
                     return (
@@ -193,7 +193,7 @@ export function ReportsSidebar({
                             onDoubleClick={() => active && editing && setRenaming(page.id)}
                             aria-current={selected ? 'page' : undefined}
                             title={active && editing ? 'Double-click to rename' : undefined}
-                            className={`block w-full truncate pr-8 text-left text-sm transition-colors ${tone === 'dark' ? 'rounded px-2 py-1.5' : 'rounded-full py-2 pl-4'} ${t.page(selected)}`}
+                            className={`block w-full truncate pr-8 text-left text-sm transition-colors ${tone === 'menu' ? 'rounded px-2 py-1.5' : 'rounded-full py-2 pl-4'} ${t.page(selected)}`}
                           >
                             {page.title}
                           </button>
@@ -221,7 +221,7 @@ export function ReportsSidebar({
                           const id = onAddPage();
                           if (id) setRenaming(id);
                         }}
-                        className={`flex w-full items-center text-left text-sm ${tone === 'dark' ? 'gap-2.5 rounded px-2 py-1.5' : 'gap-1.5 rounded-full py-2 pl-4 font-semibold'} ${t.add}`}
+                        className={`flex w-full items-center text-left text-sm ${tone === 'menu' ? 'gap-2.5 rounded px-2 py-1.5' : 'gap-1.5 rounded-full py-2 pl-4 font-semibold'} ${t.add}`}
                       >
                         <PlusIcon className="size-4" /> Add page
                       </button>
@@ -233,7 +233,7 @@ export function ReportsSidebar({
           );
         })}
       </ul>
-      {tone === 'dark' ? (
+      {tone === 'menu' ? (
         // In the side menu: plain menu entries, like the rest of the menu.
         <div className={t.footer}>
           <button type="button" onClick={onCreate} className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-sm ${t.add}`}>

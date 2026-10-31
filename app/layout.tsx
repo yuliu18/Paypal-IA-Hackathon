@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-import { Geist_Mono } from "next/font/google";
+import { Geist_Mono, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AppNav } from "./app-nav";
+
+// The interface's one typeface; Geist Mono is kept for PayPal ids.
+const ui = Schibsted_Grotesk({
+  variable: "--font-ui",
+  subsets: ["latin"],
+});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -13,14 +19,14 @@ export const metadata: Metadata = {
     template: "%s · Payment Guard",
     default: "Payment Guard",
   },
-  description: "An AI support agent for PayPal refunds, behind a payment guard the business configures",
+  description: "A firewall between a shop's AI agents and its PayPal account: every payment call is checked, held for a person or stopped.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} h-full antialiased`}
+      className={`${ui.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="h-full overflow-hidden">
         {/* The frame fills the window exactly and pages scroll inside it, so popups that libraries

@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { setNavSlot } from './nav-slot';
 
-// The control panel's side menu, on every page: the agents and their guard first, then the reports,
-// and the settings. On the dashboard, its reports and their pages appear
-// under "Dashboard" (./nav-slot). The toggle at the bottom folds the menu into a rail of icons.
+// The control panel's side menu, on every page, grouped by what the owner came to do: watch the
+// guard, put the agents to work, test a model, set things up. On the dashboard, its reports and
+// their pages appear under "Dashboard" (./nav-slot). The toggle at the bottom folds the menu into a rail of icons.
 // On small screens it is a scrolling top bar.
 
 const icon = 'size-4 shrink-0';
@@ -26,19 +26,28 @@ const Icons = {
 
 type Item = { href: string; label: string; icon: keyof typeof Icons };
 const SECTIONS: { title?: string; items: Item[] }[] = [
-  { items: [{ href: '/', label: 'Overview', icon: 'home' }] },
   {
-    title: 'Agent',
     items: [
-      { href: '/support', label: 'Support desk', icon: 'chat' },
-      { href: '/billing', label: 'Billing desk', icon: 'invoice' },
-      { href: '/sales', label: 'Sales desk', icon: 'cart' },
+      { href: '/', label: 'Overview', icon: 'home' },
       { href: '/guard', label: 'Guard log', icon: 'shield' },
-      { href: '/evaluate', label: 'Evaluate model', icon: 'check' },
+      { href: '/dashboard', label: 'Dashboard', icon: 'chart' },
     ],
   },
-  { title: 'Insights', items: [{ href: '/dashboard', label: 'Dashboard', icon: 'chart' }] },
-  { title: 'Setup', items: [{ href: '/settings', label: 'Settings', icon: 'gear' }] },
+  {
+    title: 'Agents',
+    items: [
+      { href: '/support', label: 'Support', icon: 'chat' },
+      { href: '/billing', label: 'Billing', icon: 'invoice' },
+      { href: '/sales', label: 'Sales', icon: 'cart' },
+    ],
+  },
+  {
+    title: 'Test and set up',
+    items: [
+      { href: '/evaluate', label: 'Evaluate a model', icon: 'check' },
+      { href: '/settings', label: 'Settings', icon: 'gear' },
+    ],
+  },
 ];
 
 const Icon = ({ name }: { name: keyof typeof Icons }) => (
@@ -58,21 +67,21 @@ export function AppNav() {
   const label = compact ? 'md:sr-only' : '';
   return (
     <nav
-      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-navy px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto [scrollbar-color:rgb(255_255_255/0.25)_transparent] [scrollbar-width:thin] md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
+      className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-surface px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto [scrollbar-color:var(--pp-border)_transparent] [scrollbar-width:thin] md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
     >
-      <Link href="/" title="Payment Guard" className="mr-3 flex shrink-0 items-center gap-2 px-2 font-semibold text-white md:mb-6 md:mr-0">
-        <svg viewBox="0 0 24 24" className="size-6 shrink-0 fill-pp-sky" aria-hidden>
+      <Link href="/" title="Payment Guard" className="mr-3 flex shrink-0 items-center gap-2 px-2 font-semibold text-pp-ink md:mb-6 md:mr-0">
+        <svg viewBox="0 0 24 24" className="size-6 shrink-0 fill-pp-blue" aria-hidden>
           {Icons.shield}
         </svg>
         <span className={`leading-tight ${label}`}>
           Payment Guard
-          <span className="hidden text-xs font-normal text-white/60 md:block">AI agents × PayPal</span>
+          <span className="hidden text-xs font-normal text-pp-muted md:block">Firewall for AI agents on PayPal</span>
         </span>
       </Link>
       {SECTIONS.map((section, index) => (
         <div key={index} className="flex shrink-0 gap-1 md:mb-4 md:flex-col">
           {section.title && (
-            <p className={`hidden px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/50 ${compact ? '' : 'md:block'}`}>{section.title}</p>
+            <p className={`hidden px-2 pb-1 text-xs font-medium text-pp-muted ${compact ? '' : 'md:block'}`}>{section.title}</p>
           )}
           {section.items.map((item) => (
             <Link
@@ -80,7 +89,7 @@ export function AppNav() {
               href={item.href}
               title={compact ? item.label : undefined}
               aria-current={active(item.href) ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-2.5 rounded px-2 py-1.5 ${compact ? 'md:justify-center md:py-2' : ''} ${active(item.href) ? 'bg-white/15 font-semibold text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
+              className={`flex shrink-0 items-center gap-2.5 rounded px-2 py-1.5 ${compact ? 'md:justify-center md:py-2' : ''} ${active(item.href) ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-canvas'}`}
             >
               <Icon name={item.icon} />
               <span className={label}>{item.label}</span>
@@ -96,7 +105,7 @@ export function AppNav() {
         onClick={() => setChoice({ onDashboard, compact: !compact })}
         title={compact ? 'Expand menu' : 'Collapse menu'}
         aria-expanded={!compact}
-        className={`mt-auto hidden items-center gap-2.5 rounded px-2 py-1.5 text-white/60 hover:bg-white/10 hover:text-white md:flex ${compact ? 'md:justify-center' : ''}`}
+        className={`mt-auto hidden items-center gap-2.5 rounded px-2 py-1.5 text-pp-muted hover:bg-pp-canvas hover:text-pp-ink md:flex ${compact ? 'md:justify-center' : ''}`}
       >
         <Icon name={compact ? 'expand' : 'collapse'} />
         <span className={label}>{compact ? 'Expand menu' : 'Collapse menu'}</span>

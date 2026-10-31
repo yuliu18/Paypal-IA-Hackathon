@@ -225,7 +225,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
 
   // The reports list lives in the app's side menu under "Dashboard" (app/nav-slot.ts), or in the
   // dashboard's own panel while the menu is collapsed.
-  const reportsList = (tone: 'light' | 'dark') => (
+  const reportsList = (tone: 'panel' | 'menu') => (
     <ReportsSidebar
       tone={tone}
       reports={reports}
@@ -251,8 +251,8 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
   );
 
   return (
-    <AppShell sidebar={navSlot ? undefined : reportsList('light')}>
-      {navSlot && createPortal(reportsList('dark'), navSlot)}
+    <AppShell sidebar={navSlot ? undefined : reportsList('panel')}>
+      {navSlot && createPortal(reportsList('menu'), navSlot)}
       <ReportHeader
         reportName={saved.name}
         pageTitle={pages.find((p) => p.id === state.selectedPageId)?.title}
