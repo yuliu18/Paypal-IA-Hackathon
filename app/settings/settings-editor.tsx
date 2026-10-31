@@ -232,7 +232,7 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
               <input name="contactEmails" defaultValue={defaults.contactEmails} placeholder="help@yourshop.com" className={input} />
             </Field>
             <Field label="Refund policy" error={errors.refundPolicy} wide>
-              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={4} className={`${input} h-auto`} />
+              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={8} className={`${input} h-auto leading-relaxed`} />
             </Field>
           </Section>
 
