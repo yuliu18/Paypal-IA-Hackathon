@@ -49,11 +49,11 @@ async function writeSeedFile(file: string, seed: SeedFile): Promise<void> {
   await rename(partial, file);
 }
 
-// Charges every purchase, then writes them all at once, so a failed charge keeps the previous
-// payments. The sample subscription and PayPal payment, if any, are kept.
+// Charges every purchase at the same time (each sandbox charge takes seconds), then writes them all
+// at once, so a failed charge keeps the previous payments. The sample subscription and PayPal
+// payment, if any, are kept.
 export async function seedSandbox(charge: (purchase: Purchase) => Promise<Charge> = chargeCard, file = SEED_FILE): Promise<SeedCharge[]> {
-  const charges: SeedCharge[] = [];
-  for (const purchase of PURCHASES) charges.push({ ...purchase, ...(await charge(purchase)) });
+  const charges: SeedCharge[] = await Promise.all(PURCHASES.map(async (purchase) => ({ ...purchase, ...(await charge(purchase)) })));
   const { subscription, disputePayment } = await readSeedFile(file);
   await writeSeedFile(file, { createdAt: new Date().toISOString(), charges, ...(subscription && { subscription }), ...(disputePayment && { disputePayment }) });
   return charges;
