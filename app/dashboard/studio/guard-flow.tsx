@@ -8,15 +8,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgWidgetField, AgWidgetParams } from 'ag-studio';
-import { flowLayout, VERDICTS, type FlowRow, type Verdict } from './guard-flow-layout';
+import { BrandMark } from '../../ui/brand-mark';
+import { flowLayout, spreadLabels, VERDICTS, type FlowRow, type Verdict } from './guard-flow-layout';
 
 const VERDICT_LABEL: Record<Verdict, string> = { passed: 'Passed to PayPal', held: 'Held for you', stopped: 'Stopped by the guard' };
 const VERDICT_COLOR: Record<Verdict, string> = { passed: 'var(--pp-series-1)', held: 'var(--pp-series-2)', stopped: 'var(--pp-series-3)' };
+// Bands in a solid pale tint of their verdict rather than see-through: where two cross, one lies on
+// the other instead of mixing into grey.
+const tint = (verdict: Verdict, strength: number) => `color-mix(in srgb, ${VERDICT_COLOR[verdict]} ${strength}%, white)`;
 
 // Room for the labels beside the two columns of nodes, and above the drawing for the gate's name.
 const LEFT = 132;
 const RIGHT = 178;
-const TOP = 26;
+const TOP = 34;
 // Room under the drawing for the gate's foot.
 const BOTTOM = 10;
 
@@ -79,6 +83,9 @@ export function GuardFlowWidget(params: AgWidgetParams) {
   const flow = useMemo(() => flowLayout(rows, plot), [rows, plot.width, plot.height]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = flow.agents.reduce((sum, a) => sum + a.total, 0);
   const gateX = LEFT + plot.width / 2;
+  // Two-line labels need about 34px each; small nodes would put theirs on top of each other.
+  const agentLabelY = spreadLabels(flow.agents.map((a) => a.y + a.height / 2), 34, plot.height);
+  const verdictLabelY = spreadLabels(flow.verdicts.map((v) => v.y + v.height / 2), 34, plot.height);
   const crossFilter = (format as { crossFilter?: string } | undefined)?.crossFilter;
 
   function choose(agent: string) {
@@ -101,30 +108,37 @@ export function GuardFlowWidget(params: AgWidgetParams) {
               <path
                 key={`${ribbon.agent}-${ribbon.verdict}`}
                 d={ribbon.path}
-                fill={VERDICT_COLOR[ribbon.verdict]}
-                fillOpacity={lit(ribbon.agent) ? 0.42 : 0.1}
-                className="transition-[fill-opacity] duration-150"
+                style={{ fill: tint(ribbon.verdict, lit(ribbon.agent) ? 38 : 12) }}
+                stroke="white"
+                strokeWidth={1}
+                className="transition-[fill] duration-150"
               >
                 <title>{`${capitalize(ribbon.agent)} agent: ${count(ribbon.value)} ${ribbon.value === 1 ? 'call' : 'calls'} ${VERDICT_LABEL[ribbon.verdict].toLowerCase()}`}</title>
               </path>
             ))}
             {flow.agents.map((agent) => (
-              <rect key={agent.name} x={0} y={agent.y} width={flow.node} height={Math.max(agent.height, 1)} rx={2} fill="var(--pp-ink)" opacity={lit(agent.name) ? 1 : 0.3} />
+              <rect key={agent.name} x={0} y={agent.y} width={flow.node} height={Math.max(agent.height, 2)} rx={2} fill="var(--pp-ink)" opacity={lit(agent.name) ? 1 : 0.25} />
             ))}
             {flow.verdicts.map((verdict) => (
-              <rect key={verdict.key} x={plot.width - flow.node} y={verdict.y} width={flow.node} height={Math.max(verdict.height, 1)} rx={2} fill={VERDICT_COLOR[verdict.key]} />
+              <rect key={verdict.key} x={plot.width - flow.node} y={verdict.y} width={flow.node} height={Math.max(verdict.height, 2)} rx={2} fill={VERDICT_COLOR[verdict.key]} />
             ))}
           </g>
           {/* The guard: the gate every band passes, as in the app's mark. */}
-          <rect x={gateX - 3} y={TOP - 6} width={6} height={plot.height + 12} rx={3} fill="var(--pp-ink)" />
-          <text x={gateX} y={12} textAnchor="middle" className="fill-pp-ink text-[12px] font-semibold">
-            Payment guard
-          </text>
+          <rect x={gateX - 1.5} y={TOP - 4} width={3} height={plot.height + 8} rx={1.5} fill="var(--pp-ink)" />
         </svg>
+      )}
+      {size.width > 0 && total > 0 && (
+        <span
+          className="absolute top-0 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-pp-border bg-pp-surface py-1 pr-3 pl-1.5 text-xs font-semibold whitespace-nowrap"
+          style={{ left: gateX }}
+        >
+          <BrandMark className="size-4" />
+          Payment guard
+        </span>
       )}
 
       {/* Labels as HTML beside the drawing, so they wrap and take clicks. */}
-      {flow.agents.map((agent) => (
+      {flow.agents.map((agent, i) => (
         <button
           key={agent.name}
           type="button"
@@ -133,15 +147,15 @@ export function GuardFlowWidget(params: AgWidgetParams) {
           onMouseLeave={() => setHovered(undefined)}
           aria-pressed={selected === agent.name}
           className={`absolute left-0 flex w-[124px] -translate-y-1/2 flex-col items-end rounded px-1 text-right ${lit(agent.name) ? '' : 'opacity-40'}`}
-          style={{ top: TOP + agent.y + agent.height / 2 }}
+          style={{ top: TOP + agentLabelY[i] }}
         >
-          <span className="text-sm font-semibold">{capitalize(agent.name)} agent</span>
+          <span className="text-[13px] font-semibold">{capitalize(agent.name)} agent</span>
           <span className="text-xs text-pp-muted">{count(agent.total)} calls</span>
         </button>
       ))}
-      {flow.verdicts.map((verdict) => (
-        <div key={verdict.key} className="absolute right-0 w-[170px] -translate-y-1/2 pl-2" style={{ top: TOP + verdict.y + verdict.height / 2 }}>
-          <p className="text-sm font-semibold">{VERDICT_LABEL[verdict.key]}</p>
+      {flow.verdicts.map((verdict, i) => (
+        <div key={verdict.key} className="absolute right-0 w-[170px] -translate-y-1/2 pl-2" style={{ top: TOP + verdictLabelY[i] }}>
+          <p className="text-[13px] font-semibold">{VERDICT_LABEL[verdict.key]}</p>
           <p className="text-xs text-pp-muted">
             {count(verdict.total)} calls, {percent(verdict.total, total)}
           </p>

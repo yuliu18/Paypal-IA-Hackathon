@@ -3,7 +3,7 @@
 // and cash, receivables and catalogue. Field ids ('invoices.paidAmount') refer to the data sources
 // in ./data.ts.
 //
-// Studio colours series by position (./theme.ts): the guard charts plot allowed, held and blocked
+// Studio colours series by position (./theme.ts): the guard charts plot passed, held and stopped
 // as three measures in that order, so they are always the traffic light's green, amber and red.
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from 'ag-studio';
@@ -63,8 +63,8 @@ const chartStyle = (barWidth?: number, { legend = true }: { legend?: boolean } =
   custom: AXES,
 });
 
-// The guard's three verdicts as measures, in palette order: allowed green, held amber, blocked red.
-// Named measures from ./data.ts, so the legend reads 'Allowed', not 'Allowed (sum)'.
+// The guard's three verdicts as measures, in palette order: passed green, held amber, stopped red.
+// Named measures from ./data.ts, so the legend reads 'Passed', not 'Passed (sum)'.
 const VERDICTS = [{ id: 'allowedCalls' }, { id: 'heldCalls' }, { id: 'blockedCalls' }];
 
 type Measure = { id: string; aggregation?: 'sum' | 'avg' | 'countd' };
@@ -97,12 +97,11 @@ const kpi = (
 });
 
 // --- AI operations: the cover ------------------------------------------------------
-// What the shop's AI agents (support and billing) did through the payment guard. The sentence,
-// verdict strip and money above the canvas (../components/control-room-header.tsx) already say how
-// many calls went through, were held or were stopped, so the canvas doesn't repeat them as KPIs: it
-// has the agent switch, the personal data the guard withheld, how it decided over time, why it
-// stopped calls, its latest decisions, what the agents did, the money they handled and what waits
-// for the owner (lib/guard/dashboard-rows.ts).
+// What the shop's AI agents did through the payment guard, each fact shown once: the flow from
+// every agent through the guard to its verdicts (click an agent to filter the page), the money it
+// kept in or let out, what waits for a person, the personal data it withheld, how it decided day by
+// day, what the agents tried and why calls were stopped (lib/guard/dashboard-rows.ts). The full list
+// of decisions is on Agent activity, and held calls are decided in the guard log.
 
 // The cover's own widget (./guard-flow.tsx): every call from its agent to what the guard did. The
 // report's types only know Studio's widget types, so ours goes in as one of them (./widgets.ts).
@@ -119,16 +118,12 @@ const guard: AgPageState = {
   id: 'guard',
   widgets: {
     flow: guardFlow,
-    agent: {
-      type: 'button-filter',
-      dataMapping: { value: [{ id: 'guardDecisions.agent' }] },
-      format: {
-        // No title: the two buttons fill the tile. None picked shows both agents.
-        title: { enabled: false },
-        style: { selection: { type: 'multiple' }, dimensions: { height: 36, minWidth: 96 } },
-      },
-    },
-    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Customer details the guard kept from the agents when they read PayPal'),
+    // The figures the page's charts don't show: money the guard kept in or let out, what waits for a
+    // person, and the personal data it kept from the agents.
+    'kpi-protected': kpi('Kept in the shop', { id: 'moneyProtected' }, 'Refunds and claims the guard stopped'),
+    'kpi-moved': kpi('Paid back to customers', { id: 'moneyMoved' }, 'Refunds and claims that went through'),
+    'kpi-waiting': kpi('Waiting for you', sum('guardDecisions.awaitingApproval'), 'Held calls to approve or reject in the guard log'),
+    'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Customer details kept from the agents'),
     timeline: {
       // One axis only: the share stopped, on a second scale, would read as another count.
       type: 'column-chart-stacked',
@@ -155,18 +150,6 @@ const guard: AgPageState = {
         style: chartStyle(BAR),
       },
     },
-    money: {
-      type: 'column-chart-grouped',
-      dataMapping: {
-        categoryKey: [{ id: 'guardDecisions.day' }],
-        // Palette order: moved green, billed amber (billed, not yet paid), protected red.
-        valueKey: [{ id: 'moneyMoved' }, { id: 'moneyBilled' }, { id: 'moneyProtected' }],
-      },
-      format: {
-        ...titled('Money handled per day', 'Paid back to customers, invoiced, and kept in the shop by the guard (USD)'),
-        style: chartStyle(),
-      },
-    },
     reasons: {
       type: 'bar-chart-stacked',
       dataMapping: {
@@ -181,65 +164,17 @@ const guard: AgPageState = {
         style: chartStyle(BAR),
       },
     },
-    held: {
-      type: 'grid',
-      dataMapping: {
-        // The entry id keeps one row per held action, which a person decides on /guard.
-        cols: [
-          { id: 'guardDecisions.at' },
-          { id: 'guardDecisions.id' },
-          { id: 'guardDecisions.agent' },
-          { id: 'guardDecisions.action' },
-          { id: 'guardDecisions.tool' },
-          { id: 'guardDecisions.customer' },
-          // No measure column: the grid drops rows whose measures are all blank, and only refunds
-          // state a requested amount, so held invoices would vanish from the list.
-        ],
-      },
-      sort: [{ field: { id: 'guardDecisions.at' }, direction: 'asc' }],
-      format: { ...titled('Held actions waiting for you', 'Oldest first. Approve or reject them in the guard log.'), crossFilter: 'filter' },
-    },
-    feed: {
-      type: 'grid',
-      dataMapping: {
-        // Dimensions only: the grid drops rows whose measures are all blank, and reads carry no
-        // money, so a measure column would hide them. The time keeps one row per decision.
-        cols: [
-          { id: 'guardDecisions.at' },
-          { id: 'guardDecisions.agent' },
-          { id: 'guardDecisions.action' },
-          { id: 'guardDecisions.decision' },
-          { id: 'guardDecisions.customer' },
-        ],
-      },
-      sort: [{ field: { id: 'guardDecisions.at' }, direction: 'desc' }],
-      format: {
-        ...titled('Latest decisions', 'Newest first. Click one to filter the page.'),
-        // Columns as wide as their text; a narrow tile scrolls sideways instead of cutting words.
-        style: { columnAutoSize: true },
-        crossFilter: 'filter',
-      },
-    },
   },
   widgetLayout: {
-    flow: at(0, 0, 24, 18),
-    agent: at(0, 18, 12, 7),
-    'kpi-withheld': at(12, 18, 12, 7),
-    // Full width and tall: the cover's main chart.
-    timeline: at(0, 25, 24, 24),
-    reasons: at(0, 49, 12, 24),
-    feed: at(12, 49, 12, 24),
-    'by-action': at(0, 73, 12, 23),
-    money: at(12, 73, 12, 23),
-    held: at(0, 96, 24, 16),
-  },
-  filter: {
-    // The agent switch on the canvas; no agent picked shows both.
-    page: [{ field: { id: 'guardDecisions.agent' }, filterWidgetId: 'agent' }],
-    // Only held actions no person has decided yet.
-    widget: {
-      held: [{ field: { id: 'guardDecisions.awaitingApproval' }, model: { operator: 'equals', value: 1 } }],
-    },
+    // Full width: the cover's own widget, then its figures, then how it went over time and why.
+    flow: at(0, 0, 24, 20),
+    'kpi-protected': at(0, 20, 6, 8),
+    'kpi-moved': at(6, 20, 6, 8),
+    'kpi-waiting': at(12, 20, 6, 8),
+    'kpi-withheld': at(18, 20, 6, 8),
+    timeline: at(0, 28, 24, 22),
+    'by-action': at(0, 50, 12, 23),
+    reasons: at(12, 50, 12, 23),
   },
 };
 
@@ -248,19 +183,6 @@ const guard: AgPageState = {
 const activity: AgPageState = {
   id: 'activity',
   widgets: {
-    pivot: {
-      type: 'pivot-grid',
-      dataMapping: {
-        // Expand an agent to see its actions.
-        rows: [{ id: 'guardDecisions.agent' }, { id: 'guardDecisions.action' }],
-        columns: [],
-        values: VERDICTS,
-      },
-      format: {
-        ...titled('Calls by agent and action', 'Expand an agent to see what it did'),
-        style: { grandTotalRow: { enabled: true } },
-      },
-    },
     customers: {
       type: 'bar-chart-stacked',
       dataMapping: {
@@ -294,9 +216,8 @@ const activity: AgPageState = {
     },
   },
   widgetLayout: {
-    pivot: at(0, 0, 13, 24),
-    customers: at(13, 0, 11, 24),
-    decisions: at(0, 24, 24, 28),
+    customers: at(0, 0, 24, 22),
+    decisions: at(0, 22, 24, 28),
   },
 };
 
@@ -306,19 +227,10 @@ const revenue: AgPageState = {
   id: 'revenue',
   widgets: {
     'kpi-sales': kpi('Sales (31 days)', sum('transactions.sales'), 'Payments customers made to the shop', { sparklineX: 'calendar::day' }),
-    'kpi-net': kpi('Net cash flow (31 days)', sum('transactions.net'), 'Everything in and out of the account, after fees'),
     'kpi-balance': kpi('Available balance', sum('balances.available'), 'In the PayPal account now'),
     'kpi-invoiced': kpi('Invoiced', sum('invoices.issuedAmount'), 'Sent invoices, all currencies'),
     // One table per chart: summing two tables over the shared calendar in one chart multiplies
     // their rows, so sales and the agents' money live in separate charts (the agents' on the cover).
-    sales: {
-      type: 'column-chart-grouped',
-      dataMapping: {
-        categoryKey: [{ id: 'calendar::day' }],
-        valueKey: [{ id: 'salesTotal' }],
-      },
-      format: { ...titled('Sales per day', 'Payments customers made to the shop, last 31 days'), style: chartStyle(undefined, { legend: false }) },
-    },
     'in-out': {
       type: 'column-chart-grouped',
       dataMapping: {
@@ -337,14 +249,6 @@ const revenue: AgPageState = {
       sort: [{ field: countd('transactions.id'), direction: 'desc' }],
       format: { ...titled('Ledger activity by type', 'Number of PayPal transactions, most frequent first'), style: chartStyle(BAR, { legend: false }) },
     },
-    'status-sunburst': {
-      type: 'sunburst-chart',
-      dataMapping: {
-        categoryKey: [{ id: 'invoices.statusGroup' }, { id: 'customers.name' }],
-        valueKey: [sum('invoices.total')],
-      },
-      format: titled('Invoice value by status and customer', 'Click a status to drill into its customers'),
-    },
     ledger: {
       type: 'grid',
       dataMapping: {
@@ -362,15 +266,12 @@ const revenue: AgPageState = {
     },
   },
   widgetLayout: {
-    'kpi-sales': at(0, 0, 6, 9),
-    'kpi-net': at(6, 0, 6, 9),
-    'kpi-balance': at(12, 0, 6, 9),
-    'kpi-invoiced': at(18, 0, 6, 9),
-    sales: at(0, 9, 12, 23),
-    'in-out': at(12, 9, 12, 23),
-    'event-types': at(0, 32, 14, 23),
-    'status-sunburst': at(14, 32, 10, 23),
-    ledger: at(0, 55, 24, 24),
+    'kpi-sales': at(0, 0, 8, 9),
+    'kpi-balance': at(8, 0, 8, 9),
+    'kpi-invoiced': at(16, 0, 8, 9),
+    'in-out': at(0, 9, 14, 23),
+    'event-types': at(14, 9, 10, 23),
+    ledger: at(0, 32, 24, 24),
   },
 };
 
@@ -457,29 +358,6 @@ const catalogue: AgPageState = {
     'kpi-plans': kpi('Billing plans', countd('plans.id'), 'Across all products'),
     'kpi-monthly': kpi('Avg monthly price', avg('plans.monthlyPrice'), 'Normalised to one month, USD'),
     'kpi-trial': kpi('Avg trial days', avg('plans.trialDays'), 'Before the first charge'),
-    'plan-intervals': {
-      type: 'donut-chart',
-      dataMapping: {
-        categoryKey: [{ id: 'plans.billingInterval' }],
-        valueKey: [countd('plans.id')],
-      },
-      format: {
-        ...titled('Plans by billing interval'),
-        style: {
-          theme: { common: { legend: { enabled: true, position: 'right' as const } } },
-          custom: { pieDataLabel: { enabled: true, position: 'outside' as const, format: 'percent' as const, outsideColor: MUTED, fontSize: 12 }, totalLabel: { enabled: true } },
-        },
-      },
-    },
-    'price-range': {
-      type: 'bar-chart-grouped',
-      dataMapping: {
-        categoryKey: [{ id: 'products.name' }],
-        valueKey: [avg('plans.monthlyPrice')],
-      },
-      sort: [{ field: avg('plans.monthlyPrice'), direction: 'desc' }],
-      format: { ...titled('Monthly price by product', 'Average across its plans, USD'), style: chartStyle(BAR, { legend: false }) },
-    },
     plans: {
       type: 'grid',
       dataMapping: {
@@ -495,24 +373,13 @@ const catalogue: AgPageState = {
       sort: [{ field: sum('plans.monthlyPrice'), direction: 'desc' }],
       format: { ...titled('Plan catalogue'), crossFilter: 'filter' },
     },
-    'catalogue-sunburst': {
-      type: 'sunburst-chart',
-      dataMapping: {
-        categoryKey: [{ id: 'products.type' }, { id: 'products.name' }, { id: 'plans.name' }],
-        valueKey: [sum('plans.monthlyPrice')],
-      },
-      format: titled('Type, product and plan', 'Sized by monthly price; click to drill in'),
-    },
   },
   widgetLayout: {
     'kpi-products': at(0, 0, 6, 9),
     'kpi-plans': at(6, 0, 6, 9),
     'kpi-monthly': at(12, 0, 6, 9),
     'kpi-trial': at(18, 0, 6, 9),
-    'plan-intervals': at(0, 9, 7, 23),
-    'catalogue-sunburst': at(7, 9, 8, 23),
-    'price-range': at(15, 9, 9, 23),
-    plans: at(0, 32, 24, 14),
+    plans: at(0, 9, 24, 14),
   },
 };
 

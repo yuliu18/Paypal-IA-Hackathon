@@ -7,7 +7,7 @@ import { auditLog } from '@/lib/guard/runtime';
 import { loadCatalog, withDefaultModels } from '@/lib/settings/catalog';
 import { loadSettings } from '@/lib/settings/settings';
 import { checkpointCalls, timeAgo } from './_overview/checkpoint';
-import { agentCalls, heroSentence, verdictShares } from './dashboard/control-room/hero';
+import { agentCalls, heroSentence, verdictShares } from './_overview/tally';
 import { VerdictStamp } from './ui/verdict-stamp';
 
 export const metadata: Metadata = { title: 'Overview' };

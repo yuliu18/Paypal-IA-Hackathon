@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GuardDecisionRow } from '@/lib/guard/dashboard-rows';
-import { agentCalls, heroSentence, verdictShares } from './hero';
+import { agentCalls, heroSentence, verdictShares } from './tally';
 
 type Row = Pick<GuardDecisionRow, 'decidedBy' | 'allowed' | 'held' | 'blocked'>;
 

@@ -19,7 +19,7 @@ export type Flow = {
   node: number;
 };
 
-const NODE = 10;
+const NODE = 8;
 const GAP = 14;
 
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -35,7 +35,10 @@ function stack<K>(items: (K & { total: number })[], scale: number): FlowNode<K>[
 }
 
 export function flowLayout(rows: FlowRow[], { width, height }: { width: number; height: number }): Flow {
-  const agentRows = rows.filter((r) => r.passed + r.held + r.stopped > 0);
+  // Agents whose calls mostly pass at the top, next to "passed", and those mostly stopped at the
+  // bottom, next to "stopped": the bands then cross as little as they can.
+  const share = (r: FlowRow) => r.passed / (r.passed + r.held + r.stopped);
+  const agentRows = rows.filter((r) => r.passed + r.held + r.stopped > 0).sort((a, b) => share(b) - share(a));
   const total = agentRows.reduce((sum, r) => sum + r.passed + r.held + r.stopped, 0);
   if (total === 0) return { agents: [], verdicts: [], ribbons: [], node: NODE };
 
@@ -78,5 +81,21 @@ export function flowLayout(rows: FlowRow[], { width, height }: { width: number; 
       ribbons.push({ agent: row.agent, verdict, value, thickness, path });
     }
   }
+  // Thickest first: drawn in this order, thin bands land on top and stay visible.
+  ribbons.sort((a, b) => b.value - a.value);
   return { agents, verdicts, ribbons, node: NODE };
+}
+
+// Label centres, top to bottom, moved apart so no two are closer than `gap` (small nodes sit close
+// together): each is pushed below the one above it, then the stack is pulled back up if it ran
+// past `height`.
+export function spreadLabels(centres: number[], gap: number, height: number): number[] {
+  const out = [...centres];
+  for (let i = 1; i < out.length; i++) out[i] = Math.max(out[i], out[i - 1] + gap);
+  const overflow = out.length ? out[out.length - 1] - height : 0;
+  if (overflow > 0) {
+    out[out.length - 1] = height;
+    for (let i = out.length - 2; i >= 0; i--) out[i] = Math.min(out[i], out[i + 1] - gap);
+  }
+  return out;
 }

@@ -36,10 +36,10 @@ export function ReportHeader({
   onEditingChange: (editing: boolean) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start gap-x-6 gap-y-3 px-4 pt-6 pb-4 sm:px-8 sm:pt-8">
+    <div className="mx-4 flex flex-wrap items-start gap-x-6 gap-y-3 border-b border-pp-border pt-6 pb-5 sm:mx-8 sm:pt-8">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-pp-muted">{reportName}</p>
-        <h1 className="mt-1 truncate text-[28px] font-semibold leading-tight text-pp-navy">{pageTitle}</h1>
+        <h1 className="mt-1 truncate text-[28px] font-semibold leading-tight tracking-[-0.01em] text-pp-ink">{pageTitle}</h1>
         <DataFreshness asOf={asOf} />
       </div>
       <div className="flex items-center gap-2">

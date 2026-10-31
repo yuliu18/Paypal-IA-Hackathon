@@ -1,4 +1,4 @@
-// The dashboard's opening sentence and its verdict strip, from the guard rows the AG Studio report
+// The home page's sentence and verdict strip, from the guard rows the dashboard's AG Studio report
 // reads (lib/guard/dashboard-rows.ts). Both count the calls the AI agents made; a person's
 // approval or rejection of a held call is a decision about that call, not another call.
 
