@@ -42,6 +42,17 @@ body {
   --pp-danger-tint: #fbeae9;
   --pp-font: var(--font-ui), "Helvetica Neue", Helvetica, Arial, sans-serif;
 
+  /* Chart fills, in the order a chart's series take them: the guard's verdicts first (passed,
+     held, stopped), then blue, pink and violet. Checked with the dataviz palette validator on a
+     light surface: adjacent pairs pass colour-blind and normal-vision separation; amber and pink
+     are under 3:1 against white, so charts that use them keep a legend. */
+  --pp-series-1: #199e70;
+  --pp-series-2: #e39a00;
+  --pp-series-3: #e34948;
+  --pp-series-4: #2a78d6;
+  --pp-series-5: #e87ba4;
+  --pp-series-6: #6250d6;
+
   /* Chart series, PayPal blue and navy first. */
   --pp-chart-1: #0070e0;
   --pp-chart-2: #001c64;

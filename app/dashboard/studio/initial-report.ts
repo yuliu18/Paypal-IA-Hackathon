@@ -21,8 +21,9 @@ const sum = (id: string) => ({ id, aggregation: 'sum' as const });
 const avg = (id: string) => ({ id, aggregation: 'avg' as const });
 const countd = (id: string) => ({ id, aggregation: 'countd' as const });
 
-// Same stack as --pp-font in app/globals.css.
-const PAYPAL_FONT = '"PayPal Open", "Helvetica Neue", Helvetica, Arial, sans-serif';
+// Same stack as --pp-font in app/globals.css: the app's typeface (next/font's --font-ui), then
+// the system fallbacks.
+const PAYPAL_FONT = 'var(--font-ui), "Helvetica Neue", Helvetica, Arial, sans-serif';
 
 const typography = (fontSize: number, fontWeight: 'normal' | 'bold' = 'normal') => ({
   fontFamily: PAYPAL_FONT,
@@ -37,7 +38,27 @@ const titled = (text: string, subtitle?: string) => ({
   ...(subtitle && { subtitle: { enabled: true, text: subtitle, wrapping: true } }),
 });
 
-const legend = { theme: { common: { legend: { enabled: true, position: 'bottom' as const } } } };
+// Chart chrome, the same on every chart, so they read as one set rather than spreadsheet defaults:
+// the legend above the plot at the left, where reading starts; thin bars of a fixed width; faint
+// gridlines on the value axis only; no ticks; small muted axis labels; a hairline baseline.
+const MUTED = '#56627a';
+const GRIDLINE = '#eaeef3';
+const BASELINE = '#dce3ec';
+const axisLabel = { fontSize: 12, color: MUTED };
+const AXES = {
+  categoryAxis: { line: { stroke: BASELINE, width: 1 }, tick: { enabled: false }, gridLine: { enabled: false }, label: axisLabel },
+  valueAxis: { line: { stroke: BASELINE, width: 0 }, tick: { enabled: false }, gridLine: { enabled: true, style: { stroke: GRIDLINE, strokeWidth: 1 } }, label: axisLabel },
+};
+// Bars of a fixed thickness (px) where the categories are few, like actions or rules. Charts over
+// days keep Studio's automatic width: a fixed one would not fit a month and would scroll.
+const BAR = 16;
+const chartStyle = (barWidth?: number, { legend = true }: { legend?: boolean } = {}) => ({
+  theme: {
+    common: { legend: { enabled: legend, position: 'top-left' as const } },
+    ...(barWidth && { bar: { series: { width: barWidth } } }),
+  },
+  custom: AXES,
+});
 
 // The guard's three verdicts as measures, in palette order: allowed green, held amber, blocked red.
 // Named measures from ./data.ts, so the legend reads 'Allowed', not 'Allowed (sum)'.
@@ -94,17 +115,17 @@ const guard: AgPageState = {
     },
     'kpi-withheld': kpi('Personal data withheld', sum('guardDecisions.withheld'), 'Customer details the guard kept from the agents when they read PayPal'),
     timeline: {
-      type: 'combo-chart-stacked-column-line',
+      // One axis only: the share stopped, on a second scale, would read as another count.
+      type: 'column-chart-stacked',
       dataMapping: {
         // The decision's own date, not the shared calendar: calendar days without a decision would
         // show up as empty columns.
         categoryKey: [{ id: 'guardDecisions.day' }],
         valueKey: VERDICTS,
-        secondaryValueKey: [{ id: 'blockRate' }],
       },
       format: {
-        ...titled('Decisions per day', 'Calls that went through, were held or were stopped, and the share stopped (line, right axis)'),
-        style: legend,
+        ...titled('Decisions per day', 'Calls that went through, were held or were stopped'),
+        style: chartStyle(),
       },
     },
     'by-action': {
@@ -116,7 +137,7 @@ const guard: AgPageState = {
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
         ...titled('What the agents tried to do', 'Calls by action, most stopped first'),
-        style: legend,
+        style: chartStyle(BAR),
       },
     },
     money: {
@@ -128,7 +149,7 @@ const guard: AgPageState = {
       },
       format: {
         ...titled('Money handled per day', 'Paid back to customers, invoiced, and kept in the shop by the guard (USD)'),
-        style: legend,
+        style: chartStyle(),
       },
     },
     reasons: {
@@ -142,7 +163,7 @@ const guard: AgPageState = {
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
         ...titled('Why the guard stopped a call', 'Rules the agents broke, most stops first'),
-        style: { ...legend, custom: { categoryAxis: { label: { fontSize: 12 } } } },
+        style: chartStyle(BAR),
       },
     },
     held: {
@@ -186,15 +207,15 @@ const guard: AgPageState = {
     },
   },
   widgetLayout: {
-    agent: at(0, 0, 12, 8),
-    'kpi-withheld': at(12, 0, 12, 8),
+    agent: at(0, 0, 12, 7),
+    'kpi-withheld': at(12, 0, 12, 7),
     // Full width and tall: the cover's main chart.
-    timeline: at(0, 8, 24, 24),
-    reasons: at(0, 32, 12, 24),
-    feed: at(12, 32, 12, 24),
-    'by-action': at(0, 56, 12, 23),
-    money: at(12, 56, 12, 23),
-    held: at(0, 79, 24, 16),
+    timeline: at(0, 7, 24, 24),
+    reasons: at(0, 31, 12, 24),
+    feed: at(12, 31, 12, 24),
+    'by-action': at(0, 55, 12, 23),
+    money: at(12, 55, 12, 23),
+    held: at(0, 78, 24, 16),
   },
   filter: {
     // The agent switch on the canvas; no agent picked shows both.
@@ -233,7 +254,7 @@ const activity: AgPageState = {
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
         ...titled('Customers on whose behalf the agents acted', 'Most blocked first: a customer attacked or attacking the agents'),
-        style: legend,
+        style: chartStyle(BAR),
         seriesLimit: { enabled: false },
       },
     },
@@ -280,7 +301,7 @@ const revenue: AgPageState = {
         categoryKey: [{ id: 'calendar::day' }],
         valueKey: [{ id: 'salesTotal' }],
       },
-      format: titled('Sales per day', 'Payments customers made to the shop, last 31 days'),
+      format: { ...titled('Sales per day', 'Payments customers made to the shop, last 31 days'), style: chartStyle(undefined, { legend: false }) },
     },
     'in-out': {
       type: 'column-chart-grouped',
@@ -289,7 +310,7 @@ const revenue: AgPageState = {
         // Measures, not a split by direction: days without a transaction would add a blank series.
         valueKey: [{ id: 'moneyInTotal' }, { id: 'moneyOutTotal' }],
       },
-      format: { ...titled('Money in and out per day', 'Credits and debits on the PayPal ledger'), style: legend },
+      format: { ...titled('Money in and out per day', 'Credits and debits on the PayPal ledger'), style: chartStyle() },
     },
     'event-types': {
       type: 'bar-chart-grouped',
@@ -298,7 +319,7 @@ const revenue: AgPageState = {
         valueKey: [countd('transactions.id')],
       },
       sort: [{ field: countd('transactions.id'), direction: 'desc' }],
-      format: titled('Ledger activity by type', 'Number of PayPal transactions, most frequent first'),
+      format: { ...titled('Ledger activity by type', 'Number of PayPal transactions, most frequent first'), style: chartStyle(BAR, { legend: false }) },
     },
     'status-sunburst': {
       type: 'sunburst-chart',
@@ -361,7 +382,7 @@ const receivables: AgPageState = {
         categoryKey: [{ id: 'invoices.invoiceDate' }],
         valueKey: [sum('invoices.outstanding'), sum('invoices.overdueAmount')],
       },
-      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: legend },
+      format: { ...titled('Outstanding by invoice date', 'Still owed, and how much of it is past due'), style: chartStyle() },
     },
     aging: {
       type: 'column-chart-stacked',
@@ -371,7 +392,7 @@ const receivables: AgPageState = {
         legendKey: [{ id: 'invoices.status' }],
       },
       sort: [{ field: sum('invoices.total'), direction: 'desc' }],
-      format: { ...titled('Receivables by customer and status', 'Largest balance first'), style: legend },
+      format: { ...titled('Receivables by customer and status', 'Largest balance first'), style: chartStyle() },
     },
     'open-invoices': {
       type: 'grid',
@@ -428,7 +449,10 @@ const catalogue: AgPageState = {
       },
       format: {
         ...titled('Plans by billing interval'),
-        style: { custom: { pieDataLabel: { enabled: true }, totalLabel: { enabled: true } } },
+        style: {
+          theme: { common: { legend: { enabled: true, position: 'right' as const } } },
+          custom: { pieDataLabel: { enabled: true, position: 'outside' as const, format: 'percent' as const, outsideColor: MUTED, fontSize: 12 }, totalLabel: { enabled: true } },
+        },
       },
     },
     'price-range': {
@@ -438,7 +462,7 @@ const catalogue: AgPageState = {
         valueKey: [avg('plans.monthlyPrice')],
       },
       sort: [{ field: avg('plans.monthlyPrice'), direction: 'desc' }],
-      format: titled('Monthly price by product', 'Average across its plans, USD'),
+      format: { ...titled('Monthly price by product', 'Average across its plans, USD'), style: chartStyle(BAR, { legend: false }) },
     },
     plans: {
       type: 'grid',

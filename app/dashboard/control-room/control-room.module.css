@@ -1,48 +1,11 @@
 /*
- * The dashboard's dark look, for the dashboard only: a ledger the shop owner reads at night,
- * ink blue rather than black, with the guard's verdicts in stamp and banknote tones.
- *
- * `.room` redefines the PayPal design tokens of app/globals.css for everything inside it. The
- * shell's Tailwind classes (bg-pp-canvas, text-pp-navy...) and the AG Studio theme
- * (../studio/theme.ts) both read these variables, so the header, the edit bar, the dialogs and
- * every widget, grid and chart turn dark together; the rest of the app keeps the light tokens.
- * Inside the room `--pp-navy` is the strongest text colour (headings, big figures), not a fill,
- * and PayPal blue is kept for things you can click.
+ * The dashboard's frame: the same light tokens as the rest of the app (app/globals.css), so the
+ * header, the edit bar, the dialogs and every AG Studio widget, grid and chart (../studio/theme.ts)
+ * read as one product with the other pages.
  */
 .room {
-  --pp-canvas: #0f1b2d;
-  --pp-surface: #16243a;
-  /* Raised: hovers, selected rows, tooltips. */
-  --pp-highlight: #1d2e48;
-  --pp-border: #26385a;
-  --pp-gridline: #26385a;
-  --pp-ink: #e6ecf3;
-  --pp-muted: #9aa8ba;
-  --pp-navy: #f3f6fa;
-  --pp-blue: #2f8cff;
-  --pp-blue-dark: #1f74e0;
-  --pp-sky: #2f8cff;
-
-  /* The guard's verdicts: allowed, held, blocked. Fills, not text: blocked is 4.4:1 on the canvas. */
-  --pp-success: #3fa37a;
-  --pp-warning: #d9a23a;
-  --pp-danger: #d6574b;
-
-  /* Quiet accents after the verdicts. */
-  --pp-chart-1: #2f8cff;
-  --pp-chart-2: #8fb3d9;
-  --pp-chart-3: #6fa8dc;
-  --pp-chart-4: #d9a23a;
-  --pp-chart-5: #a58bd6;
-  --pp-chart-6: #c98a7d;
-  --pp-chart-7: #7fb8a4;
-  --pp-chart-8: #3fa37a;
-  --pp-chart-9: #b7a6d9;
-  --pp-chart-10: #8796ab;
-
-  color-scheme: dark;
+  color-scheme: light;
   background: var(--pp-canvas);
-  font-variant-numeric: tabular-nums;
 }
 
 /* --- The opening: one sentence, one strip, one line of money ------------------------ */
@@ -57,7 +20,7 @@
   line-height: 1.22;
   font-weight: 500;
   letter-spacing: -0.012em;
-  color: var(--pp-navy);
+  color: var(--pp-ink);
   text-wrap: balance;
 }
 
@@ -96,15 +59,15 @@
 }
 
 .allowed {
-  background: var(--pp-success);
+  background: var(--pp-series-1);
 }
 
 .held {
-  background: var(--pp-warning);
+  background: var(--pp-series-2);
 }
 
 .blocked {
-  background: var(--pp-danger);
+  background: var(--pp-series-3);
 }
 
 /* Labels under the strip: each is as wide as its segment, so it starts where the segment starts,

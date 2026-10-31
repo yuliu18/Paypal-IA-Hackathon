@@ -22,13 +22,29 @@ type FieldFormat = AgFormat | 'usd';
 // [id, name, format, hide?]
 type FieldSpec = [id: string, name: string, format: FieldFormat, hide?: boolean];
 
-const USD = { format: '$#,##0.00' };
+// Numbers in English like the rest of the app, whatever the browser's language: a format pattern
+// ('#,##0') would group digits the browser's way, so a Spanish browser would read 5,148 as 5.148.
+const EN = 'en-US';
+const USD = { format: new Intl.NumberFormat(EN, { style: 'currency', currency: 'USD' }) };
+const NUMBER_OPTIONS: Partial<Record<FieldFormat, { format: Intl.NumberFormat }>> = {
+  integerFormat: { format: new Intl.NumberFormat(EN, { maximumFractionDigits: 0 }) },
+  // Amounts in whatever currency the row names, without a symbol.
+  currencyFormat: { format: new Intl.NumberFormat(EN, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+  decimalFormat: { format: new Intl.NumberFormat(EN, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+  percentageFormat: { format: new Intl.NumberFormat(EN, { style: 'percent', maximumFractionDigits: 1 }) },
+};
+
+// The field definition's format and, for numbers, the English formatter it uses.
+const formatOf = (format: FieldFormat) =>
+  format === 'usd'
+    ? { format: 'currencyFormat' as const, formatOptions: USD }
+    : { format, ...(NUMBER_OPTIONS[format] && { formatOptions: NUMBER_OPTIONS[format] }) };
 
 const fields = (specs: FieldSpec[]): AgFieldDefinition[] =>
   specs.map(([id, name, format, hide]) => ({
     id,
     name,
-    ...(format === 'usd' ? { format: 'currencyFormat', formatOptions: USD } : { format }),
+    ...formatOf(format),
     ...(hide && { hide }),
   }));
 
@@ -64,7 +80,7 @@ const ratio = (
   id,
   name,
   description,
-  format: 'percentageFormat',
+  ...formatOf('percentageFormat'),
   isMeasure: true,
   expression: { operator: 'divide', inputs: [sumOf(numerator), { id: denominator, aggregation: denominatorAggregation }] },
 });
@@ -76,7 +92,7 @@ const total = (id: string, name: string, description: string, field: string, for
   description,
   isMeasure: true,
   expression: sumOf(field),
-  ...(format === 'usd' ? { format: 'currencyFormat', formatOptions: USD } : { format }),
+  ...formatOf(format),
 });
 
 // --- Data sources -----------------------------------------------------------------
