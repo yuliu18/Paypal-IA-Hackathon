@@ -7,6 +7,7 @@ import { format } from '@/lib/guard/domain/policy';
 import { maskEmail, maskPersonalData } from '@/lib/guard/domain/redact';
 import { auditLog } from '@/lib/guard/runtime';
 import { EndpointPage } from '../endpoint-page';
+import { GuardAssistant } from './guard-assistant';
 import { HeldQueue, type HeldCall } from './held-queue';
 
 const FULL_CHECK_MS = 60_000;
@@ -143,6 +144,7 @@ export default async function GuardLogPage() {
     >
       {!chain.intact && <ChainStatus check={chain} />}
       <HeldQueue calls={held} />
+      <GuardAssistant />
     </EndpointPage>
   );
 }

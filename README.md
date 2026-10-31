@@ -229,6 +229,12 @@ The same message also goes to every other channel set up, all at once, so one th
 
 Each channel gives up after 5 seconds (SMTP: 5 seconds for each of connecting, the greeting and each reply) and logs failures without its key, token, password or URL. The settings page has a step-by-step setup guide for each channel.
 
+### Guard assistant
+
+`/guard` has a **Guard assistant** under the held calls: ask it about the guard's decisions ("Why was the last refund blocked?", "Summarise today", "What is waiting for me?") and it answers in a few sentences with the LLM chosen on `/settings`. It only explains. It is one chat completion with no tools, so it can't approve or reject a held call, create rules, call PayPal or move money, and the page shows its answer as plain text, never as a link or a button.
+
+The log holds text an attacker wrote: the ticket, and the arguments and PayPal answers the agent saw. So the model only sees structured, masked fields of the newest 200 entries, up to about 80 KB ([`lib/guard/assistant.ts`](lib/guard/assistant.ts)): time, agent, tool, verdict, outcome, who decided, rule codes and messages, the masked customer and the amounts requested, moved, kept and billed. The ticket text, the agent's reply, arguments and PayPal answers never reach it, and it is told the log may be partial and to say it doesn't know when the log doesn't show the answer. Its route ([`app/api/guard/assistant`](app/api/guard/assistant/route.ts)) takes questions of up to 500 characters, 30 per address per 10 minutes, and keeps provider errors in the server log.
+
 ### The black box
 
 Every decision is written to a SQLite file (`data/guard-audit.db`, or `GUARD_AUDIT_DB`) before the call runs, and its outcome is appended as a separate row afterwards, so no row is ever rewritten. Each row stores `sha256` of the previous row's hash and its own content. `/guard` checks the chain on every visit and shows either **Black box intact** with the head hash, or **Black box tampered** with the first bad row:
