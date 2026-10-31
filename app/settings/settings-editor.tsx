@@ -21,15 +21,36 @@ const button =
 
 // One section of the form. Only the open one shows; the others stay in the form, hidden, so one
 // save keeps every field.
-function Section({ id, open, title, detail, children }: { id: SettingsSectionId; open: SettingsSectionId; title: string; detail: string; children: React.ReactNode }) {
+// `cards`: the section is a stack of cards of its own (one per notification channel) rather than one card.
+function Section({ id, open, title, detail, cards, children }: { id: SettingsSectionId; open: SettingsSectionId; title: string; detail: string; cards?: boolean; children: React.ReactNode }) {
   return (
-    <section id={`settings-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} hidden={id !== open} className="rounded-lg border border-pp-border bg-pp-surface p-6">
+    <section id={`settings-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} hidden={id !== open} className={cards ? '' : 'rounded-lg border border-pp-border bg-pp-surface p-6'}>
       <h2 className="text-lg font-semibold">{title}</h2>
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
+      {cards ? <div className="mt-5 space-y-4">{children}</div> : <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>}
     </section>
   );
 }
+
+// One notification channel: its own card, saying whether it is set up.
+function Channel({ title, detail, on, children }: { title: string; detail: string; on: boolean; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-pp-border bg-pp-surface p-6">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="font-semibold">{title}</h3>
+        <span
+          className={`rounded-[3px] border px-2 py-0.5 text-xs font-semibold ${on ? 'border-pp-success/40 bg-pp-success-tint text-pp-success' : 'border-pp-border bg-pp-canvas text-pp-muted'}`}
+        >
+          {on ? 'On' : 'Off'}
+        </span>
+      </div>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
+    </div>
+  );
+}
+
+const isSet = (status: KeyStatus) => status.source === 'saved' || status.source === 'env';
 
 function Field({ label, error, hint, wide, children }: { label: string; error?: string; hint?: React.ReactNode; wide?: boolean; children: React.ReactNode }) {
   return (
@@ -299,150 +320,163 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </div>
           </Section>
 
-          <Section id="notifications" open={open} title="Notifications" detail="When the guard holds a refund for a person, it tells every channel set here: a Slack or Discord webhook, an email, a Telegram chat. The message names the amount, the masked customer email and the rules, never the ticket's text.">
-            <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
-              <input
-                name="webhookUrl"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.webhookUrl.hint || 'https://hooks.slack.com/services/…'}
-                className={input}
-              />
-            </Field>
-            {view.notifications.webhookUrl.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
-              </label>
-            )}
-            <SetupGuide title="How to get a Slack or Discord webhook">
-              <li>
-                <strong>Slack:</strong> on <ExternalLink href="https://api.slack.com/apps">api.slack.com/apps</ExternalLink>, create an app from scratch in your workspace, open{' '}
-                <em>Incoming Webhooks</em>, turn them on, click <em>Add New Webhook to Workspace</em>, pick the channel and copy the URL.
-              </li>
-              <li>
-                <strong>Discord:</strong> in your server, open the channel&apos;s <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, then{' '}
-                <em>Copy Webhook URL</em>.
-              </li>
-              <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
-            </SetupGuide>
-            <p className="text-sm text-pp-muted sm:col-span-2">
-              Email goes to the contact emails above, through your own mail server (SMTP) when its server, login and password are set, otherwise through Resend.
-            </p>
-            <Field
-              label="From address"
-              error={errors.emailFrom}
-              hint="With SMTP, leave blank to send from the login. With Resend, a sender on a domain verified there, or onboarding@resend.dev to try it."
-              wide
+          <Section
+            id="notifications"
+            open={open}
+            cards
+            title="Notifications"
+            detail="When the guard holds a call for a person, it tells every channel that is on. The message names the amount, the masked customer email and the rules, never the ticket's text."
+          >
+            <Channel title="Slack or Discord" detail="A message in a channel of your team chat, through an incoming webhook." on={isSet(view.notifications.webhookUrl)}>
+              <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
+                <input
+                  name="webhookUrl"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.webhookUrl.hint || 'https://hooks.slack.com/services/…'}
+                  className={input}
+                />
+              </Field>
+              {view.notifications.webhookUrl.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
+                </label>
+              )}
+              <SetupGuide title="How to get a Slack or Discord webhook">
+                <li>
+                  <strong>Slack:</strong> on <ExternalLink href="https://api.slack.com/apps">api.slack.com/apps</ExternalLink>, create an app from scratch in your workspace, open{' '}
+                  <em>Incoming Webhooks</em>, turn them on, click <em>Add New Webhook to Workspace</em>, pick the channel and copy the URL.
+                </li>
+                <li>
+                  <strong>Discord:</strong> in your server, open the channel&apos;s <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, then{' '}
+                  <em>Copy Webhook URL</em>.
+                </li>
+                <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
+              </SetupGuide>
+            </Channel>
+            <Channel
+              title="Email"
+              detail="An email to the contact emails under Business, through your own mail server (SMTP) when its server, login and password are set, otherwise through Resend."
+              on={Boolean(defaults.smtpHost && isSet(view.notifications.smtpPassword)) || isSet(view.notifications.resendApiKey)}
             >
-              <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
-            </Field>
-            <Field label="SMTP server" error={errors.smtpHost}>
-              <input name="smtpHost" defaultValue={defaults.smtpHost} autoComplete="off" placeholder="smtp.gmail.com" className={input} />
-            </Field>
-            <Field label="SMTP port" error={errors.smtpPort} hint="587 (STARTTLS) or 465 (TLS). Blank means 587.">
-              <input name="smtpPort" inputMode="numeric" defaultValue={defaults.smtpPort} autoComplete="off" placeholder="587" className={input} />
-            </Field>
-            <Field label="SMTP login" error={errors.smtpUser}>
-              <input name="smtpUser" defaultValue={defaults.smtpUser} autoComplete="off" placeholder="you@gmail.com" className={input} />
-            </Field>
-            <Field
-              label="SMTP password"
-              error={errors.smtpPassword}
-              hint={`${keyHint(view.notifications.smtpPassword, 'SMTP_PASSWORD', 'password')} Changing the server or login forgets it.`}
-            >
-              <input
-                name="smtpPassword"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.smtpPassword.hint || 'App password'}
-                className={input}
-              />
-            </Field>
-            {view.notifications.smtpPassword.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearSmtpPassword" /> Remove the saved SMTP password
-              </label>
-            )}
-            <SetupGuide title="How to set up email with your own mail (SMTP)">
-              <li>
-                <strong>Gmail:</strong> turn on 2-Step Verification for the account, then create an app password on{' '}
-                <ExternalLink href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</ExternalLink>. Use server <code>smtp.gmail.com</code>,
-                port <code>587</code>, your Gmail address as login and the 16-letter app password, without spaces. Your normal password does not work.
-              </li>
-              <li>
-                <strong>Outlook or Microsoft 365:</strong> server <code>smtp.office365.com</code>, port <code>587</code>, your address and password (an app password if
-                the account uses two-step sign-in). Your administrator may need to allow SMTP for the mailbox.
-              </li>
-              <li>
-                <strong>Your hosting&apos;s mail:</strong> the server, port and login are in your hosting panel&apos;s email settings, often <code>mail.your-domain.com</code>{' '}
-                with your full address as login.
-              </li>
-              <li>Leave the from address blank: most mail servers only send from the account you log in with.</li>
-              <li>The password only travels encrypted (TLS), and is only ever sent to the server and login it was saved with.</li>
-            </SetupGuide>
-            <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
-              <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
-            </Field>
-            {view.notifications.resendApiKey.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
-              </label>
-            )}
-            <SetupGuide title="How to set up email with Resend">
-              <li>
-                Sign up on <ExternalLink href="https://resend.com">resend.com</ExternalLink> (the free plan is enough), open <em>API Keys</em>, create a key with sending
-                access and paste it above.
-              </li>
-              <li>
-                <strong>To try it:</strong> use <code>onboarding@resend.dev</code> as the from address and put your Resend account&apos;s email in Contact emails under
-                Business. Resend&apos;s test sender only delivers to that address, and may land in spam.
-              </li>
-              <li>
-                <strong>For real:</strong> in Resend, open <em>Domains</em>, add your domain, add the DNS records it shows, and once it is verified use an address on it,
-                like <code>guard@your-domain.com</code>.
-              </li>
-              <li>Every contact email under Business gets the message.</li>
-            </SetupGuide>
-            <Field label="Telegram bot token" error={errors.telegramBotToken} hint={keyHint(view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
-              <input
-                name="telegramBotToken"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.telegramBotToken.hint || '123456789:AA…'}
-                className={input}
-              />
-            </Field>
-            <Field label="Telegram chat id" error={errors.telegramChatId} hint="Message your bot, then open api.telegram.org/bot<token>/getUpdates and copy chat.id, or use @channelname.">
-              <input name="telegramChatId" defaultValue={defaults.telegramChatId} autoComplete="off" placeholder="-1001234567890" className={input} />
-            </Field>
-            {view.notifications.telegramBotToken.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearTelegramBotToken" /> Remove the saved bot token
-              </label>
-            )}
-            <SetupGuide title="How to set up Telegram">
-              <li>
-                In Telegram, open <ExternalLink href="https://t.me/BotFather">@BotFather</ExternalLink>, send <code>/newbot</code>, choose a name and a username ending in{' '}
-                <code>bot</code>, and paste the token it gives you (<code>123456789:AA…</code>) above.
-              </li>
-              <li>
-                Open a chat with your new bot, press <em>Start</em> and send it any message. For a group, add the bot to the group and send a message there.
-              </li>
-              <li>
-                In a browser, open <code>https://api.telegram.org/bot&lt;token&gt;/getUpdates</code>, with your token right after <code>bot</code> and no spaces or{' '}
-                <code>&lt; &gt;</code>. Copy the number in <code>&quot;chat&quot;: {'{'} &quot;id&quot;: … {'}'}</code> into Telegram chat id. A group&apos;s id starts with{' '}
-                <code>-100</code>.
-              </li>
-              <li>
-                If it shows <code>&quot;result&quot;: []</code>, the bot has no message yet: send it one and reload.
-              </li>
-              <li>
-                Set <code>APP_URL</code> on the server so the message links to the guard page; without it, Telegram shows <code>/guard</code> as a bot command.
-              </li>
-            </SetupGuide>
+              <Field
+                label="From address"
+                error={errors.emailFrom}
+                hint="With SMTP, leave blank to send from the login. With Resend, a sender on a domain verified there, or onboarding@resend.dev to try it."
+                wide
+              >
+                <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
+              </Field>
+              <Field label="SMTP server" error={errors.smtpHost}>
+                <input name="smtpHost" defaultValue={defaults.smtpHost} autoComplete="off" placeholder="smtp.gmail.com" className={input} />
+              </Field>
+              <Field label="SMTP port" error={errors.smtpPort} hint="587 (STARTTLS) or 465 (TLS). Blank means 587.">
+                <input name="smtpPort" inputMode="numeric" defaultValue={defaults.smtpPort} autoComplete="off" placeholder="587" className={input} />
+              </Field>
+              <Field label="SMTP login" error={errors.smtpUser}>
+                <input name="smtpUser" defaultValue={defaults.smtpUser} autoComplete="off" placeholder="you@gmail.com" className={input} />
+              </Field>
+              <Field
+                label="SMTP password"
+                error={errors.smtpPassword}
+                hint={`${keyHint(view.notifications.smtpPassword, 'SMTP_PASSWORD', 'password')} Changing the server or login forgets it.`}
+              >
+                <input
+                  name="smtpPassword"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.smtpPassword.hint || 'App password'}
+                  className={input}
+                />
+              </Field>
+              {view.notifications.smtpPassword.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearSmtpPassword" /> Remove the saved SMTP password
+                </label>
+              )}
+              <SetupGuide title="How to set up email with your own mail (SMTP)">
+                <li>
+                  <strong>Gmail:</strong> turn on 2-Step Verification for the account, then create an app password on{' '}
+                  <ExternalLink href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</ExternalLink>. Use server <code>smtp.gmail.com</code>,
+                  port <code>587</code>, your Gmail address as login and the 16-letter app password, without spaces. Your normal password does not work.
+                </li>
+                <li>
+                  <strong>Outlook or Microsoft 365:</strong> server <code>smtp.office365.com</code>, port <code>587</code>, your address and password (an app password if
+                  the account uses two-step sign-in). Your administrator may need to allow SMTP for the mailbox.
+                </li>
+                <li>
+                  <strong>Your hosting&apos;s mail:</strong> the server, port and login are in your hosting panel&apos;s email settings, often <code>mail.your-domain.com</code>{' '}
+                  with your full address as login.
+                </li>
+                <li>Leave the from address blank: most mail servers only send from the account you log in with.</li>
+                <li>The password only travels encrypted (TLS), and is only ever sent to the server and login it was saved with.</li>
+              </SetupGuide>
+              <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
+                <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
+              </Field>
+              {view.notifications.resendApiKey.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
+                </label>
+              )}
+              <SetupGuide title="How to set up email with Resend">
+                <li>
+                  Sign up on <ExternalLink href="https://resend.com">resend.com</ExternalLink> (the free plan is enough), open <em>API Keys</em>, create a key with sending
+                  access and paste it above.
+                </li>
+                <li>
+                  <strong>To try it:</strong> use <code>onboarding@resend.dev</code> as the from address and put your Resend account&apos;s email in Contact emails under
+                  Business. Resend&apos;s test sender only delivers to that address, and may land in spam.
+                </li>
+                <li>
+                  <strong>For real:</strong> in Resend, open <em>Domains</em>, add your domain, add the DNS records it shows, and once it is verified use an address on it,
+                  like <code>guard@your-domain.com</code>.
+                </li>
+                <li>Every contact email under Business gets the message.</li>
+              </SetupGuide>
+            </Channel>
+            <Channel title="Telegram" detail="A message from your own Telegram bot to a chat, a group or a channel." on={isSet(view.notifications.telegramBotToken) && Boolean(defaults.telegramChatId)}>
+              <Field label="Telegram bot token" error={errors.telegramBotToken} hint={keyHint(view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
+                <input
+                  name="telegramBotToken"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.telegramBotToken.hint || '123456789:AA…'}
+                  className={input}
+                />
+              </Field>
+              <Field label="Telegram chat id" error={errors.telegramChatId} hint="Message your bot, then open api.telegram.org/bot<token>/getUpdates and copy chat.id, or use @channelname.">
+                <input name="telegramChatId" defaultValue={defaults.telegramChatId} autoComplete="off" placeholder="-1001234567890" className={input} />
+              </Field>
+              {view.notifications.telegramBotToken.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearTelegramBotToken" /> Remove the saved bot token
+                </label>
+              )}
+              <SetupGuide title="How to set up Telegram">
+                <li>
+                  In Telegram, open <ExternalLink href="https://t.me/BotFather">@BotFather</ExternalLink>, send <code>/newbot</code>, choose a name and a username ending in{' '}
+                  <code>bot</code>, and paste the token it gives you (<code>123456789:AA…</code>) above.
+                </li>
+                <li>
+                  Open a chat with your new bot, press <em>Start</em> and send it any message. For a group, add the bot to the group and send a message there.
+                </li>
+                <li>
+                  In a browser, open <code>https://api.telegram.org/bot&lt;token&gt;/getUpdates</code>, with your token right after <code>bot</code> and no spaces or{' '}
+                  <code>&lt; &gt;</code>. Copy the number in <code>&quot;chat&quot;: {'{'} &quot;id&quot;: … {'}'}</code> into Telegram chat id. A group&apos;s id starts with{' '}
+                  <code>-100</code>.
+                </li>
+                <li>
+                  If it shows <code>&quot;result&quot;: []</code>, the bot has no message yet: send it one and reload.
+                </li>
+                <li>
+                  Set <code>APP_URL</code> on the server so the message links to the guard page; without it, Telegram shows <code>/guard</code> as a bot command.
+                </li>
+              </SetupGuide>
+            </Channel>
           </Section>
 
           <div className="flex flex-wrap items-center gap-4">
