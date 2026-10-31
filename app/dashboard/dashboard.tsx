@@ -53,6 +53,7 @@ import { agentCalls } from './control-room/hero';
 import { buildAi } from './studio/ai';
 import { buildStudioData, hasData } from './studio/data';
 import { agStudioPayPalTheme } from './studio/theme';
+import { dashboardWidgets } from './studio/widgets';
 import { useReports } from './use-reports';
 
 if (process.env.NODE_ENV !== 'production') {
@@ -281,6 +282,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
               style={{ height: '100%', width: '100%' }}
               theme={agStudioPayPalTheme}
               layout={{ widgetBorderEnabled: true }}
+              widgets={dashboardWidgets}
               data={studioData}
               ai={ai}
               initialState={initialState}

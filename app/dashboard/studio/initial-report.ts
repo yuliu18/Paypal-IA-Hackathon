@@ -7,6 +7,7 @@
 // as three measures in that order, so they are always the traffic light's green, amber and red.
 
 import type { AgPageState, AgReportState, AgWidgetLayoutState } from 'ag-studio';
+import { GUARD_FLOW } from './widgets';
 
 // --- Helpers ----------------------------------------------------------------------
 
@@ -103,9 +104,21 @@ const kpi = (
 // stopped calls, its latest decisions, what the agents did, the money they handled and what waits
 // for the owner (lib/guard/dashboard-rows.ts).
 
+// The cover's own widget (./guard-flow.tsx): every call from its agent to what the guard did. The
+// report's types only know Studio's widget types, so ours goes in as one of them (./widgets.ts).
+const guardFlow = {
+  type: GUARD_FLOW,
+  dataMapping: { categoryKey: [{ id: 'guardDecisions.agent' }], valueKey: VERDICTS },
+  format: {
+    ...titled('Flow through the guard', 'Every call your agents made, from the agent to what the guard did with it. Click an agent to filter the page.'),
+    crossFilter: 'filter' as const,
+  },
+} as unknown as NonNullable<AgPageState['widgets']>[string];
+
 const guard: AgPageState = {
   id: 'guard',
   widgets: {
+    flow: guardFlow,
     agent: {
       type: 'button-filter',
       dataMapping: { value: [{ id: 'guardDecisions.agent' }] },
@@ -209,15 +222,16 @@ const guard: AgPageState = {
     },
   },
   widgetLayout: {
-    agent: at(0, 0, 12, 7),
-    'kpi-withheld': at(12, 0, 12, 7),
+    flow: at(0, 0, 24, 18),
+    agent: at(0, 18, 12, 7),
+    'kpi-withheld': at(12, 18, 12, 7),
     // Full width and tall: the cover's main chart.
-    timeline: at(0, 7, 24, 24),
-    reasons: at(0, 31, 12, 24),
-    feed: at(12, 31, 12, 24),
-    'by-action': at(0, 55, 12, 23),
-    money: at(12, 55, 12, 23),
-    held: at(0, 78, 24, 16),
+    timeline: at(0, 25, 24, 24),
+    reasons: at(0, 49, 12, 24),
+    feed: at(12, 49, 12, 24),
+    'by-action': at(0, 73, 12, 23),
+    money: at(12, 73, 12, 23),
+    held: at(0, 96, 24, 16),
   },
   filter: {
     // The agent switch on the canvas; no agent picked shows both.
