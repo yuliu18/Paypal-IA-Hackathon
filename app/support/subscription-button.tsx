@@ -12,8 +12,7 @@ export function SubscriptionButton({ pendingApproveUrl }: { pendingApproveUrl?: 
   const [state, action, pending] = useActionState(createSampleSubscriptionAction, null);
   const approveUrl = state?.ok ? state.approveUrl : pendingApproveUrl;
   return (
-    <form action={action} className="flex flex-col items-start gap-2 px-4 py-3">
-      <p className="text-sm text-pp-muted">A subscription a sandbox buyer approves, for the cancellation tickets.</p>
+    <form action={action} className="flex flex-col items-start gap-2.5 px-5 py-4">
       <button
         type="submit"
         disabled={pending}
@@ -22,9 +21,10 @@ export function SubscriptionButton({ pendingApproveUrl }: { pendingApproveUrl?: 
         {pending && <Spinner className="text-pp-blue" />}
         {pending ? 'Creating subscription…' : 'Create sample subscription'}
       </button>
+      <p className="text-sm text-pp-muted">A subscription a sandbox buyer approves, for the cancellation tickets.</p>
       {state && !state.ok && <span className="text-sm text-pp-danger">{state.message}</span>}
       {approveUrl && (
-        <span className="text-sm text-pp-muted">
+        <span className="text-sm text-pp-ink">
           <a href={approveUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
             Approval link
           </a>

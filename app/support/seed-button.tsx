@@ -8,8 +8,7 @@ import { createSamplePaymentsAction } from './actions';
 export function SeedButton({ label }: { label: string }) {
   const [state, action, pending] = useActionState(createSamplePaymentsAction, null);
   return (
-    <form action={action} className="flex flex-col items-start gap-2 px-4 py-3">
-      <p className="text-sm text-pp-muted">Three card payments, one per sample customer. Make new ones once the old ones are refunded.</p>
+    <form action={action} className="flex flex-col items-start gap-2.5 px-5 py-4">
       <button
         type="submit"
         disabled={pending}
@@ -18,6 +17,7 @@ export function SeedButton({ label }: { label: string }) {
         {pending && <Spinner className="text-pp-blue" />}
         {pending ? 'Creating payments…' : label}
       </button>
+      <p className="text-sm text-pp-muted">Three card payments, one per sample customer. Make new ones once the old ones are refunded.</p>
       {state && <span className={`text-sm ${state.ok ? 'text-pp-muted' : 'text-pp-danger'}`}>{state.message}</span>}
     </form>
   );
