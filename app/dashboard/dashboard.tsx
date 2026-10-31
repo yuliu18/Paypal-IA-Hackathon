@@ -32,6 +32,7 @@ import {
 } from './components/dialogs';
 import { EmptyData } from './components/empty-data';
 import { ReportHeader } from './components/report-header';
+import { GuidePanel } from './components/guide';
 import {
   blankReport,
   copyOf,
@@ -90,6 +91,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
   const [history, setHistory] = useState<StudioHistory>(NO_HISTORY);
   const [mode, setMode] = useState<AgStudioMode>('view');
   const [dialog, setDialog] = useState<DashboardDialog>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const { reports } = store;
   // The open report, as it was last saved.
@@ -261,7 +263,9 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
         onEditingChange={(next) =>
           next ? changeMode('edit') : guard(() => changeMode('view'))
         }
+        onGuide={() => setGuideOpen(!guideOpen)}
       />
+      <GuidePanel open={guideOpen} onClose={() => setGuideOpen(false)} aiEnabled={Boolean(ai)} />
 
       {/* What the agents did opens the cover page, the one about the guard. */}
 

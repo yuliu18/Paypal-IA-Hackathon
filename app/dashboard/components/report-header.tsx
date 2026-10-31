@@ -21,6 +21,7 @@ export function ReportHeader({
   onSave,
   onDiscard,
   onEditingChange,
+  onGuide,
 }: {
   reportName: string;
   pageTitle?: string;
@@ -34,6 +35,8 @@ export function ReportHeader({
   onSave: () => void;
   onDiscard: () => void;
   onEditingChange: (editing: boolean) => void;
+  // Opens the guide on using the dashboard (./guide.tsx).
+  onGuide: () => void;
 }) {
   return (
     <div className="mx-4 flex flex-wrap items-start gap-x-6 gap-y-3 border-b border-pp-border pt-6 pb-5 sm:mx-8 sm:pt-8">
@@ -65,6 +68,12 @@ export function ReportHeader({
             </Button>
           </>
         )}
+        <Button variant="ghost" size="sm" onClick={onGuide}>
+          <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 7c-1.5-1.3-3.6-2-6-2H4v13h2c2.4 0 4.5.7 6 2 1.5-1.3 3.6-2 6-2h2V5h-2c-2.4 0-4.5.7-6 2zM12 7v13" />
+          </svg>
+          Guide
+        </Button>
         {editing ? (
           <Button variant="ghost" size="sm" onClick={() => onEditingChange(false)}>
             <EyeIcon className="size-4" /> View
