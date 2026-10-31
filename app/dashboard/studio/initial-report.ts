@@ -67,6 +67,11 @@ const chartStyle = (barWidth?: number, { legend = true }: { legend?: boolean } =
 // Named measures from ./data.ts, so the legend reads 'Passed', not 'Passed (sum)'.
 const VERDICTS = [{ id: 'allowedCalls' }, { id: 'heldCalls' }, { id: 'blockedCalls' }];
 
+// A widget filter for charts that answer "what was stopped": with only stopped calls left, the passed
+// and held measures are zero, so the bars keep the verdict palette's red (Studio colours by position,
+// and a lone 'Stopped' measure would take the first colour, green).
+const STOPPED_ONLY = { field: { id: 'guardDecisions.blocked' }, model: { operator: 'equals' as const, value: 1 } };
+
 type Measure = { id: string; aggregation?: 'sum' | 'avg' | 'countd' };
 
 // A KPI tile, styled the same everywhere: a full (wrapping) title, a large value, a caption saying
@@ -134,7 +139,7 @@ const guard: AgPageState = {
         valueKey: VERDICTS,
       },
       format: {
-        ...titled('Decisions per day', 'Calls that went through, were held or were stopped'),
+        ...titled('Decisions per day', 'Each bar is one day of calls: green passed to PayPal, amber held for you, red stopped'),
         style: chartStyle(),
       },
     },
@@ -146,22 +151,22 @@ const guard: AgPageState = {
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('What the agents tried to do', 'Calls by action, most stopped first'),
+        ...titled('What the agents tried to do', 'Calls by action, most stopped first: green passed, amber held, red stopped'),
         style: chartStyle(BAR),
       },
     },
     reasons: {
       type: 'bar-chart-stacked',
       dataMapping: {
-        // Violations join their decision, so each rule shows how often it led to a block (red) or a
-        // hold for a person (amber).
+        // Violations join their decision. The widget filter below keeps stopped calls only, so the
+        // passed and held measures are zero and the bars are all stopped red.
         categoryKey: [{ id: 'guardViolations.reason' }],
         valueKey: VERDICTS,
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('Why the guard stopped a call', 'Rules the agents broke, most stops first'),
-        style: chartStyle(BAR),
+        ...titled('Why calls were stopped', 'The rule each stopped call broke, most frequent first'),
+        style: chartStyle(BAR, { legend: false }),
       },
     },
   },
@@ -175,6 +180,9 @@ const guard: AgPageState = {
     timeline: at(0, 28, 24, 22),
     'by-action': at(0, 50, 12, 23),
     reasons: at(12, 50, 12, 23),
+  },
+  filter: {
+    widget: { reasons: [STOPPED_ONLY] },
   },
 };
 
@@ -191,8 +199,9 @@ const activity: AgPageState = {
       },
       sort: [{ field: { id: 'blockedCalls' }, direction: 'desc' }],
       format: {
-        ...titled('Customers on whose behalf the agents acted', 'Most blocked first: a customer attacked or attacking the agents'),
-        style: chartStyle(BAR),
+        // Stopped calls only (widget filter below): who attacked, or whose name an attack used.
+        ...titled('Customers behind stopped calls', 'Calls the guard stopped, by the customer they were made for'),
+        style: chartStyle(BAR, { legend: false }),
         seriesLimit: { enabled: false },
       },
     },
@@ -218,6 +227,9 @@ const activity: AgPageState = {
   widgetLayout: {
     customers: at(0, 0, 24, 22),
     decisions: at(0, 22, 24, 28),
+  },
+  filter: {
+    widget: { customers: [STOPPED_ONLY] },
   },
 };
 
