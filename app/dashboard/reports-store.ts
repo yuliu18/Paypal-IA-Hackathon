@@ -29,7 +29,8 @@ export const BUILT_IN_ID = 'paypal-overview';
 // 2: the payment guard page comes first.
 // 3: redesign: "AI operations" cover and "Agent activity"; cash folded into "Revenue & cash".
 // 4: control room: the cover's money figures move to the header; live feed; taller charts.
-const BUILT_IN_VERSION = 5;
+// 6: light dashboard: "Flow through the guard" cover, one fact per widget, one question per chart.
+const BUILT_IN_VERSION = 6;
 
 // Sidebar titles for the built-in report's pages, keyed by page id in initial-report.ts.
 const defaultPageTitles: Record<string, string> = {
