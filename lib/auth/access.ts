@@ -22,6 +22,16 @@ export function neonAccess({ userId, ownerId }: { userId: string | undefined; ow
 // Where to go after signing in: a path on this site only, never back to the login or its endpoints.
 export function safeNextPath(next: string | null | undefined): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return '/';
+  // A browser drops tab, CR and LF and reads a backslash as a slash, so "/\t/evil.example" would
+  // become "//evil.example", another site: refuse control characters and backslashes anywhere,
+  // then check that the path still resolves on this site.
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return '/';
+  const base = 'https://this.site';
+  try {
+    if (new URL(next, base).origin !== base) return '/';
+  } catch {
+    return '/';
+  }
   const path = next.split(/[?#]/)[0];
   if (path === '/login' || path.startsWith('/api/auth')) return '/';
   return next;

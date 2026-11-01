@@ -51,6 +51,16 @@ describe('safeNextPath', () => {
       expect(safeNextPath(next)).toBe('/');
     }
   });
+
+  it('refuses control characters and backslashes, which a browser drops or reads as slashes before following the path', () => {
+    for (const next of ['/\t/evil.example', '/\n/evil.example', '/\r/evil.example', '/%09/evil.example'.replace('%09', '\t'), '/guard\\..\\evil', '/\u0000/x']) {
+      expect(safeNextPath(next)).toBe('/');
+    }
+  });
+
+  it('keeps only paths that stay on this site once a browser resolves them', () => {
+    expect(safeNextPath('/guard/../settings?section=ai')).toBe('/guard/../settings?section=ai');
+  });
 });
 
 describe('sameOrigin', () => {
