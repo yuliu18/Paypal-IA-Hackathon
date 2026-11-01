@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Suspense } from 'react';
 import { setNavSlot } from './nav-slot';
 import { SettingsNav } from './settings/settings-nav';
 import { BrandMark } from './ui/brand-mark';
@@ -66,6 +65,7 @@ export function AppNav() {
   const pathname = usePathname();
   const onDashboard = pathname.startsWith('/dashboard');
   const onSettings = pathname.startsWith('/settings');
+  usePreloadDashboard(onDashboard);
   // The owner's choice holds until they move between the dashboard and the other pages.
   const [choice, setChoice] = useState<{ onDashboard: boolean; compact: boolean }>();
   const compact = choice?.onDashboard === onDashboard ? choice.compact : false;
@@ -113,11 +113,9 @@ export function AppNav() {
             </Link>
           ))}
           {section.items.some((item) => item.href === '/settings') && onSettings && !compact && (
-            <div className="hidden md:block">
-              <Suspense fallback={null}>
-                <SettingsNav />
-              </Suspense>
-            </div>
+            <Suspense fallback={null}>
+              <SettingsNav />
+            </Suspense>
           )}
           {section.items.some((item) => item.href === '/dashboard') && onDashboard && !compact && (
             <div ref={setNavSlot} className="hidden md:block" />
@@ -126,4 +124,21 @@ export function AppNav() {
       ))}
     </nav>
   );
+}
+
+// The dashboard's code (AG Studio, about 1.3 MB) loads in the background once the browser is idle on
+// any other page, so opening the dashboard doesn't wait for it. Next prefetches only up to the
+// dashboard's loading screen (it is a dynamic route), not the client code behind it. Importing the
+// module only downloads and evaluates it; nothing renders.
+function usePreloadDashboard(onDashboard: boolean) {
+  useEffect(() => {
+    if (onDashboard) return;
+    const preload = () => void import('./dashboard/dashboard').catch(() => {});
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(preload, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(preload, 2000);
+    return () => clearTimeout(id);
+  }, [onDashboard]);
 }

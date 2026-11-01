@@ -10,7 +10,6 @@ import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction
 import { Picker, type PickerOption } from './picker';
 import { latestOnly } from './picker-logic';
 import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './sections';
-import { SettingsNav } from './settings-nav';
 import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
@@ -217,9 +216,6 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
         </p>
       )}
 
-      <div className="mt-6 md:hidden">
-        <SettingsNav row />
-      </div>
       <form ref={formRef} onSubmit={submit} className="mt-8 max-w-4xl">
         <div className="min-w-0 space-y-6">
         <Section id="language" open={open} title={t('language.title')} detail={t('language.detail')}>
