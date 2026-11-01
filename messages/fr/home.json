@@ -28,7 +28,7 @@
     "guardLog": "Journal du guard",
     "empty": "Aucun agent n’a encore appelé PayPal. Envoyez un ticket sur la <link>page du support</link> et ses appels apparaîtront ici.",
     "call": "<strong>{action}</strong>{hasAmount, select, yes { de {amount}} other {}}<muted> pour {customer}</muted>",
-    "byAgent": "Agent de {agent}",
+    "byAgent": "Agent de {agent}, {time}",
     "agents": {
       "support": "support",
       "billing": "facturation",
