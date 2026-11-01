@@ -25,6 +25,7 @@ const Icons = {
   collapse: <path d="M15 6l-6 6 6 6" />,
   expand: <path d="M9 6l6 6-6 6" />,
   signOut: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
+  code: <path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" />,
   gear: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />,
 };
 
@@ -39,6 +40,7 @@ const SECTIONS: { title?: string; tag?: string; items: Item[] }[] = [
       { href: '/guard', label: 'items.guard', icon: 'shield' },
       { href: '/dashboard', label: 'items.dashboard', icon: 'chart' },
       { href: '/settings', label: 'items.settings', icon: 'gear' },
+      { href: '/api-docs', label: 'items.apiDocs', icon: 'code' },
     ],
   },
   {
