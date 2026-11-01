@@ -3,8 +3,8 @@
   "expand": "Expandir menú",
   "collapse": "Contraer menú",
   "groups": {
-    "agents": "Agentes",
-    "setup": "Probar y configurar"
+    "test": "Probar un modelo",
+    "sandbox": "Sandbox"
   },
   "items": {
     "overview": "Resumen",

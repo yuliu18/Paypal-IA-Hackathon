@@ -29,27 +29,25 @@ const Icons = {
 
 // Labels are message keys under `nav` (messages/<locale>/nav.json).
 type Item = { href: string; label: string; icon: keyof typeof Icons };
-const SECTIONS: { title?: string; items: Item[] }[] = [
+// Two groups: what a business runs on (its guard, its log and reports, its settings), and the test
+// bench, where the agents and the evaluation always work on the PayPal sandbox.
+const SECTIONS: { title?: string; tag?: string; items: Item[] }[] = [
   {
     items: [
       { href: '/', label: 'items.overview', icon: 'home' },
       { href: '/guard', label: 'items.guard', icon: 'shield' },
       { href: '/dashboard', label: 'items.dashboard', icon: 'chart' },
+      { href: '/settings', label: 'items.settings', icon: 'gear' },
     ],
   },
   {
-    title: 'groups.agents',
+    title: 'groups.test',
+    tag: 'groups.sandbox',
     items: [
       { href: '/support', label: 'items.support', icon: 'chat' },
       { href: '/billing', label: 'items.billing', icon: 'invoice' },
       { href: '/sales', label: 'items.sales', icon: 'cart' },
-    ],
-  },
-  {
-    title: 'groups.setup',
-    items: [
       { href: '/evaluate', label: 'items.evaluate', icon: 'check' },
-      { href: '/settings', label: 'items.settings', icon: 'gear' },
     ],
   },
 ];
@@ -98,7 +96,14 @@ export function AppNav() {
       {SECTIONS.map((section, index) => (
         <div key={index} className="flex shrink-0 gap-1 md:mb-4 md:flex-col">
           {section.title && (
-            <p className={`hidden px-2 pb-1 text-xs font-medium text-pp-muted ${compact ? '' : 'md:block'}`}>{t(section.title)}</p>
+            <p className={`hidden items-center gap-2 px-2 pb-1 text-xs font-medium text-pp-muted ${compact ? '' : 'md:flex'}`}>
+              {t(section.title)}
+              {section.tag && (
+                <span className="rounded-[3px] border border-pp-warning/40 bg-pp-warning-tint px-1.5 py-px text-[11px] font-semibold text-pp-warning">
+                  {t(section.tag)}
+                </span>
+              )}
+            </p>
           )}
           {section.items.map((item) => (
             <Link

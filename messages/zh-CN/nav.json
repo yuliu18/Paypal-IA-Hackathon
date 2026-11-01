@@ -3,8 +3,8 @@
   "expand": "展开菜单",
   "collapse": "收起菜单",
   "groups": {
-    "agents": "智能体",
-    "setup": "测试与设置"
+    "test": "测试模型",
+    "sandbox": "沙盒"
   },
   "items": {
     "overview": "概览",
