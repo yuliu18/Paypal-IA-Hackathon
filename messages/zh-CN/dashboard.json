@@ -1,0 +1,470 @@
+{
+  "metadata": {
+    "title": "仪表板"
+  },
+  "header": {
+    "dragHint": "从<b>{compose}</b>拖入一个组件即可开始。",
+    "undo": "撤销",
+    "redo": "重做",
+    "discard": "放弃",
+    "save": "保存",
+    "guide": "指南",
+    "view": "查看",
+    "edit": "编辑",
+    "sandbox": "PayPal 沙盒",
+    "refreshing": "正在刷新…",
+    "updated": "更新于{when}",
+    "justNow": "刚刚",
+    "minutesAgo": "{minutes} 分钟前",
+    "hoursAgo": "{hours} 小时前",
+    "utc": "{time} UTC",
+    "refresh": "刷新数据",
+    "builtWith": "使用 <logo></logo> 构建"
+  },
+  "sidebar": {
+    "reports": "报表",
+    "reportName": "报表名称",
+    "actionsFor": "{name} 的操作",
+    "rename": "重命名",
+    "duplicate": "复制",
+    "resetToDefault": "恢复默认",
+    "delete": "删除",
+    "pagesOf": "{name} 的页面",
+    "pageName": "页面名称",
+    "doubleClickToRename": "双击以重命名",
+    "removePageNamed": "移除页面 {title}",
+    "removePage": "移除页面",
+    "addPage": "添加页面",
+    "newReport": "新建报表",
+    "resetDemo": "重置演示",
+    "savedHereResetHint": "报表保存在此浏览器中。重置会恢复演示报表。",
+    "savedHere": "报表保存在此浏览器中。"
+  },
+  "reports": {
+    "pageNumber": "第 {number} 页",
+    "copyName": "{name}（副本）"
+  },
+  "dialogs": {
+    "cancel": "取消",
+    "unsaved": {
+      "title": "保存对“{name}”的更改？",
+      "discard": "放弃更改",
+      "save": "保存",
+      "body": "你对这个报表的更改尚未保存。"
+    },
+    "create": {
+      "title": "新建报表",
+      "submit": "创建报表",
+      "intro": "从空白页面开始，用{compose}中的组件搭建它。",
+      "nameLabel": "报表名称",
+      "defaultName": "未命名报表"
+    },
+    "delete": {
+      "titleReset": "恢复默认？",
+      "title": "删除报表？",
+      "reset": "恢复",
+      "delete": "删除",
+      "bodyReset": "“{name}”将恢复为应用自带的报表。你保存的更改将会丢失。",
+      "body": "“{name}”将从此浏览器中移除。此操作无法撤销。"
+    },
+    "resetDemo": {
+      "title": "重置演示？",
+      "confirm": "重置演示",
+      "body": "你创建的所有报表都将被删除，“{name}”将恢复到初始状态，包括所有未保存的更改。此操作无法撤销。"
+    }
+  },
+  "empty": {
+    "title": "还没有 PayPal 数据",
+    "body": "这个沙盒账户没有发票、产品、套餐或交易。先在 PayPal 沙盒中创建一些，然后刷新即可用它们生成报表。",
+    "link": "打开 PayPal Developer Dashboard"
+  },
+  "error": {
+    "title": "无法加载你的 PayPal 数据",
+    "body": "PayPal 沙盒没有按预期响应。请检查 <code>.env.local</code> 中的 API 凭据，然后重试。",
+    "reference": "参考编号：{digest}",
+    "retry": "重试"
+  },
+  "guide": {
+    "title": "如何使用这个仪表板",
+    "intro": "使用 AG Studio 构建。尝试每个步骤时，可以一直开着这份指南。",
+    "close": "关闭指南",
+    "read": {
+      "title": "阅读页面",
+      "body": "每个组件回答一个问题，标题会说明是哪个问题。把指针移到柱条或色带上即可查看数字。"
+    },
+    "filter": {
+      "title": "点击即可筛选",
+      "click": "点击<b>{flow}</b>中的某个智能体，或图表中的某根柱条，页面上的其他组件就只显示这部分。再点一次即可清除。",
+      "panel": "打开右侧边缘的<b>{filters}</b>，查看页面的筛选以及你点击产生的筛选。"
+    },
+    "pages": {
+      "title": "在页面和报表之间切换",
+      "menu": "打开的报表的页面列在左侧菜单的<b>{dashboard}</b>下。<b>{addPage}</b>会添加一个空白页面；双击页面或报表即可重命名。",
+      "reports": "<b>{newReport}</b>会新建一个空白报表。报表的<b>⋯</b>菜单里有<b>{rename}</b>、<b>{duplicate}</b>和删除。<b>{resetDemo}</b>会恢复内置报表，并移除你创建的报表。"
+    },
+    "edit": {
+      "title": "编辑页面",
+      "open": "点击<b>{edit}</b>。右侧会打开两个面板：<b>{compose}</b>和<b>{data}</b>。",
+      "add": "<b>添加组件：</b>在<b>{compose}</b>中打开<b>{widgets}</b>，把一个组件拖到页面上。也可以从<b>{data}</b>拖一个字段（智能体、客户、金额）到页面上，Studio 会用它生成图表。",
+      "change": "<b>修改组件：</b>点击它。它的设置会显示在<b>{compose}</b>中：图表类型、各坐标轴的字段、排序和标题。",
+      "move": "<b>移动或调整大小：</b>拖动组件即可移动，拖动边缘即可调整大小。它的工具栏可以复制或删除它。",
+      "save": "撤销和重做在<b>{save}</b>旁边。<b>{save}</b>会把报表保存在此浏览器中；<b>{discard}</b>会丢弃更改；<b>{view}</b>会退出编辑。"
+    },
+    "guardWidget": {
+      "title": "添加守卫专属组件",
+      "body": "在<b>{compose}</b> › <b>{widgets}</b>中，<b>{group}</b>分组里有<b>{flow}</b>：每个智能体的调用经过守卫后的去向。把它拖到任意页面即可。"
+    },
+    "export": {
+      "title": "导出",
+      "body": "表格或图表的工具栏可以把数据行下载为 CSV，或把图表下载为图片。"
+    },
+    "ai": {
+      "title": "询问 AI",
+      "on": "在<b>{edit}</b>模式下打开<b>{assistant}</b>，描述你想要的组件，例如“按客户统计被拦截的退款”。它会在页面上生成该组件，你可以像其他更改一样保留或放弃。",
+      "off": "<b>{assistant}</b>可以根据一句话生成组件。在服务器上设置 OpenAI 密钥后，它会出现在编辑模式中（参见 README）。"
+    }
+  },
+  "flow": {
+    "verdicts": {
+      "passed": "已通过，交给 PayPal",
+      "held": "已暂扣，等你处理",
+      "stopped": "已被守卫拦截"
+    },
+    "verdictsInline": {
+      "passed": "已通过并交给 PayPal",
+      "held": "已暂扣等你处理",
+      "stopped": "已被守卫拦截"
+    },
+    "agent": "{name} 智能体",
+    "agentCalls": "{count} 次调用",
+    "verdictCalls": "{count} 次调用，{percent}",
+    "band": "{agent} 智能体：{count} 次调用{verdict}",
+    "gate": "Payment guard",
+    "noCalls": "还没有调用。",
+    "summaryItem": "{count} 次{verdict}"
+  },
+  "widgets": {
+    "guardFlow": "经过守卫的调用流",
+    "agentMapping": "智能体",
+    "verdictsMapping": "已通过、已暂扣、已拦截",
+    "menuGroup": "Payment guard"
+  },
+  "ai": {
+    "stoppedMost": {
+      "label": "哪个智能体被拦截最多？",
+      "prompt": "支付守卫最常拦截哪个 AI 智能体？原因是什么？请使用守卫的决定和违规记录，并用简体中文回答。"
+    },
+    "protectedVsMoved": {
+      "label": "保护的金额与转出的金额",
+      "prompt": "守卫通过拦截保护了多少钱？与智能体转出和开票的金额相比如何？请按智能体和操作细分，并用简体中文回答。"
+    },
+    "waiting": {
+      "label": "哪些在等人处理？",
+      "prompt": "列出仍在等待批准的已暂扣操作，从最早的开始，包含智能体、操作、客户和金额。请用简体中文回答。"
+    },
+    "blockRate": {
+      "label": "绘制拦截率图表",
+      "prompt": "添加一个折线图，显示守卫每天的拦截率，并按智能体拆分。标题请使用简体中文。"
+    },
+    "summarise": {
+      "label": "总结这个页面",
+      "prompt": "总结这个页面显示的内容：每个组件、它读取的字段，以及值得注意的地方。请用简体中文回答。"
+    }
+  },
+  "report": {
+    "name": "PayPal 概览",
+    "pages": {
+      "guard": "AI 运营",
+      "activity": "智能体活动",
+      "revenue": "收入与现金",
+      "receivables": "应收账款",
+      "catalogue": "产品目录"
+    },
+    "guard": {
+      "flow": {
+        "title": "经过守卫的调用流",
+        "subtitle": "你的智能体发出的每一次调用，从智能体到守卫的处理结果。点击某个智能体即可筛选页面。"
+      },
+      "kpiProtected": {
+        "title": "留在店铺中的金额",
+        "caption": "被守卫拦截的退款和索赔"
+      },
+      "kpiMoved": {
+        "title": "退还给客户的金额",
+        "caption": "已通过的退款和索赔"
+      },
+      "kpiWaiting": {
+        "title": "等你处理",
+        "caption": "在守卫日志中批准或拒绝"
+      },
+      "kpiWithheld": {
+        "title": "已隐藏的个人数据",
+        "caption": "未提供给智能体的客户信息"
+      },
+      "timeline": {
+        "title": "每日决定",
+        "subtitle": "每根柱条代表一天的调用：绿色已通过并交给 PayPal，琥珀色已暂扣等你处理，红色已拦截"
+      },
+      "byAction": {
+        "title": "智能体尝试做了什么",
+        "subtitle": "按操作统计的调用，被拦截最多的在前：绿色已通过，琥珀色已暂扣，红色已拦截"
+      },
+      "reasons": {
+        "title": "调用为何被拦截",
+        "subtitle": "每次被拦截的调用违反的规则，最常见的在前"
+      }
+    },
+    "activity": {
+      "customers": {
+        "title": "被拦截调用涉及的客户",
+        "subtitle": "守卫拦截的调用，按调用所针对的客户统计"
+      },
+      "decisions": {
+        "title": "所有决定，最新的在前",
+        "subtitle": "点击某一行即可筛选上方的图表"
+      }
+    },
+    "revenue": {
+      "kpiSales": {
+        "title": "销售额（31 天）",
+        "caption": "客户向店铺支付的款项"
+      },
+      "kpiBalance": {
+        "title": "可用余额",
+        "caption": "PayPal 账户当前余额"
+      },
+      "kpiInvoiced": {
+        "title": "已开票",
+        "caption": "已发送的发票，所有币种"
+      },
+      "inOut": {
+        "title": "每日资金流入与流出",
+        "subtitle": "PayPal 账本上的入账和出账"
+      },
+      "eventTypes": {
+        "title": "按类型统计的账本活动",
+        "subtitle": "PayPal 交易笔数，最常见的在前"
+      },
+      "ledger": {
+        "title": "PayPal 账本，最新的在前",
+        "subtitle": "账户最近 31 天的活动"
+      }
+    },
+    "receivables": {
+      "currency": {
+        "title": "币种"
+      },
+      "kpiOutstanding": {
+        "title": "未收款",
+        "caption": "未付和部分付款的发票"
+      },
+      "kpiOverdue": {
+        "title": "已逾期",
+        "caption": "已过到期日"
+      },
+      "kpiOpen": {
+        "title": "未结发票",
+        "caption": "等待付款"
+      },
+      "byInvoiceDate": {
+        "title": "按开票日期统计的未收款",
+        "subtitle": "仍欠的金额，以及其中逾期的部分"
+      },
+      "aging": {
+        "title": "按客户和状态统计的应收账款",
+        "subtitle": "余额最大的在前"
+      },
+      "openInvoices": {
+        "title": "未结发票，逾期最久的在前"
+      }
+    },
+    "catalogue": {
+      "kpiProducts": {
+        "title": "产品",
+        "caption": "以订阅方式销售"
+      },
+      "kpiPlans": {
+        "title": "计费套餐",
+        "caption": "涵盖所有产品"
+      },
+      "kpiMonthly": {
+        "title": "平均月价",
+        "caption": "折算为一个月，USD"
+      },
+      "kpiTrial": {
+        "title": "平均试用天数",
+        "caption": "首次扣款之前"
+      },
+      "plans": {
+        "title": "套餐目录"
+      }
+    }
+  },
+  "data": {
+    "calendar": "日历",
+    "tables": {
+      "customers": "客户",
+      "invoices": "发票",
+      "invoiceItems": "发票明细",
+      "invoicePayments": "发票付款",
+      "products": "产品",
+      "plans": "计费套餐",
+      "transactions": "交易",
+      "payouts": "出款",
+      "balances": "余额",
+      "guardDecisions": "守卫决定",
+      "guardViolations": "守卫违规"
+    },
+    "fields": {
+      "customers": {
+        "id": "客户 ID",
+        "name": "客户",
+        "company": "公司",
+        "email": "邮箱"
+      },
+      "invoices": {
+        "id": "发票 ID",
+        "number": "发票",
+        "customerId": "客户 ID",
+        "status": "发票状态",
+        "statusGroup": "状态分组",
+        "currency": "币种",
+        "paymentTerm": "付款期限",
+        "invoiceDate": "开票日期",
+        "dueDate": "到期日",
+        "total": "发票总额",
+        "issuedAmount": "已开票",
+        "paidAmount": "已付款",
+        "refundedAmount": "已退款",
+        "netCollected": "净收款",
+        "isReceivable": "是否应收",
+        "outstanding": "未收款",
+        "overdueAmount": "已逾期",
+        "daysOverdue": "逾期天数",
+        "agingBucket": "账龄区间",
+        "daysToPay": "付款天数",
+        "taxTotal": "税额"
+      },
+      "invoiceItems": {
+        "id": "明细 ID",
+        "invoiceId": "发票 ID",
+        "name": "项目",
+        "unit": "单位",
+        "quantity": "数量",
+        "unitPrice": "单价",
+        "gross": "总额",
+        "discount": "明细折扣",
+        "tax": "明细税额",
+        "lineTotal": "明细合计"
+      },
+      "invoicePayments": {
+        "id": "付款 ID",
+        "invoiceId": "发票 ID",
+        "kind": "付款类型",
+        "method": "付款方式",
+        "date": "付款日期",
+        "amount": "付款金额",
+        "signedAmount": "净现金"
+      },
+      "products": {
+        "id": "产品 ID",
+        "name": "产品",
+        "type": "产品类型",
+        "category": "产品类别",
+        "description": "产品描述"
+      },
+      "plans": {
+        "id": "套餐 ID",
+        "productId": "产品 ID",
+        "name": "套餐",
+        "status": "套餐状态",
+        "billingInterval": "计费周期",
+        "price": "价格",
+        "monthlyPrice": "月价",
+        "trialDays": "试用天数",
+        "setupFee": "开通费"
+      },
+      "transactions": {
+        "id": "交易 ID",
+        "date": "交易日期",
+        "eventType": "事件类型",
+        "status": "交易状态",
+        "direction": "方向",
+        "currency": "交易币种",
+        "amount": "交易金额",
+        "fee": "交易手续费",
+        "net": "交易净额",
+        "sales": "销售额",
+        "moneyIn": "资金流入",
+        "moneyOut": "资金流出",
+        "endingBalance": "期末余额",
+        "counterparty": "交易对方",
+        "note": "交易备注"
+      },
+      "payouts": {
+        "id": "出款 ID",
+        "campaign": "活动",
+        "recipient": "收款人",
+        "date": "出款日期",
+        "status": "出款状态",
+        "amount": "出款金额",
+        "fee": "出款手续费",
+        "note": "出款备注"
+      },
+      "balances": {
+        "currency": "余额币种",
+        "total": "总余额",
+        "available": "可用余额",
+        "withheld": "冻结余额"
+      },
+      "guardDecisions": {
+        "id": "守卫条目",
+        "at": "时间",
+        "day": "决定日期",
+        "tool": "工具",
+        "verdict": "裁决",
+        "decision": "决定",
+        "outcome": "守卫结果",
+        "customer": "工单客户",
+        "currency": "守卫币种",
+        "requested": "申请退款",
+        "agent": "智能体",
+        "action": "操作",
+        "moved": "转出金额",
+        "protected": "保护金额",
+        "billed": "开票金额",
+        "awaitingApproval": "等待批准",
+        "allowed": "已通过",
+        "held": "已暂扣",
+        "blocked": "已拦截",
+        "withheld": "已隐藏的个人数据",
+        "decidedBy": "决定者",
+        "dayText": "日期"
+      },
+      "guardViolations": {
+        "id": "违规 ID",
+        "decisionId": "守卫条目 ID",
+        "code": "违规代码",
+        "reason": "拦截原因",
+        "message": "违规详情"
+      }
+    },
+    "measures": {
+      "collectionRate": "收款率",
+      "overdueShare": "逾期占比",
+      "refundRate": "退款率",
+      "allowedCalls": "已通过",
+      "heldCalls": "已暂扣",
+      "blockedCalls": "已拦截",
+      "moneyMoved": "已转出",
+      "moneyBilled": "已开票",
+      "moneyProtected": "已保护",
+      "moneyInTotal": "资金流入",
+      "moneyOutTotal": "资金流出",
+      "salesTotal": "销售额",
+      "outstandingTotal": "未收款",
+      "overdueTotal": "已逾期",
+      "blockRate": "拦截率"
+    }
+  }
+}

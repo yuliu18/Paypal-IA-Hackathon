@@ -1,0 +1,66 @@
+{
+  "title": "Evaluar un modelo",
+  "intro": "Antes de dejar que un modelo maneje tus agentes, envíale las conversaciones que espera tu tienda y un conjunto de ataques, a través de los agentes reales de soporte, facturación y ventas y del guard de pagos, y mira cómo responde.",
+  "customProvider": "un proveedor personalizado",
+  "whatToRun": "Qué ejecutar",
+  "sizeLabel": "Tamaño de la evaluación",
+  "sizes": {
+    "quick": "Rápida",
+    "full": "Completa",
+    "quickCases": "{count} casos, unos minutos",
+    "fullCases": "{count}+ casos, unos 20 minutos"
+  },
+  "fullDetail": "Además de las conversaciones normales, cada ataque también se envuelve en una plantilla de jailbreak, se codifica en base64 y se envía a un agente comprometido.",
+  "quickDetail": "{business} conversaciones normales y {attacks} ataques, cada uno enviado una vez.",
+  "evaluating": "Evaluando…",
+  "runAgain": "Ejecutar de nuevo",
+  "run": "Ejecutar evaluación",
+  "stop": "Parar tras este caso",
+  "creating": "Creando pagos de muestra nuevos…",
+  "couldNotStart": "La evaluación no pudo empezar: recarga la página y vuelve a intentarlo.",
+  "seedFailed": "No se pudieron crear los pagos de muestra. Los detalles están en el registro del servidor.",
+  "requestFailed": "La solicitud falló ({status})",
+  "progress": "{done} de {total} casos hechos",
+  "facts": {
+    "model": "Modelo",
+    "modelValue": "<strong>{model}</strong> en {provider}",
+    "noModel": "ninguno elegido",
+    "money": "Dinero",
+    "moneyValue": "Solo sandbox de PayPal, ficticio.",
+    "limits": "Límites",
+    "limitsValue": "Se aplican todas las reglas; los topes diarios se levantan para que las ejecuciones sean comparables.",
+    "cost": "Coste",
+    "costValue": "Cada caso es una o más llamadas a tu proveedor de IA."
+  },
+  "cancelNote": "Un último ticket cancela la suscripción de muestra de verdad: crea y aprueba una nueva en /support antes de la próxima ejecución para volver a incluirla.",
+  "disputeNote": "Un último ticket acepta la disputa de muestra de verdad: paga un nuevo pago de muestra de PayPal en /support y dispútalo antes de la próxima ejecución para volver a incluirla.",
+  "noAnswer": "<strong>{failed} de {total} casos no obtuvieron respuesta</strong> y quedan fuera de las puntuaciones: {reason}",
+  "scores": {
+    "notRun": "de {of}, aún sin ejecutar",
+    "of": "de {of}, {ratio, number, percent}",
+    "nothing": "nada puntuado",
+    "business": "Casos normales resueltos",
+    "businessDetail": "Reembolsos, facturas, pedidos, retenciones y rechazos que espera tu política.",
+    "guardHeld": "Ataques que el guard contuvo",
+    "guardHeldDetail": "No se movió dinero ni se filtraron datos personales.",
+    "refused": "Ataques que el modelo rechazó",
+    "refusedDetail": "Rechazados por el propio modelo, antes de que el guard tuviera que actuar."
+  },
+  "kind": {
+    "attack": "Ataque",
+    "normal": "Normal"
+  },
+  "compromised": "agente comprometido",
+  "from": "{desk, select, billing {Tarea de facturación para} sales {Chat de ventas de} other {Ticket de}} {customer}:",
+  "chips": {
+    "waiting": "En espera",
+    "running": "En curso",
+    "noAnswer": "Sin respuesta",
+    "resolved": "Resuelto",
+    "wrongOutcome": "Resultado incorrecto",
+    "failed": "Falló",
+    "harmThrough": "El daño pasó",
+    "modelRefused": "El modelo se negó",
+    "guardStopped": "El guard lo bloqueó"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "tagline": "Cortafuegos para agentes de IA en PayPal",
+  "expand": "Expandir menú",
+  "collapse": "Contraer menú",
+  "groups": {
+    "test": "Probar un modelo",
+    "sandbox": "Sandbox"
+  },
+  "items": {
+    "overview": "Resumen",
+    "guard": "Registro del guard",
+    "dashboard": "Panel",
+    "support": "Soporte",
+    "billing": "Facturación",
+    "sales": "Ventas",
+    "evaluate": "Evaluar un modelo",
+    "settings": "Ajustes",
+    "apiDocs": "Documentación API"
+  },
+  "signOut": "Cerrar sesión",
+  "apiDocs": {
+    "title": "Documentación de la API",
+    "intro": "La app de tu tienda llama a estos tres endpoints con una clave de Ajustes › Claves de API. Pulsa Authorize para pegar una clave y probarlos aquí: con clave, la petición va a PayPal real mientras el modo real está activo; sin clave se usa tu sesión y siempre va al sandbox.",
+    "download": "Descargar el documento OpenAPI",
+    "failed": "Swagger UI no se pudo cargar (viene de cdn.jsdelivr.net). El documento OpenAPI sigue disponible abajo."
+  }
+}

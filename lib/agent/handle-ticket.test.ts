@@ -9,20 +9,26 @@ import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-direct
 import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
 
 const toolkitActions = vi.fn();
+const toolkitSetup = vi.fn();
 const decideHeldCall = vi.fn();
+const accessToken = vi.fn(async (environment?: string) => `TOKEN-${environment ?? 'sandbox'}`);
 const limits = { approvalThreshold: { minor: 10_000, currency: 'USD' }, perRefund: { minor: 25_000, currency: 'USD' }, daily: { minor: 20_000, currency: 'USD' } };
+let shop: Record<string, unknown> = { limits, mode: 'test', paypalLive: { clientId: '', secret: '' } };
+let heldEnvironment: 'sandbox' | 'live' | undefined;
+const AUDIT = { get: async (id: string) => ({ id, environment: heldEnvironment }) };
 
 vi.mock('@paypal/agent-toolkit/mcp', () => ({
   PayPalAgentToolkit: class {
-    constructor({ configuration }: { configuration: { actions: unknown } }) {
+    constructor({ accessToken, configuration }: { accessToken: string; configuration: { actions: unknown; context: unknown } }) {
       toolkitActions(configuration.actions);
+      toolkitSetup({ accessToken, context: configuration.context });
     }
   },
 }));
-vi.mock('@/lib/paypal', async (original) => ({ ...(await original<object>()), accessToken: async () => 'TOKEN' }));
-vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => ({ limits }) }));
+vi.mock('@/lib/paypal', async (original) => ({ ...(await original<object>()), accessToken: (environment?: string) => accessToken(environment) }));
+vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => shop }));
 vi.mock('@/lib/guard/guard', () => ({ decideHeldCall: (...args: unknown[]) => decideHeldCall(...args) }));
-vi.mock('@/lib/guard/runtime', () => ({ auditLog: () => 'AUDIT' }));
+vi.mock('@/lib/guard/runtime', () => ({ auditLog: () => AUDIT }));
 vi.mock('./in-memory-mcp', () => ({ withClient: (_server: unknown, name: string, work: (client: unknown) => unknown) => work(`client:${name}`) }));
 
 const { decideHeld } = await import('./handle-ticket');
@@ -32,7 +38,12 @@ const deps = () => decideHeldCall.mock.calls[0][0] as Record<string, unknown>;
 describe('decideHeld', () => {
   afterEach(() => {
     toolkitActions.mockReset();
+    toolkitSetup.mockReset();
     decideHeldCall.mockReset();
+    accessToken.mockClear();
+    heldEnvironment = undefined;
+    shop = { limits, mode: 'test', paypalLive: { clientId: '', secret: '' } };
+    vi.unstubAllEnvs();
   });
 
   it('still runs held refunds, cancellations, dispute acceptances and invoice actions with their lookups', async () => {
@@ -55,9 +66,10 @@ describe('decideHeld', () => {
       disputes: payPalDisputeLookup,
       invoices: payPalInvoiceLookup,
       customers: seedCustomerDirectory,
-      audit: 'AUDIT',
+      audit: expect.objectContaining({ environment: 'sandbox', log: AUDIT }),
       limits,
     });
+    expect(toolkitSetup).toHaveBeenCalledWith({ accessToken: 'TOKEN-sandbox', context: { sandbox: true } });
     expect(decideHeldCall.mock.calls[0].slice(1)).toEqual(['7', true]);
   });
 
@@ -69,5 +81,58 @@ describe('decideHeld', () => {
     expect(toolkitActions.mock.calls[0][0]).toMatchObject({ orders: { get: true, create: true } });
     expect(toolkitActions.mock.calls[0][0].orders).not.toHaveProperty('capture');
     expect(deps().orders).toEqual({ catalogue: SHOP_CATALOGUE, shopOrigin: 'https://shop.example', checkout: checkoutUrls('https://shop.example'), binder: payPalOrderBinder });
+  });
+
+  it('approves a live hold on live PayPal while live mode is on', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    shop = { limits, mode: 'live', paypalLive: { clientId: 'live-id', secret: 'live-secret' } };
+    heldEnvironment = 'live';
+    decideHeldCall.mockResolvedValue({ outcome: 'executed', message: 'ok' });
+
+    await decideHeld('7', true);
+
+    expect(toolkitSetup).toHaveBeenCalledWith({ accessToken: 'TOKEN-live', context: { sandbox: false } });
+    expect(deps().audit).toMatchObject({ environment: 'live' });
+    expect(deps().captures).not.toBe(payPalCaptureLookup);
+  });
+
+  it.each([
+    ['the server flag is gone', { mode: 'live', paypalLive: { clientId: 'live-id', secret: 'live-secret' } }, undefined],
+    ['the owner switched back to test', { mode: 'test', paypalLive: { clientId: 'live-id', secret: 'live-secret' } }, 'true'],
+  ])('refuses to approve a live hold when %s, without a token or a PayPal call', async (_why, settings, allow) => {
+    if (allow) vi.stubEnv('ALLOW_LIVE_MODE', allow);
+    shop = { limits, ...settings };
+    heldEnvironment = 'live';
+
+    const result = await decideHeld('7', true);
+
+    expect(result.outcome).toBe('refused');
+    expect(result.message).toContain('live mode is off');
+    expect(accessToken).not.toHaveBeenCalled();
+    expect(decideHeldCall).not.toHaveBeenCalled();
+  });
+
+  it('can still reject a live hold after live mode was turned off, recorded as live, with no token', async () => {
+    heldEnvironment = 'live';
+    decideHeldCall.mockResolvedValue({ outcome: 'blocked', message: 'rejected' });
+
+    expect(await decideHeld('7', false)).toEqual({ outcome: 'blocked', message: 'rejected' });
+
+    expect(accessToken).not.toHaveBeenCalled();
+    expect(toolkitSetup.mock.calls[0][0].context).toEqual({ sandbox: true });
+    expect(deps().audit).toMatchObject({ environment: 'live' });
+  });
+
+  it('keeps a sandbox hold on the sandbox even in live mode', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    shop = { limits, mode: 'live', paypalLive: { clientId: 'live-id', secret: 'live-secret' } };
+    heldEnvironment = 'sandbox';
+    decideHeldCall.mockResolvedValue({ outcome: 'executed', message: 'ok' });
+
+    await decideHeld('7', true);
+
+    expect(accessToken).toHaveBeenCalledWith('sandbox');
+    expect(toolkitSetup).toHaveBeenCalledWith({ accessToken: 'TOKEN-sandbox', context: { sandbox: true } });
+    expect(deps().audit).toMatchObject({ environment: 'sandbox' });
   });
 });

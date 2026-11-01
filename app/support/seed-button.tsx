@@ -1,20 +1,25 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
+import { secondaryButton, Spinner } from '../ui/desk';
 import { createSamplePaymentsAction } from './actions';
 
 // Charges fresh sandbox payments for the sample tickets: a refunded order can't be refunded twice.
 export function SeedButton({ label }: { label: string }) {
+  const t = useTranslations('desks.seed');
   const [state, action, pending] = useActionState(createSamplePaymentsAction, null);
   return (
-    <form action={action} className="flex items-center gap-3">
+    <form action={action} className="flex flex-col items-start gap-2.5 px-5 py-4">
       <button
         type="submit"
         disabled={pending}
-        className="rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight disabled:opacity-60"
+        className={secondaryButton}
       >
-        {pending ? 'Creating payments…' : label}
+        {pending && <Spinner className="text-pp-blue" />}
+        {pending ? t('creating') : label}
       </button>
+      <p className="text-sm text-pp-muted">{t('hint')}</p>
       {state && <span className={`text-sm ${state.ok ? 'text-pp-muted' : 'text-pp-danger'}`}>{state.message}</span>}
     </form>
   );

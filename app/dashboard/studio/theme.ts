@@ -3,9 +3,8 @@
 // part of the page rather than a component embedded in it: change a token there and the shell,
 // widgets, grids and charts all follow.
 //
-// The dashboard is dark: its frame redefines those tokens with ink-blue values
-// (../control-room/control-room.module.css), so this theme is dark too, while the rest of the app
-// stays light. Studio, its grids and its charts resolve the variables inside that frame.
+// The dashboard is light like the rest of the app: white widgets with a hairline edge on the grey
+// canvas, the same cards the other pages use.
 
 import { studioTheme } from 'ag-studio';
 
@@ -14,20 +13,9 @@ const line = (color: string) => ({ width: 1, color: token(color) });
 
 // Studio colours series by position: the first measure (or legend value) of a chart takes colour 1,
 // the second colour 2 and so on, and a chart can't pick its own. So the palette starts with the
-// guard's verdicts, which the guard charts plot as measures in this order: allowed green, held
-// ochre, blocked red. Two quiet accents, a dusty blue and a lilac, follow for everything else.
-const SERIES = [
-  token('success'),
-  token('warning'),
-  token('danger'),
-  token('chart-3'),
-  token('chart-5'),
-  token('chart-2'),
-  token('chart-7'),
-  token('chart-9'),
-  token('chart-6'),
-  token('chart-10'),
-];
+// guard's verdicts, which the guard charts plot as measures in this order: passed green, held amber,
+// stopped red; blue, pink and violet follow (app/globals.css, validated for colour blindness).
+const SERIES = [1, 2, 3, 4, 5, 6].map((n) => token(`series-${n}`));
 
 const palette = Object.fromEntries(
   SERIES.map((color, i) => [
@@ -49,18 +37,17 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   accentColor: token('blue'),
   iconColor: token('navy'),
   rowHoverColor: token('highlight'),
-  // Native scrollbars, inputs and pickers drawn dark.
-  browserColorScheme: 'dark',
-  // Menus, pickers and tooltips (the filters panel, Edit mode, chart hovers) on the dark surface.
+  browserColorScheme: 'light',
+  // Menus, pickers and tooltips (the filters panel, Edit mode, chart hovers) on white.
   menuBackgroundColor: token('surface'),
   menuTextColor: token('ink'),
   menuBorder: line('border'),
   menuSeparatorColor: token('border'),
-  tooltipBackgroundColor: token('highlight'),
+  tooltipBackgroundColor: token('surface'),
   tooltipTextColor: token('ink'),
   tooltipBorder: line('border'),
 
-  // No frame: the canvas is the page's own ink-blue background. Each widget is inset 12px inside its grid cell, so 20px of padding puts
+  // No frame: the canvas is the page's own grey background. Each widget is inset 12px inside its grid cell, so 20px of padding puts
   // widget edges on the header's 32px gutter.
   studioWrapperBorder: false,
   studioWrapperBorderRadius: 0,
@@ -76,15 +63,15 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioCanvasRowHeight: 20,
   studioCanvasFontFamily: token('font'),
 
-  // Widgets sit on a slightly lighter surface with no border: the step in colour is the edge.
+  // Widgets are white cards with a hairline edge on the grey canvas, like the other pages' cards.
   studioWidgetBackgroundColor: token('surface'),
-  studioWidgetBorder: false,
-  studioWidgetBorderRadius: 6,
+  studioWidgetBorder: line('border'),
+  studioWidgetBorderRadius: 8,
   studioWidgetPadding: 18,
   studioWidgetTitleFontFamily: token('font'),
   studioWidgetTitleFontSize: 15,
   studioWidgetTitleFontWeight: 600,
-  studioWidgetTitleTextColor: token('navy'),
+  studioWidgetTitleTextColor: token('ink'),
   studioWidgetSubtitleFontFamily: token('font'),
   studioWidgetSubtitleFontSize: 13,
   studioWidgetSubtitleTextColor: token('muted'),
@@ -99,7 +86,7 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioWidgetLoadingOverlayBackgroundColor: token('surface'),
   studioWidgetNoDataOverlayBackgroundColor: token('surface'),
 
-  // Edit-mode panels: the same dark surface as the widgets.
+  // Edit-mode panels: white, like the widgets.
   studioPanelContainerBackgroundColor: token('surface'),
   studioPanelContainerBorder: line('border'),
   studioPanelContainerBorderRadius: 0,
@@ -119,11 +106,10 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   studioDragAndDropImageTextColor: token('ink'),
   studioPanelChevronButtonHoverBackgroundColor: token('highlight'),
   studioPanelChevronButtonHoverColor: token('blue'),
-  // Selected toggles (the agent switch): raised fill, PayPal blue edge, light text. Blue text on
-  // the raised fill would be 4.1:1, under AA for small text.
+  // Selected toggles (the agent switch): pale blue fill, PayPal blue edge and text.
   studioToggleButtonActiveBackgroundColor: token('highlight'),
   studioToggleButtonActiveBorderColor: token('blue'),
-  studioToggleButtonActiveColor: token('navy'),
+  studioToggleButtonActiveColor: token('blue'),
 
   // Grid widgets: muted semibold headers, faint dividers, roomy rows.
   gridFontFamily: token('font'),
@@ -146,11 +132,11 @@ export const agStudioPayPalTheme = studioTheme.withParams({
   chartSubtleTextColor: token('muted'),
   chartAxisLineColor: token('border'),
   chartGridLineColor: token('gridline'),
-  chartTooltipBackgroundColor: token('highlight'),
+  chartTooltipBackgroundColor: token('surface'),
   chartTooltipTextColor: token('ink'),
   chartTooltipSubtleTextColor: token('muted'),
   chartTooltipBorder: line('border'),
-  chartCrosshairLabelBackgroundColor: token('highlight'),
-  chartCrosshairLabelTextColor: token('ink'),
+  chartCrosshairLabelBackgroundColor: token('ink'),
+  chartCrosshairLabelTextColor: token('surface'),
   ...palette,
 });

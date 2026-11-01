@@ -1,6 +1,7 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
 import { clientAddress } from '@/lib/demo-auth';
+import { requestEnvironment } from '@/lib/settings/live-mode';
 
 // Runs the demo support agent on one ticket. Every PayPal call it makes goes through the payment
 // guard (lib/guard/guard.ts), and each decision lands in the guard log at /guard. `agent:
@@ -31,6 +32,18 @@ export async function POST(request: Request) {
   if (message.length > MAX_MESSAGE_LENGTH) return error(400, `message must be at most ${MAX_MESSAGE_LENGTH} characters.`);
   if (agent !== 'careful' && agent !== 'vulnerable') return error(400, 'agent must be "careful" or "vulnerable".');
 
+  // Live PayPal (real money) only for an API-key request while live mode is really on
+  // (lib/settings/live-mode.ts); the test pages, with the owner's session, always get the sandbox.
+  let environment: Awaited<ReturnType<typeof requestEnvironment>>;
+  try {
+    environment = await requestEnvironment(request.headers);
+  } catch (cause) {
+    console.error('The PayPal environment could not be decided', cause);
+    return error(502, 'The settings could not be read. Try again in a moment.');
+  }
+  // The vulnerable agent is a demonstration: it never runs with real money.
+  if (environment === 'live' && agent === 'vulnerable') return error(400, 'agent "vulnerable" runs only on the PayPal sandbox, never in live mode.');
+
   const slot = tickets.acquire(clientAddress(request.headers), Date.now());
   if (!slot.ok) {
     const seconds = Math.ceil(slot.retryAfterMs / 1000);
@@ -42,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await handleTicket({ customerEmail, message }, agent));
+    return Response.json(await handleTicket({ customerEmail, message }, agent, { environment }));
   } catch (cause) {
     // The cause can carry provider responses or configuration names, so it stays in the server log.
     console.error('Support agent failed', cause);

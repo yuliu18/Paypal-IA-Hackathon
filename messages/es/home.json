@@ -1,0 +1,100 @@
+{
+  "title": "Resumen",
+  "hero": {
+    "heading": "Un cortafuegos entre tus agentes de IA y tu cuenta de PayPal.",
+    "intro": "Tus agentes de soporte, facturación y ventas solo llegan a PayPal a través del guard. Revisa cada llamada según tus reglas y lo que pidió el propio cliente, retiene las arriesgadas para que las apruebes y bloquea el resto antes de que PayPal las vea. Un modelo engañado o defectuoso no puede mover dinero que no debe.",
+    "trySupport": "Intenta engañar al agente de soporte",
+    "seeDecisions": "Ver todas las decisiones"
+  },
+  "tally": {
+    "none": "Tus agentes aún no han hecho ninguna llamada a PayPal.",
+    "opening": "Tus agentes hicieron {calls, plural, one {# llamada a PayPal} other {# llamadas a PayPal}}",
+    "onlyOutcome": {
+      "allowed": "{opening} y {calls, plural, one {se aprobó} other {todas se aprobaron}}.",
+      "held": "{opening} y {calls, plural, one {se retuvo para ti} other {todas se retuvieron para ti}}.",
+      "blocked": "{opening} y {calls, plural, one {se bloqueó} other {todas se bloquearon}}."
+    },
+    "outcome": {
+      "allowed": "{count, plural, one {# se aprobó} other {# se aprobaron}}",
+      "held": "{count, plural, one {# se retuvo para ti} other {# se retuvieron para ti}}",
+      "blocked": "{count, plural, one {# se bloqueó} other {# se bloquearon}}"
+    },
+    "mixed": "{opening}. {outcomes}.",
+    "listTwo": "{first} y {second}",
+    "listThree": "{first}, {second} y {third}"
+  },
+  "checkpoint": {
+    "heading": "Últimas llamadas en el guard",
+    "guardLog": "Registro del guard",
+    "empty": "Ningún agente ha llamado aún a PayPal. Envía un ticket en la <link>página de soporte</link> y sus llamadas aparecerán aquí.",
+    "call": "<strong>{action}</strong>{hasAmount, select, yes { de {amount}} other {}}<muted> para {customer}</muted>",
+    "byAgent": "Agente de {agent}, {time}",
+    "agents": {
+      "support": "soporte",
+      "billing": "facturación",
+      "sales": "ventas"
+    },
+    "actions": {
+      "refund": "Reembolso",
+      "disputeAcceptance": "Aceptación de disputa",
+      "cancellation": "Cancelación",
+      "invoice": "Factura",
+      "invoiceSending": "Envío de factura",
+      "reminder": "Recordatorio",
+      "order": "Pedido",
+      "other": "Otra"
+    },
+    "timeAgo": {
+      "justNow": "ahora mismo",
+      "minutes": "hace {n} min",
+      "hours": "hace {n} h",
+      "days": "{n, plural, one {hace # día} other {hace # días}}"
+    }
+  },
+  "agents": {
+    "heading": "Pon a trabajar a un agente",
+    "intro": "Cada uno tiene sus propias herramientas de PayPal y el mismo guard. Pídele algo normal y luego intenta engañarlo.",
+    "tryToFool": "Intenta engañarlo",
+    "support": {
+      "title": "Agente de soporte",
+      "does": "Responde el ticket de un cliente: reembolsa un pedido, acepta una disputa, cancela una suscripción.",
+      "open": "Abrir el escritorio de soporte"
+    },
+    "billing": {
+      "title": "Agente de facturación",
+      "does": "Factura a los clientes de la tienda: crea y envía facturas de PayPal, envía recordatorios.",
+      "open": "Abrir el escritorio de facturación"
+    },
+    "sales": {
+      "title": "Agente de ventas",
+      "does": "Vende el catálogo: crea el pedido de PayPal que paga el cliente.",
+      "open": "Abrir el escritorio de ventas"
+    }
+  },
+  "evaluate": {
+    "heading": "Prueba un modelo antes de confiar en él",
+    "intro": "La evaluación ejecuta los tickets que espera tu tienda y una serie de ataques contra el modelo que elijas, y puntúa con qué frecuencia hace su trabajo y con qué frecuencia solo el guard mantuvo el dinero en su sitio.",
+    "link": "Evaluar un modelo"
+  },
+  "rules": {
+    "heading": "Tus reglas para {business}",
+    "passesAlone": "Pasa por sí sola",
+    "youApprove": "Tú apruebas",
+    "upTo": "hasta {amount}",
+    "mostADay": "Máximo al día",
+    "agentsAndJudge": "Agentes y juez",
+    "customProvider": "Proveedor personalizado",
+    "noModel": "sin modelo",
+    "noApiKey": " (sin clave de API)",
+    "paypal": "PayPal",
+    "sandbox": "Sandbox, dinero ficticio",
+    "noCredentials": "Aún no hay credenciales de la app",
+    "change": "Cambiar las reglas",
+    "live": "Real: dinero real para la app de tu tienda"
+  },
+  "liveMode": {
+    "on": "El modo real está activado: las llamadas de la app de tu tienda mueven dinero real.",
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba: todas las llamadas usan el sandbox.",
+    "settings": "Ajustes del modo"
+  }
+}

@@ -3,21 +3,23 @@
 // payment. create_order can't carry a custom_id, and get_order's owner check reads it. One bounded
 // PATCH, no retries: the guard reports any failure.
 
-import { accessToken, PAYPAL_API } from '@/lib/paypal';
+import { accessToken, payPalApi, type PaymentEnvironment } from '@/lib/paypal';
 import { ORDER_ID } from '../domain/order';
 import type { OrderBinder } from '../ports';
 
 export function createPayPalOrderBinder({
-  fetch = globalThis.fetch,
-  token = accessToken,
+  environment = 'sandbox',
+  // Looked up at call time, so the shared default never holds on to a fetch replaced later.
+  fetch = (input, init) => globalThis.fetch(input, init),
+  token = () => accessToken(environment),
   timeoutMs = 10_000,
-}: { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): OrderBinder {
+}: { environment?: PaymentEnvironment; fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): OrderBinder {
   return {
     async bindToCustomer(orderId, customerEmail) {
       if (!ORDER_ID.test(orderId)) throw new Error(`${orderId.slice(0, 40)} is not a plain PayPal order id`);
       const path = `/v2/checkout/orders/${orderId}`;
       // The toolkit sends one purchase unit with no reference_id, which PayPal names `default`.
-      const res = await fetch(`${PAYPAL_API}${path}`, {
+      const res = await fetch(`${payPalApi(environment)}${path}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify([{ op: 'add', path: "/purchase_units/@reference_id=='default'/custom_id", value: customerEmail }]),

@@ -6,23 +6,16 @@
 // somewhere else catches that.
 // Amounts are stored in minor units so daily totals are exact sums.
 
-import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import type { Money } from '../domain/policy';
-import type { AuditEntry, AuditLog, AuditRow } from '../ports';
+import type { AuditLog, AuditRow, ChainCheck } from '../ports';
+import { boundOrderDetail, GENESIS, hashOf, ORDER_ID, recordRow, settleRow, soleCustomer, toEntry, type LogRow, type StateRow } from './audit-chain.ts';
 
-// Type-only imports above: other processes load this file with plain Node (see the test that
-// appends from several processes), which can't resolve the app's extensionless imports. So the
-// binding detail and the order id pattern are repeated here, as domain/order.ts writes them
-// (boundOrderDetail, ORDER_ID); the guard and adapter tests pin the same text.
-const ORDER_ID = /^[A-Z0-9]{17,32}$/;
-const boundOrderDetail = (orderId: string) => `Order ${orderId} bound to the task customer`;
+// Type-only imports from the app above, and the shared chain by its .ts path: other processes load
+// this file with plain Node (see the test that appends from several processes), which can't resolve
+// the app's extensionless imports.
 
-export type { AuditRow };
-
-export type ChainCheck =
-  | { intact: true; records: number; head: string | null }
-  | { intact: false; brokenAt: string; reason: string };
+export type { AuditRow, ChainCheck };
 
 export type SqliteAuditLog = AuditLog & {
   list(limit: number): AuditRow[];
@@ -30,78 +23,6 @@ export type SqliteAuditLog = AuditLog & {
   // only rows added since and the last verified row; 0 always checks the whole chain.
   verifyChain(reuseFullCheckMs?: number, now?: number): ChainCheck;
 };
-
-// One row of the append-only table, as stored: every column is part of the hash.
-type LogRow = {
-  id: number;
-  kind: 'record' | 'settle';
-  at: string;
-  ref: number | null;
-  tool: string | null;
-  args: string | null;
-  task: string | null;
-  decision: string | null;
-  moved_minor: number | null;
-  moved_currency: string | null;
-  moved_set: number;
-  outcome: string | null;
-  detail: string | null;
-  resolves: number | null;
-  prev_hash: string;
-  hash: string;
-};
-
-// A record with its settlements applied, as the audit_state view returns it.
-type StateRow = {
-  id: number;
-  at: string;
-  tool: string;
-  args: string;
-  task: string;
-  decision: string;
-  moved_minor: number | null;
-  moved_currency: string | null;
-  outcome: AuditEntry['outcome'];
-  detail: string | null;
-  resolves: number | null;
-};
-
-const GENESIS = '0'.repeat(64);
-
-// The row id is left out: it is only known after the insert, and the prev_hash links already pin
-// each row's place in the chain.
-function hashOf(row: Omit<LogRow, 'id' | 'hash'>): string {
-  const content = [
-    row.prev_hash,
-    row.kind,
-    row.at,
-    row.ref,
-    row.tool,
-    row.args,
-    row.task,
-    row.decision,
-    row.moved_minor,
-    row.moved_currency,
-    row.moved_set,
-    row.outcome,
-    row.detail,
-    row.resolves,
-  ];
-  return createHash('sha256').update(JSON.stringify(content)).digest('hex');
-}
-
-const toEntry = (row: StateRow): AuditRow => ({
-  id: String(row.id),
-  at: row.at,
-  tool: row.tool,
-  args: JSON.parse(row.args),
-  task: JSON.parse(row.task),
-  decision: JSON.parse(row.decision),
-  moved: row.moved_minor === null || row.moved_currency === null ? undefined : { minor: row.moved_minor, currency: row.moved_currency },
-  outcome: row.outcome,
-  detail: row.detail ?? undefined,
-  ...(row.resolves === null ? {} : { resolves: String(row.resolves) }),
-});
 
 export function createSqliteAuditLog(path: string): SqliteAuditLog {
   const db = new DatabaseSync(path);
@@ -124,6 +45,7 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       outcome TEXT,
       detail TEXT,
       resolves INTEGER,
+      environment TEXT,
       prev_hash TEXT NOT NULL,
       hash TEXT NOT NULL
     );
@@ -131,10 +53,20 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
     CREATE INDEX IF NOT EXISTS audit_log_resolves ON audit_log (resolves);
     CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log (at);
 
+  `);
+  // A file from before the environment was recorded gets the column (its rows stay null and read as
+  // sandbox) and the view that returns it.
+  if (!(db.prepare(`PRAGMA table_info(audit_log)`).all() as { name: string }[]).some((c) => c.name === 'environment')) {
+    db.exec(`ALTER TABLE audit_log ADD COLUMN environment TEXT`);
+  }
+  if (!(db.prepare(`PRAGMA table_info(audit_state)`).all() as { name: string }[]).some((c) => c.name === 'environment')) {
+    db.exec(`DROP VIEW IF EXISTS audit_state`);
+  }
+  db.exec(`
     -- Each record with its latest settlement applied. A settlement that sets the amount wins even
     -- when it clears it (moved_set = 1 with a null amount).
     CREATE VIEW IF NOT EXISTS audit_state AS
-    SELECT r.id, r.at, r.tool, r.args, r.task, r.decision, r.resolves,
+    SELECT r.id, r.at, r.tool, r.args, r.task, r.decision, r.resolves, r.environment,
       COALESCE((SELECT s.outcome FROM audit_log s WHERE s.ref = r.id AND s.outcome IS NOT NULL ORDER BY s.id DESC LIMIT 1), r.outcome) AS outcome,
       COALESCE((SELECT s.detail FROM audit_log s WHERE s.ref = r.id AND s.detail IS NOT NULL ORDER BY s.id DESC LIMIT 1), r.detail) AS detail,
       CASE WHEN EXISTS (SELECT 1 FROM audit_log s WHERE s.ref = r.id AND s.moved_set = 1)
@@ -148,8 +80,8 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
 
   const lastHash = db.prepare(`SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1`);
   const insert = db.prepare(
-    `INSERT INTO audit_log (id, kind, at, ref, tool, args, task, decision, moved_minor, moved_currency, moved_set, outcome, detail, resolves, prev_hash, hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_log (id, kind, at, ref, tool, args, task, decision, moved_minor, moved_currency, moved_set, outcome, detail, resolves, environment, prev_hash, hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   // Pending entries count too: their call may have moved money even if it never settled. An
   // invoice's amount is money billed, not refunded, so each sum only sees its own kind of entry;
@@ -171,7 +103,8 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
   // (executeWrite joins details with '; '). Order ids are [A-Z0-9], so they hold no LIKE wildcard.
   const boundOrder = db.prepare(
     `SELECT DISTINCT json_extract(task, '$.mandate.customerEmail') AS customer FROM audit_state
-       WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = ? OR detail LIKE ?)`,
+       WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = ? OR detail LIKE ?)
+         AND (? IS NULL OR COALESCE(environment, 'sandbox') = ?)`,
   );
   const rowsAfter = db.prepare(`SELECT * FROM audit_log WHERE id > ? ORDER BY id`);
   const hashAt = db.prepare(`SELECT hash FROM audit_log WHERE id = ?`);
@@ -219,6 +152,7 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       row.outcome,
       row.detail,
       row.resolves,
+      row.environment,
       prev_hash,
       hash,
     );
@@ -239,7 +173,7 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       const hasResolves = (db.prepare(`PRAGMA table_info(audit)`).all() as { name: string }[]).some((c) => c.name === 'resolves');
       const rows = db
         .prepare(`SELECT *${hasResolves ? '' : ', NULL AS resolves'} FROM audit ORDER BY id`)
-        .all() as unknown as (Omit<StateRow, 'resolves'> & { resolves: number | null })[];
+        .all() as unknown as Omit<StateRow, 'environment'>[];
       const renumbered = new Map(rows.map((row, i) => [row.id, i + 1]));
       for (const row of rows) {
         append(
@@ -257,6 +191,7 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
             outcome: row.outcome,
             detail: row.detail,
             resolves: row.resolves === null ? null : (renumbered.get(row.resolves) ?? null),
+            environment: null,
           },
           renumbered.get(row.id)!,
         );
@@ -289,42 +224,12 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
 
   return {
     async record(entry) {
-      return inWriteTransaction(() => append({
-        kind: 'record',
-        at: entry.at,
-        ref: null,
-        tool: entry.tool,
-        args: JSON.stringify(entry.args),
-        task: JSON.stringify(entry.task),
-        decision: JSON.stringify(entry.decision),
-        moved_minor: entry.moved?.minor ?? null,
-        moved_currency: entry.moved?.currency ?? null,
-        moved_set: 1,
-        outcome: entry.outcome,
-        detail: entry.detail ?? null,
-        resolves: entry.resolves === undefined ? null : Number(entry.resolves),
-      }));
+      return inWriteTransaction(() => append(recordRow(entry)));
     },
 
     async update(id, patch) {
-      // Presence, not value, decides: an explicit `moved: undefined` clears the amount.
-      const movedSet = 'moved' in patch;
-      if (patch.outcome === undefined && patch.detail === undefined && !movedSet) return;
-      inWriteTransaction(() => append({
-        kind: 'settle',
-        at: new Date().toISOString(),
-        ref: Number(id),
-        tool: null,
-        args: null,
-        task: null,
-        decision: null,
-        moved_minor: movedSet ? (patch.moved?.minor ?? null) : null,
-        moved_currency: movedSet ? (patch.moved?.currency ?? null) : null,
-        moved_set: movedSet ? 1 : 0,
-        outcome: patch.outcome ?? null,
-        detail: patch.detail ?? null,
-        resolves: null,
-      }));
+      const row = settleRow(id, patch, new Date().toISOString());
+      if (row) inWriteTransaction(() => append(row));
     },
 
     async movedSince(since, currency): Promise<Money> {
@@ -350,12 +255,12 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       return resolver.get(Number(id)) !== undefined;
     },
 
-    async boundOrderCustomer(orderId) {
+    async boundOrderCustomer(orderId, environment) {
       if (!ORDER_ID.test(orderId)) return undefined;
       const detail = boundOrderDetail(orderId);
-      const rows = boundOrder.all(detail, `%; ${detail}`) as { customer: unknown }[];
-      // One order is created once; two customers for one id would be a log nobody can trust.
-      return rows.length === 1 && typeof rows[0].customer === 'string' ? rows[0].customer : undefined;
+      const only = environment === undefined ? null : environment === 'live' ? 'live' : 'sandbox';
+      const rows = boundOrder.all(detail, `%; ${detail}`, only, only) as { customer: unknown }[];
+      return soleCustomer(rows.map((r) => r.customer));
     },
 
     list(limit) {

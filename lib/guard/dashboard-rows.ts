@@ -93,9 +93,9 @@ function requestedAmount(entry: AuditRow) {
 
 // The newest `limit` entries as rows; an unreadable log leaves the guard page empty instead of
 // taking the PayPal pages of the dashboard down with it.
-export function readGuardDashboardRows(list: (limit: number) => AuditRow[], limit: number): GuardDashboardRows {
+export async function readGuardDashboardRows(list: (limit: number) => AuditRow[] | Promise<AuditRow[]>, limit: number): Promise<GuardDashboardRows> {
   try {
-    return guardDashboardRows(list(limit));
+    return guardDashboardRows(await list(limit));
   } catch (error) {
     console.error('Payment guard log could not be read for the dashboard', error);
     return { guardDecisions: [], guardViolations: [] };

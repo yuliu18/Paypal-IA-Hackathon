@@ -1,0 +1,10 @@
+{
+  "appDescription": "Un cortafuegos entre los agentes de IA de una tienda y su cuenta de PayPal: cada llamada de pago se revisa, se retiene para una persona o se bloquea.",
+  "on": "Activo",
+  "off": "Inactivo",
+  "verdicts": {
+    "passed": "Aprobada",
+    "held": "Retenida",
+    "stopped": "Bloqueada"
+  }
+}

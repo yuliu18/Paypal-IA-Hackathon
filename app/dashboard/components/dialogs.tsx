@@ -1,6 +1,8 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
 import type { SavedReport } from '../reports-store';
+import { studioLabel } from '../studio/locale';
 import { Button, Dialog } from './ui/ui';
 
 // The shell's confirmation dialogs. Each takes its own open flag and callbacks, so the
@@ -27,24 +29,25 @@ export function UnsavedChangesDialog({
   onDiscard: () => void;
   onSave: () => void;
 }) {
+  const t = useTranslations('dashboard.dialogs');
   return (
     <Dialog
       open={open}
-      title={`Save changes to “${reportName}”?`}
+      title={t('unsaved.title', { name: reportName })}
       onClose={onCancel}
       actions={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
-          <Button onClick={onDiscard}>Discard changes</Button>
+          <Button onClick={onDiscard}>{t('unsaved.discard')}</Button>
           <Button variant="primary" onClick={onSave}>
-            Save
+            {t('unsaved.save')}
           </Button>
         </>
       }
     >
-      Your changes to this report haven&apos;t been saved yet.
+      {t('unsaved.body')}
     </Dialog>
   );
 }
@@ -59,18 +62,20 @@ export function CreateReportDialog({
   onCreate: (name: string) => void;
 }) {
   const formId = 'create-report';
+  const t = useTranslations('dashboard.dialogs');
+  const locale = useLocale();
   return (
     <Dialog
       open={open}
-      title="New report"
+      title={t('create.title')}
       onClose={onClose}
       actions={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button variant="primary" type="submit" form={formId}>
-            Create report
+            {t('create.submit')}
           </Button>
         </>
       }
@@ -80,18 +85,18 @@ export function CreateReportDialog({
         onSubmit={(e) => {
           e.preventDefault();
           const name = String(new FormData(e.currentTarget).get('name') ?? '').trim();
-          onCreate(name || 'Untitled report');
+          onCreate(name || t('create.defaultName'));
         }}
       >
-        <p>Start from a blank page and build it with the widgets in Compose.</p>
+        <p>{t('create.intro', { compose: studioLabel(locale, 'panelTitleEdit') })}</p>
         <label className="mt-4 block text-sm font-semibold text-pp-navy" htmlFor="report-name">
-          Report name
+          {t('create.nameLabel')}
         </label>
         <input
           id="report-name"
           name="name"
           autoFocus
-          defaultValue="Untitled report"
+          defaultValue={t('create.defaultName')}
           onFocus={(e) => e.currentTarget.select()}
           className="mt-1 h-11 w-full rounded border border-pp-border bg-pp-canvas px-3 text-[15px] text-pp-ink outline-none focus:border-pp-blue focus:ring-2 focus:ring-pp-highlight"
         />
@@ -110,26 +115,24 @@ export function DeleteReportDialog({
   onCancel: () => void;
   onConfirm: (report: SavedReport) => void;
 }) {
+  const t = useTranslations('dashboard.dialogs');
   return (
     <Dialog
       open={report !== null}
-      title={report?.builtIn ? 'Reset to default?' : 'Delete report?'}
+      title={report?.builtIn ? t('delete.titleReset') : t('delete.title')}
       onClose={onCancel}
       actions={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button variant="danger" onClick={() => report && onConfirm(report)}>
-            {report?.builtIn ? 'Reset' : 'Delete'}
+            {report?.builtIn ? t('delete.reset') : t('delete.delete')}
           </Button>
         </>
       }
     >
-      {report &&
-        (report.builtIn
-          ? `“${report.name}” will go back to the report shipped with the app. Your saved changes to it will be lost.`
-          : `“${report.name}” will be removed from this browser. This can't be undone.`)}
+      {report && (report.builtIn ? t('delete.bodyReset', { name: report.name }) : t('delete.body', { name: report.name }))}
     </Dialog>
   );
 }
@@ -145,24 +148,24 @@ export function ResetDemoDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useTranslations('dashboard.dialogs');
   return (
     <Dialog
       open={open}
-      title="Reset the demo?"
+      title={t('resetDemo.title')}
       onClose={onCancel}
       actions={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button variant="danger" onClick={onConfirm}>
-            Reset demo
+            {t('resetDemo.confirm')}
           </Button>
         </>
       }
     >
-      All reports you&apos;ve created will be deleted and “{builtInName}” will go back to its original state,
-      including any unsaved changes. This can&apos;t be undone.
+      {t('resetDemo.body', { name: builtInName })}
     </Dialog>
   );
 }

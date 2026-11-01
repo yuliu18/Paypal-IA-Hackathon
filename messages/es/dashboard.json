@@ -1,0 +1,470 @@
+{
+  "metadata": {
+    "title": "Panel"
+  },
+  "header": {
+    "dragHint": "Arrastra un widget desde <b>{compose}</b> para empezar.",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "discard": "Descartar",
+    "save": "Guardar",
+    "guide": "Guía",
+    "view": "Ver",
+    "edit": "Editar",
+    "sandbox": "Sandbox de PayPal",
+    "refreshing": "Actualizando…",
+    "updated": "Actualizado {when}",
+    "justNow": "ahora mismo",
+    "minutesAgo": "hace {minutes} min",
+    "hoursAgo": "hace {hours} h",
+    "utc": "{time} UTC",
+    "refresh": "Actualizar datos",
+    "builtWith": "Hecho con <logo></logo>"
+  },
+  "sidebar": {
+    "reports": "Informes",
+    "reportName": "Nombre del informe",
+    "actionsFor": "Acciones de {name}",
+    "rename": "Renombrar",
+    "duplicate": "Duplicar",
+    "resetToDefault": "Restablecer",
+    "delete": "Eliminar",
+    "pagesOf": "Páginas de {name}",
+    "pageName": "Nombre de la página",
+    "doubleClickToRename": "Doble clic para renombrar",
+    "removePageNamed": "Quitar la página {title}",
+    "removePage": "Quitar página",
+    "addPage": "Añadir página",
+    "newReport": "Nuevo informe",
+    "resetDemo": "Restablecer demo",
+    "savedHereResetHint": "Los informes se guardan en este navegador. Restablecer recupera los informes de la demo.",
+    "savedHere": "Los informes se guardan en este navegador."
+  },
+  "reports": {
+    "pageNumber": "Página {number}",
+    "copyName": "{name} (copia)"
+  },
+  "dialogs": {
+    "cancel": "Cancelar",
+    "unsaved": {
+      "title": "¿Guardar los cambios de «{name}»?",
+      "discard": "Descartar cambios",
+      "save": "Guardar",
+      "body": "Los cambios de este informe aún no se han guardado."
+    },
+    "create": {
+      "title": "Nuevo informe",
+      "submit": "Crear informe",
+      "intro": "Empieza con una página en blanco y constrúyela con los widgets de {compose}.",
+      "nameLabel": "Nombre del informe",
+      "defaultName": "Informe sin título"
+    },
+    "delete": {
+      "titleReset": "¿Restablecer el informe?",
+      "title": "¿Eliminar el informe?",
+      "reset": "Restablecer",
+      "delete": "Eliminar",
+      "bodyReset": "«{name}» volverá al informe que trae la app. Se perderán los cambios que guardaste en él.",
+      "body": "«{name}» se eliminará de este navegador. No se puede deshacer."
+    },
+    "resetDemo": {
+      "title": "¿Restablecer la demo?",
+      "confirm": "Restablecer demo",
+      "body": "Se eliminarán todos los informes que has creado y «{name}» volverá a su estado original, también los cambios sin guardar. No se puede deshacer."
+    }
+  },
+  "empty": {
+    "title": "Aún no hay datos de PayPal",
+    "body": "Esta cuenta sandbox no tiene facturas, productos, planes ni transacciones. Crea algunos en el sandbox de PayPal y actualiza para construir informes con ellos.",
+    "link": "Abrir el PayPal Developer Dashboard"
+  },
+  "error": {
+    "title": "No pudimos cargar tus datos de PayPal",
+    "body": "El sandbox de PayPal no respondió como se esperaba. Revisa las credenciales de la API en <code>.env.local</code> e inténtalo de nuevo.",
+    "reference": "Referencia: {digest}",
+    "retry": "Reintentar"
+  },
+  "guide": {
+    "title": "Cómo usar este panel",
+    "intro": "Hecho con AG Studio. Déjala abierta mientras pruebas cada paso.",
+    "close": "Cerrar la guía",
+    "read": {
+      "title": "Leer una página",
+      "body": "Cada widget responde a una pregunta; su título dice cuál. Pasa el puntero sobre una barra o una banda para ver sus cifras."
+    },
+    "filter": {
+      "title": "Filtrar con un clic",
+      "click": "Haz clic en un agente en <b>{flow}</b>, o en una barra de un gráfico, y los demás widgets de la página muestran solo eso. Vuelve a hacer clic para quitarlo.",
+      "panel": "Abre <b>{filters}</b> en el borde derecho para ver los filtros de la página y los que has marcado con clics."
+    },
+    "pages": {
+      "title": "Moverse entre páginas e informes",
+      "menu": "Las páginas del informe abierto aparecen en el menú de la izquierda, bajo <b>{dashboard}</b>. <b>{addPage}</b> añade una vacía; haz doble clic en una página o un informe para renombrarlo.",
+      "reports": "<b>{newReport}</b> empieza un informe en blanco. El menú <b>⋯</b> de un informe tiene <b>{rename}</b>, <b>{duplicate}</b> y eliminar. <b>{resetDemo}</b> recupera el informe de serie y quita los que has creado."
+    },
+    "edit": {
+      "title": "Editar una página",
+      "open": "Pulsa <b>{edit}</b>. Se abren dos paneles a la derecha: <b>{compose}</b> y <b>{data}</b>.",
+      "add": "<b>Añadir un widget:</b> en <b>{compose}</b>, abre <b>{widgets}</b> y arrastra uno a la página. O arrastra un campo desde <b>{data}</b> (un agente, un cliente, un importe) a la página y Studio crea un gráfico con él.",
+      "change": "<b>Cambiar un widget:</b> haz clic en él. Su configuración aparece en <b>{compose}</b>: tipo de gráfico, los campos de cada eje, el orden y sus títulos.",
+      "move": "<b>Mover o redimensionar:</b> arrastra un widget para moverlo, o arrastra sus bordes para cambiar su tamaño. Su barra de herramientas lo duplica o lo elimina.",
+      "save": "Deshacer y rehacer están junto a <b>{save}</b>. <b>{save}</b> guarda el informe en este navegador; <b>{discard}</b> descarta los cambios; <b>{view}</b> sale de la edición."
+    },
+    "guardWidget": {
+      "title": "Añadir el widget propio del guard",
+      "body": "En <b>{compose}</b> › <b>{widgets}</b>, el grupo <b>{group}</b> tiene <b>{flow}</b>: las llamadas de cada agente a través del guard hasta lo que hizo con ellas. Arrástralo a cualquier página."
+    },
+    "export": {
+      "title": "Exportar",
+      "body": "La barra de herramientas de una tabla o un gráfico descarga sus filas en CSV, o el gráfico como imagen."
+    },
+    "ai": {
+      "title": "Preguntar a la IA",
+      "on": "En <b>{edit}</b>, abre el <b>{assistant}</b> y describe el widget que quieres, por ejemplo «reembolsos bloqueados por cliente». Lo construye en la página, y lo conservas o lo descartas como cualquier otro cambio.",
+      "off": "El <b>{assistant}</b> crea widgets a partir de una frase. Aparece en modo edición cuando hay una clave de OpenAI configurada en el servidor (consulta el README)."
+    }
+  },
+  "flow": {
+    "verdicts": {
+      "passed": "Aprobadas hacia PayPal",
+      "held": "Retenidas para ti",
+      "stopped": "Bloqueadas por el guard"
+    },
+    "verdictsInline": {
+      "passed": "aprobadas hacia PayPal",
+      "held": "retenidas para ti",
+      "stopped": "bloqueadas por el guard"
+    },
+    "agent": "Agente {name}",
+    "agentCalls": "{n, plural, one {{count} llamada} other {{count} llamadas}}",
+    "verdictCalls": "{n, plural, one {{count} llamada} other {{count} llamadas}}, {percent}",
+    "band": "Agente {agent}: {n, plural, one {{count} llamada} other {{count} llamadas}} {verdict}",
+    "gate": "Payment guard",
+    "noCalls": "Aún no hay llamadas.",
+    "summaryItem": "{count} {verdict}"
+  },
+  "widgets": {
+    "guardFlow": "Flujo a través del guard",
+    "agentMapping": "Agente",
+    "verdictsMapping": "Aprobadas, retenidas, bloqueadas",
+    "menuGroup": "Payment guard"
+  },
+  "ai": {
+    "stoppedMost": {
+      "label": "¿Qué agente se bloqueó más?",
+      "prompt": "¿Qué agente de IA bloqueó más a menudo el guard de pagos, y por qué motivos? Usa las decisiones y las infracciones del guard. Responde en español."
+    },
+    "protectedVsMoved": {
+      "label": "Dinero protegido frente a movido",
+      "prompt": "¿Cuánto dinero protegió el guard al bloquear, comparado con lo que los agentes movieron y facturaron? Desglósalo por agente y acción. Responde en español."
+    },
+    "waiting": {
+      "label": "¿Qué espera a una persona?",
+      "prompt": "Enumera las acciones retenidas que aún esperan aprobación, de la más antigua a la más reciente, con el agente, la acción, el cliente y el importe. Responde en español."
+    },
+    "blockRate": {
+      "label": "Graficar la tasa de bloqueo",
+      "prompt": "Añade un gráfico de líneas de la tasa de bloqueo del guard por día, separado por agente. Pon los títulos en español."
+    },
+    "summarise": {
+      "label": "Resumir esta página",
+      "prompt": "Resume lo que muestra esta página: cada widget, los campos que lee y lo que destaca. Responde en español."
+    }
+  },
+  "report": {
+    "name": "Resumen de PayPal",
+    "pages": {
+      "guard": "Operaciones de IA",
+      "activity": "Actividad de los agentes",
+      "revenue": "Ingresos y caja",
+      "receivables": "Cobros pendientes",
+      "catalogue": "Catálogo"
+    },
+    "guard": {
+      "flow": {
+        "title": "Flujo a través del guard",
+        "subtitle": "Cada llamada de tus agentes, desde el agente hasta lo que el guard hizo con ella. Haz clic en un agente para filtrar la página."
+      },
+      "kpiProtected": {
+        "title": "Se quedó en la tienda",
+        "caption": "Reembolsos y disputas bloqueados"
+      },
+      "kpiMoved": {
+        "title": "Devuelto a clientes",
+        "caption": "Reembolsos y disputas aprobados"
+      },
+      "kpiWaiting": {
+        "title": "Esperando por ti",
+        "caption": "Llamadas retenidas pendientes de tu decisión"
+      },
+      "kpiWithheld": {
+        "title": "Datos ocultados",
+        "caption": "Datos de clientes que no llegaron a los agentes"
+      },
+      "timeline": {
+        "title": "Decisiones por día",
+        "subtitle": "Cada barra es un día de llamadas: verde aprobadas hacia PayPal, ámbar retenidas para ti, rojo bloqueadas"
+      },
+      "byAction": {
+        "title": "Qué intentaron hacer los agentes",
+        "subtitle": "Llamadas por acción, las más bloqueadas primero: verde aprobadas, ámbar retenidas, rojo bloqueadas"
+      },
+      "reasons": {
+        "title": "Por qué se bloquearon llamadas",
+        "subtitle": "La regla que incumplió cada llamada bloqueada, la más frecuente primero"
+      }
+    },
+    "activity": {
+      "customers": {
+        "title": "Clientes detrás de las llamadas bloqueadas",
+        "subtitle": "Llamadas que el guard bloqueó, por el cliente para el que se hicieron"
+      },
+      "decisions": {
+        "title": "Todas las decisiones, la más reciente primero",
+        "subtitle": "Haz clic en una fila para filtrar los gráficos de arriba"
+      }
+    },
+    "revenue": {
+      "kpiSales": {
+        "title": "Ventas (31 días)",
+        "caption": "Pagos que los clientes hicieron a la tienda"
+      },
+      "kpiBalance": {
+        "title": "Saldo disponible",
+        "caption": "En la cuenta de PayPal ahora"
+      },
+      "kpiInvoiced": {
+        "title": "Facturado",
+        "caption": "Facturas enviadas, todas las monedas"
+      },
+      "inOut": {
+        "title": "Entradas y salidas de dinero por día",
+        "subtitle": "Abonos y cargos en el libro de PayPal"
+      },
+      "eventTypes": {
+        "title": "Actividad del libro por tipo",
+        "subtitle": "Número de transacciones de PayPal, las más frecuentes primero"
+      },
+      "ledger": {
+        "title": "Libro de PayPal, lo más reciente primero",
+        "subtitle": "Últimos 31 días de actividad de la cuenta"
+      }
+    },
+    "receivables": {
+      "currency": {
+        "title": "Moneda"
+      },
+      "kpiOutstanding": {
+        "title": "Pendiente de cobro",
+        "caption": "Facturas abiertas y pagadas en parte"
+      },
+      "kpiOverdue": {
+        "title": "Vencido",
+        "caption": "Pasada su fecha de vencimiento"
+      },
+      "kpiOpen": {
+        "title": "Facturas abiertas",
+        "caption": "A la espera de pago"
+      },
+      "byInvoiceDate": {
+        "title": "Pendiente por fecha de factura",
+        "subtitle": "Lo que se debe aún, y cuánto está vencido"
+      },
+      "aging": {
+        "title": "Cobros pendientes por cliente y estado",
+        "subtitle": "El saldo mayor primero"
+      },
+      "openInvoices": {
+        "title": "Facturas abiertas, las más vencidas primero"
+      }
+    },
+    "catalogue": {
+      "kpiProducts": {
+        "title": "Productos",
+        "caption": "Vendidos como suscripciones"
+      },
+      "kpiPlans": {
+        "title": "Planes de facturación",
+        "caption": "De todos los productos"
+      },
+      "kpiMonthly": {
+        "title": "Precio mensual medio",
+        "caption": "Llevado a un mes, en USD"
+      },
+      "kpiTrial": {
+        "title": "Días de prueba medios",
+        "caption": "Antes del primer cargo"
+      },
+      "plans": {
+        "title": "Catálogo de planes"
+      }
+    }
+  },
+  "data": {
+    "calendar": "Calendario",
+    "tables": {
+      "customers": "Clientes",
+      "invoices": "Facturas",
+      "invoiceItems": "Líneas de factura",
+      "invoicePayments": "Pagos de facturas",
+      "products": "Productos",
+      "plans": "Planes de facturación",
+      "transactions": "Transacciones",
+      "payouts": "Pagos salientes",
+      "balances": "Saldos",
+      "guardDecisions": "Decisiones del guard",
+      "guardViolations": "Infracciones del guard"
+    },
+    "fields": {
+      "customers": {
+        "id": "ID de cliente",
+        "name": "Cliente",
+        "company": "Empresa",
+        "email": "Correo electrónico"
+      },
+      "invoices": {
+        "id": "ID de factura",
+        "number": "Factura",
+        "customerId": "ID de cliente",
+        "status": "Estado de la factura",
+        "statusGroup": "Grupo de estado",
+        "currency": "Moneda",
+        "paymentTerm": "Plazo de pago",
+        "invoiceDate": "Fecha de factura",
+        "dueDate": "Fecha de vencimiento",
+        "total": "Total de la factura",
+        "issuedAmount": "Facturado",
+        "paidAmount": "Pagado",
+        "refundedAmount": "Reembolsado",
+        "netCollected": "Cobrado neto",
+        "isReceivable": "Pendiente de cobro (sí/no)",
+        "outstanding": "Pendiente de cobro",
+        "overdueAmount": "Vencido",
+        "daysOverdue": "Días de retraso",
+        "agingBucket": "Tramo de antigüedad",
+        "daysToPay": "Días hasta el pago",
+        "taxTotal": "Impuestos"
+      },
+      "invoiceItems": {
+        "id": "ID de línea",
+        "invoiceId": "ID de factura",
+        "name": "Artículo",
+        "unit": "Unidad",
+        "quantity": "Cantidad",
+        "unitPrice": "Precio unitario",
+        "gross": "Bruto",
+        "discount": "Descuento de la línea",
+        "tax": "Impuestos de la línea",
+        "lineTotal": "Total de la línea"
+      },
+      "invoicePayments": {
+        "id": "ID de pago",
+        "invoiceId": "ID de factura",
+        "kind": "Tipo de pago",
+        "method": "Método de pago",
+        "date": "Fecha de pago",
+        "amount": "Importe del pago",
+        "signedAmount": "Caja neta"
+      },
+      "products": {
+        "id": "ID de producto",
+        "name": "Producto",
+        "type": "Tipo de producto",
+        "category": "Categoría de producto",
+        "description": "Descripción del producto"
+      },
+      "plans": {
+        "id": "ID de plan",
+        "productId": "ID de producto",
+        "name": "Plan",
+        "status": "Estado del plan",
+        "billingInterval": "Facturación",
+        "price": "Precio",
+        "monthlyPrice": "Precio mensual",
+        "trialDays": "Días de prueba",
+        "setupFee": "Cuota de alta"
+      },
+      "transactions": {
+        "id": "ID de transacción",
+        "date": "Fecha de la transacción",
+        "eventType": "Tipo de evento",
+        "status": "Estado de la transacción",
+        "direction": "Dirección",
+        "currency": "Moneda de la transacción",
+        "amount": "Importe de la transacción",
+        "fee": "Comisión de la transacción",
+        "net": "Neto de la transacción",
+        "sales": "Ventas",
+        "moneyIn": "Entrada de dinero",
+        "moneyOut": "Salida de dinero",
+        "endingBalance": "Saldo final",
+        "counterparty": "Contraparte",
+        "note": "Nota de la transacción"
+      },
+      "payouts": {
+        "id": "ID de pago saliente",
+        "campaign": "Campaña",
+        "recipient": "Destinatario",
+        "date": "Fecha del pago saliente",
+        "status": "Estado del pago saliente",
+        "amount": "Importe del pago saliente",
+        "fee": "Comisión del pago saliente",
+        "note": "Nota del pago saliente"
+      },
+      "balances": {
+        "currency": "Moneda del saldo",
+        "total": "Saldo total",
+        "available": "Saldo disponible",
+        "withheld": "Saldo retenido"
+      },
+      "guardDecisions": {
+        "id": "Entrada del guard",
+        "at": "Hora",
+        "day": "Fecha de la decisión",
+        "tool": "Herramienta",
+        "verdict": "Veredicto",
+        "decision": "Decisión",
+        "outcome": "Resultado del guard",
+        "customer": "Cliente del ticket",
+        "currency": "Moneda del guard",
+        "requested": "Reembolso solicitado",
+        "agent": "Agente",
+        "action": "Acción",
+        "moved": "Dinero movido",
+        "protected": "Dinero protegido",
+        "billed": "Dinero facturado",
+        "awaitingApproval": "Esperando aprobación",
+        "allowed": "Aprobada",
+        "held": "Retenida",
+        "blocked": "Bloqueada",
+        "withheld": "Datos personales ocultados",
+        "decidedBy": "Decidido por",
+        "dayText": "Día"
+      },
+      "guardViolations": {
+        "id": "ID de infracción",
+        "decisionId": "ID de entrada del guard",
+        "code": "Código de infracción",
+        "reason": "Motivo del bloqueo",
+        "message": "Detalle de la infracción"
+      }
+    },
+    "measures": {
+      "collectionRate": "Tasa de cobro",
+      "overdueShare": "Parte vencida",
+      "refundRate": "Tasa de reembolso",
+      "allowedCalls": "Aprobadas",
+      "heldCalls": "Retenidas",
+      "blockedCalls": "Bloqueadas",
+      "moneyMoved": "Salió",
+      "moneyBilled": "Facturado",
+      "moneyProtected": "Protegido",
+      "moneyInTotal": "Entradas",
+      "moneyOutTotal": "Salidas",
+      "salesTotal": "Ventas",
+      "outstandingTotal": "Pendiente",
+      "overdueTotal": "Vencido",
+      "blockRate": "Tasa de bloqueo"
+    }
+  }
+}

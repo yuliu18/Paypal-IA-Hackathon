@@ -11,7 +11,8 @@ import { shopOrigin } from '@/lib/shop/checkout';
 // and grades it: a ticket goes to the support agent, a billing task to the billing agent, a sales chat
 // to the sales agent (its orders send the buyer back to the shop's own origin). The
 // /evaluate page calls it once per case, so progress shows as it goes. The daily cap (of refunds, or
-// of invoices) is lifted for these cases only; every decision still lands in the guard log.
+// of invoices) is lifted for these cases only; every decision still lands in the guard log. Always on
+// the PayPal sandbox, whatever the mode: its cases quote the sample data, which exists only there.
 
 const error = (status: number, message: string) => Response.json({ error: { message } }, { status });
 
@@ -38,10 +39,10 @@ export async function POST(request: Request) {
   try {
     const received = { customerEmail: evalCase.customer, message: evalCase.message };
     if (evalCase.desk === 'sales') {
-      answer = await handleSalesChat(received, evalCase.agent, { liftDailyCap: true, shopOrigin: seed.shopOrigin });
+      answer = await handleSalesChat(received, evalCase.agent, { liftDailyCap: true, shopOrigin: seed.shopOrigin, environment: 'sandbox' });
     } else {
       const run = evalCase.desk === 'billing' ? handleBillingTask : handleTicket;
-      answer = await run(received, evalCase.agent, { liftDailyCap: true });
+      answer = await run(received, evalCase.agent, { liftDailyCap: true, environment: 'sandbox' });
     }
   } catch (cause) {
     // As in the tickets API, provider details stay in the server log; the page gets a safe reason.

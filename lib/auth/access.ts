@@ -1,0 +1,67 @@
+// What the owner login lets through without a session, and small checks the sign-in endpoints share.
+
+// The login and password-recovery pages are read with GET only; signing in, creating the owner,
+// signing out, asking for a reset code and resetting the password are plain form posts to their
+// own endpoints (app/api/auth/*). Paths match exactly, nothing below them. Server Actions are never
+// public: their ids are global, so any public path that accepted them would run any action in the app.
+// A buyer coming back from PayPal's checkout never signs in: the capture route (it captures only an
+// order the guard created and bound, once the buyer approved it on PayPal) and its result page.
+const PUBLIC_PAGES = ['/login', '/login/forgot', '/login/reset', '/api/sales/paypal-return', '/checkout'];
+const PUBLIC_POSTS = ['/api/auth/sign-in', '/api/auth/owner', '/api/auth/sign-out', '/api/auth/forgot', '/api/auth/reset'];
+
+export function isPublicRequest({ method, pathname, serverAction = false }: { method: string; pathname: string; serverAction?: boolean }): boolean {
+  if (serverAction) return false;
+  if (method === 'GET' || method === 'HEAD') return PUBLIC_PAGES.includes(pathname);
+  if (method === 'POST') return PUBLIC_POSTS.includes(pathname);
+  return false;
+}
+
+// The only requests an API key opens (lib/apikeys): the business's own app posting to the agents.
+// Paths match exactly; a Server Action never counts, whatever path it is posted to.
+export const API_KEY_ROUTES = ['/api/support/tickets', '/api/billing/tasks', '/api/sales/chats'];
+
+export function acceptsApiKey({ method, pathname, serverAction = false }: { method: string; pathname: string; serverAction?: boolean }): boolean {
+  return !serverAction && method === 'POST' && API_KEY_ROUTES.includes(pathname);
+}
+
+// The key in `Authorization: Bearer <key>`, or undefined when the header holds anything else.
+export function bearerToken(authorization: string | null): string | undefined {
+  const match = /^Bearer[ ]+(\S+)[ ]*$/i.exec(authorization ?? '');
+  return match?.[1];
+}
+
+// One owner per installation: only their session opens the app. While nobody has signed up yet,
+// everyone is sent to the login page, which then offers to create the owner account.
+export function neonAccess({ userId, ownerId }: { userId: string | undefined; ownerId: string | null }): 'allow' | 'sign-in' {
+  return userId !== undefined && ownerId !== null && userId === ownerId ? 'allow' : 'sign-in';
+}
+
+// Where to go after signing in: a path on this site only, never back to the login or its endpoints.
+export function safeNextPath(next: string | null | undefined): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return '/';
+  // A browser drops tab, CR and LF and reads a backslash as a slash, so "/\t/evil.example" would
+  // become "//evil.example", another site: refuse control characters and backslashes anywhere,
+  // then check that the path still resolves on this site.
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return '/';
+  const base = 'https://this.site';
+  try {
+    if (new URL(next, base).origin !== base) return '/';
+  } catch {
+    return '/';
+  }
+  const path = next.split(/[?#]/)[0];
+  if (path === '/login' || path.startsWith('/api/auth')) return '/';
+  return next;
+}
+
+// A sign-in form must be posted from this site (the browser sets Origin on every form post).
+export function sameOrigin(headers: Headers): boolean {
+  const origin = headers.get('origin');
+  const host = headers.get('x-forwarded-host') ?? headers.get('host');
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}

@@ -4,7 +4,7 @@ import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup'
 import { payPalOrderBinder } from '@/lib/guard/adapters/paypal-order-binder';
 import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
 
-const payPalToolkit = vi.fn(async (actions: unknown) => ({ toolkit: actions }));
+const payPalToolkit = vi.fn(async (actions: unknown, environment?: unknown) => ({ toolkit: actions, environment }));
 const createPaymentGuard = vi.fn((deps: unknown) => ({ guard: deps }));
 const runSalesAgent = vi.fn();
 const shop = {
@@ -16,7 +16,7 @@ const shop = {
 
 vi.mock('./handle-ticket', () => ({
   llmConfig: async () => ({ baseUrl: 'https://llm.test', apiKey: 'k', agentModel: 'agent-m', judgeModel: 'judge-m', headers: {} }),
-  payPalToolkit: (actions: unknown) => payPalToolkit(actions),
+  payPalToolkit: (actions: unknown, environment?: unknown) => payPalToolkit(actions, environment),
   heldNotifier: () => 'NOTIFIER',
 }));
 vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => shop }));
@@ -48,7 +48,7 @@ describe('handleSalesChat', () => {
 
     expect(SALES_ACTIONS).toEqual({ orders: { create: true, get: true } });
     expect(payPalToolkit).toHaveBeenCalledTimes(1);
-    expect(payPalToolkit).toHaveBeenCalledWith(SALES_ACTIONS);
+    expect(payPalToolkit).toHaveBeenCalledWith(SALES_ACTIONS, 'sandbox');
   });
 
   it('puts the guard in front of the toolkit with the writer as mandate, the sales policy and the catalogue, shop origin and order binder', async () => {
@@ -62,7 +62,7 @@ describe('handleSalesChat', () => {
       judge: 'JUDGE',
       captures: payPalCaptureLookup,
       orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
-      audit: 'AUDIT',
+      audit: expect.objectContaining({ environment: 'sandbox', log: 'AUDIT' }),
       limits: shop.limits,
       notifier: 'NOTIFIER',
     });
@@ -118,5 +118,15 @@ describe('handleSalesChat', () => {
     expect(result.reply).toContain(link);
     expect(result.reply).not.toContain('thief@outside.example');
     expect(result.redacted).toEqual({ ticket: 1, reply: 1 });
+  });
+
+  it('runs a live request on live PayPal: the toolkit, the lookups and every logged decision', async () => {
+    runSalesAgent.mockResolvedValue({ reply: 'Done', steps: [] });
+
+    await handleSalesChat(chat, 'careful', { environment: 'live' });
+
+    expect(payPalToolkit).toHaveBeenCalledWith(SALES_ACTIONS, 'live');
+    expect(guardDeps().audit).toMatchObject({ environment: 'live' });
+    expect(guardDeps().captures).not.toBe(payPalCaptureLookup);
   });
 });

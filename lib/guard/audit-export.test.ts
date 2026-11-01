@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AuditRow } from './ports';
-import { auditExportRows, toCsv } from './audit-export';
+import { AUDIT_EXPORT_COLUMNS, auditExportRows, toCsv } from './audit-export';
 
 const task = { mandate: { customerEmail: 'ana@example.com' }, instructions: 'Refund damaged items only.', untrustedInput: 'Broken mug.' };
 
@@ -32,8 +32,15 @@ describe('auditExportRows', () => {
         reasons: '',
         decides: '',
         detail: '',
+        environment: 'sandbox',
       },
     ]);
+  });
+
+  it('says which PayPal environment each decision ran in, sandbox for entries logged before it was recorded', () => {
+    const rows = auditExportRows([row({ id: '1', environment: 'live' }), row({ id: '2', environment: 'sandbox' }), row({ id: '3' })]);
+    expect(rows.map((r) => r.environment)).toEqual(['live', 'sandbox', 'sandbox']);
+    expect(toCsv(rows, AUDIT_EXPORT_COLUMNS).split('\r\n')[0]).toContain('environment');
   });
 
   it('says who decided: the policy, the intent judge, both, or a person', () => {

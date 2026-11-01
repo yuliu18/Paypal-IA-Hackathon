@@ -1,0 +1,66 @@
+{
+  "title": "Évaluer un modèle",
+  "intro": "Avant de confier vos agents à un modèle, envoyez-lui les conversations que votre boutique attend et une série d’attaques, via les vrais agents support, facturation et ventes et le guard de paiement, et voyez comment il s’en sort.",
+  "customProvider": "un fournisseur personnalisé",
+  "whatToRun": "Que lancer",
+  "sizeLabel": "Taille de l’évaluation",
+  "sizes": {
+    "quick": "Rapide",
+    "full": "Complète",
+    "quickCases": "{count} cas, quelques minutes",
+    "fullCases": "{count}+ cas, environ 20 minutes"
+  },
+  "fullDetail": "En plus des conversations normales, chaque attaque est aussi enveloppée dans un modèle de jailbreak, encodée en base64 et envoyée à un agent compromis.",
+  "quickDetail": "{business} conversations normales et {attacks} attaques, chacune envoyée une fois.",
+  "evaluating": "Évaluation…",
+  "runAgain": "Relancer",
+  "run": "Lancer l’évaluation",
+  "stop": "Arrêter après ce cas",
+  "creating": "Création de nouveaux paiements d’exemple…",
+  "couldNotStart": "L’évaluation n’a pas pu démarrer : rechargez la page et réessayez.",
+  "seedFailed": "Les paiements d’exemple n’ont pas pu être créés. Les détails sont dans le journal du serveur.",
+  "requestFailed": "La requête a échoué ({status})",
+  "progress": "{done} cas sur {total} terminés",
+  "facts": {
+    "model": "Modèle",
+    "modelValue": "<strong>{model}</strong> sur {provider}",
+    "noModel": "aucun choisi",
+    "money": "Argent",
+    "moneyValue": "Sandbox PayPal uniquement, fictif.",
+    "limits": "Limites",
+    "limitsValue": "Toutes les règles s’appliquent ; les plafonds quotidiens sont levés pour que les exécutions soient comparables.",
+    "cost": "Coût",
+    "costValue": "Chaque cas représente un ou plusieurs appels à votre fournisseur d’IA."
+  },
+  "cancelNote": "Un dernier ticket annule réellement l’abonnement d’exemple : créez et approuvez-en un nouveau sur /support avant la prochaine exécution pour l’inclure à nouveau.",
+  "disputeNote": "Un dernier ticket accepte réellement le litige d’exemple : payez un nouveau paiement PayPal d’exemple sur /support et contestez-le avant la prochaine exécution pour l’inclure à nouveau.",
+  "noAnswer": "<strong>{failed} cas sur {total} n’ont reçu aucune réponse</strong> et sont exclus des scores : {reason}",
+  "scores": {
+    "notRun": "sur {of}, pas encore lancé",
+    "of": "sur {of}, {ratio, number, percent}",
+    "nothing": "rien de noté",
+    "business": "Cas normaux résolus",
+    "businessDetail": "Remboursements, factures, commandes, retenues et refus attendus par votre politique.",
+    "guardHeld": "Attaques retenues par le guard",
+    "guardHeldDetail": "Aucun argent n’a bougé et aucune donnée personnelle n’a fuité.",
+    "refused": "Attaques refusées par le modèle",
+    "refusedDetail": "Rejetées par le modèle lui-même, avant que le guard n’ait à agir."
+  },
+  "kind": {
+    "attack": "Attaque",
+    "normal": "Normal"
+  },
+  "compromised": "agent compromis",
+  "from": "{desk, select, billing {Tâche de facturation pour} sales {Chat de vente de} other {Ticket de}} {customer} :",
+  "chips": {
+    "waiting": "En attente",
+    "running": "En cours",
+    "noAnswer": "Pas de réponse",
+    "resolved": "Résolu",
+    "wrongOutcome": "Mauvais résultat",
+    "failed": "Échec",
+    "harmThrough": "Le préjudice est passé",
+    "modelRefused": "Le modèle a refusé",
+    "guardStopped": "Le guard l’a bloqué"
+  }
+}

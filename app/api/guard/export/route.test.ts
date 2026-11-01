@@ -25,8 +25,8 @@ describe('GET /api/guard/export', () => {
     expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="guard-log-\d{4}-\d{2}-\d{2}\.csv"$/);
     const [header, line] = (await res.text()).split('\r\n');
-    expect(header).toBe('id,at,tool,outcome,verdict,decidedBy,customer,moved,currency,codes,reasons,decides,detail');
-    expect(line).toBe('1,2026-10-21T10:00:00.000Z,create_refund,blocked,block,policy,a***@example.com,,,CUSTOMER_MISMATCH,Not her order,,');
+    expect(header).toBe('id,at,tool,outcome,verdict,decidedBy,customer,moved,currency,codes,reasons,decides,detail,environment');
+    expect(line).toBe('1,2026-10-21T10:00:00.000Z,create_refund,blocked,block,policy,a***@example.com,,,CUSTOMER_MISMATCH,Not her order,,,sandbox');
   });
 
   it('downloads JSON when asked', async () => {

@@ -4,11 +4,13 @@
 // takes the payment here, and only for an order the guard itself created and bound to a customer.
 
 import { ORDER_ID } from '@/lib/guard/domain/order';
-import type { AuditLog } from '@/lib/guard/ports';
+import type { AuditLog, PaymentEnvironment } from '@/lib/guard/ports';
 import { appBase, demoClient, type DemoDeps } from '@/lib/demo-paypal-client';
 
 export const SALES_RETURN_PATH = '/api/sales/paypal-return';
-export const SALES_CANCEL_PATH = '/sales?order=cancelled';
+// Where the buyer lands, paid or not: a public page (app/checkout), since buyers never sign in.
+export const CHECKOUT_RESULT_PATH = '/checkout';
+export const SALES_CANCEL_PATH = `${CHECKOUT_RESULT_PATH}?order=cancelled`;
 
 // The shop's origin, the only place the guard lets an order send the buyer back to: APP_URL, else
 // the local dev server, as the sample payments' return links (lib/demo-paypal-client.ts appBase).
@@ -39,17 +41,20 @@ export type GuardOrderRecords = Pick<AuditLog, 'boundOrderCustomer'>;
 // captures nothing: an order created outside the guard (any merchant app could set a custom_id), a
 // log that can't be read, another customer, an extra purchase unit, an order not approved yet, or
 // one already paid.
+// `deps.environment`: where the order was created (checkoutEnvironment); the log must record the
+// guard creating it in that same environment. The sandbox by default.
 export async function completeSalesOrder(orderId: string, records: GuardOrderRecords, deps: DemoDeps = {}): Promise<CompletedSale> {
   if (!ORDER_ID.test(orderId)) throw new Error(`${orderId.slice(0, 40)} is not a PayPal order id`);
+  const environment: PaymentEnvironment = deps.environment === 'live' ? 'live' : 'sandbox';
   let boundTo: string | undefined;
   try {
-    boundTo = await records.boundOrderCustomer(orderId);
+    boundTo = await records.boundOrderCustomer(orderId, environment);
   } catch (error) {
     throw new Error(`Order ${orderId} could not be checked against the payment guard's log: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!boundTo) throw new Error(`Order ${orderId} is not an order the payment guard created for a customer`);
 
-  const { call } = demoClient(deps);
+  const { call } = demoClient({ ...deps, environment });
   const path = `/v2/checkout/orders/${orderId}`;
   const order = await call<Order>('GET', path);
   const units = order.purchase_units ?? [];
@@ -65,4 +70,13 @@ export async function completeSalesOrder(orderId: string, records: GuardOrderRec
   const captureId = captured.purchase_units?.[0]?.payments?.captures?.[0]?.id;
   if (!captureId) throw new Error(`Order ${orderId} was captured without a capture id`);
   return { orderId, captureId, customerEmail, amount: `${unit?.amount?.value ?? '?'} ${unit?.amount?.currency_code ?? ''}`.trim() };
+}
+
+// The PayPal environment to capture a returning buyer's order in. The buyer's redirect carries no
+// API key, so it comes from the guard's log: live only for an order the guard created on live
+// PayPal, while live mode is still on (`liveActive`, lib/settings/live-mode.ts); otherwise the
+// sandbox, where a live order is not found and nothing is captured.
+export async function checkoutEnvironment(orderId: string, records: GuardOrderRecords, { liveActive }: { liveActive: boolean }): Promise<PaymentEnvironment> {
+  if (!liveActive || !ORDER_ID.test(orderId)) return 'sandbox';
+  return (await records.boundOrderCustomer(orderId, 'live')) ? 'live' : 'sandbox';
 }

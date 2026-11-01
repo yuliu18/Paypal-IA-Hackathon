@@ -1,18 +1,20 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 
 // Shown when the PayPal API can't be reached, or rejects the request, while loading an endpoint page.
 export default function EndpointError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+  const t = useTranslations('guard.error');
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   return (
     <main className="flex min-h-0 flex-1 flex-col bg-pp-canvas px-8 py-6 font-paypal text-pp-ink">
-      <h1 className="text-[28px] font-semibold text-pp-navy">We couldn&apos;t load this PayPal data</h1>
+      <h1 className="text-[28px] font-semibold text-pp-navy">{t('title')}</h1>
       <p className="mt-2 text-sm text-pp-muted">
-        Check the API credentials in <code>.env.local</code>, and that the sandbox app has the features this endpoint needs.
+        {t.rich('detail', { file: '.env.local', code: (chunks) => <code>{chunks}</code> })}
       </p>
       <pre className="mt-4 whitespace-pre-wrap rounded-lg border border-pp-border bg-white p-4 font-mono text-xs text-pp-muted">
         {error.message}
@@ -22,7 +24,7 @@ export default function EndpointError({ error, retry }: { error: Error & { diges
         onClick={retry}
         className="mt-4 h-10 self-start rounded-full bg-pp-blue px-5 font-semibold text-white hover:bg-pp-blue-dark"
       >
-        Try again
+        {t('retry')}
       </button>
     </main>
   );

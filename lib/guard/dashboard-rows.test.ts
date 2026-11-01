@@ -192,9 +192,9 @@ describe('guardDashboardRows', () => {
 });
 
 describe('readGuardDashboardRows', () => {
-  it('reads the newest entries up to the limit', () => {
+  it('reads the newest entries up to the limit', async () => {
     let asked = 0;
-    const rows = readGuardDashboardRows((limit) => {
+    const rows = await readGuardDashboardRows(async (limit) => {
       asked = limit;
       return [row({ id: '1' })];
     }, 5000);
@@ -202,11 +202,19 @@ describe('readGuardDashboardRows', () => {
     expect(rows.guardDecisions).toHaveLength(1);
   });
 
-  it('returns empty tables when the log cannot be read, so the rest of the dashboard still loads', () => {
+  it('returns empty tables when the log cannot be read, so the rest of the dashboard still loads', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const rows = readGuardDashboardRows(() => {
+    const rows = await readGuardDashboardRows(() => {
       throw new Error('database is locked');
     }, 5000);
+    expect(rows).toEqual({ guardDecisions: [], guardViolations: [] });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('returns empty tables when the database rejects the read', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rows = await readGuardDashboardRows(() => Promise.reject(new Error('connection terminated')), 5000);
     expect(rows).toEqual({ guardDecisions: [], guardViolations: [] });
     expect(error).toHaveBeenCalled();
     error.mockRestore();

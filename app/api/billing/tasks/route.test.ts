@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const handleBillingTask = vi.fn();
 vi.mock('@/lib/agent/handle-billing-task', () => ({ handleBillingTask: (...args: unknown[]) => handleBillingTask(...args) }));
+// The shop's mode for the live-mode cases; test mode with no live app unless a case says otherwise.
+let settings: Record<string, unknown> = { mode: 'test', paypalLive: { clientId: '', secret: '' } };
+vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => settings }));
 
 const { POST } = await import('./route');
 
@@ -35,7 +38,7 @@ describe('POST /api/billing/tasks', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reply: 'Done', steps: [] });
-    expect(handleBillingTask).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, 'vulnerable');
+    expect(handleBillingTask).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, 'vulnerable', { environment: 'sandbox' });
   });
 
   it('rejects an invalid email with its validation message', async () => {
@@ -99,6 +102,56 @@ describe('POST /api/billing/tasks', () => {
     const mode = await post({ ...task, agent: 'rogue' });
     expect(mode.status).toBe(400);
     expect(await mode.json()).toEqual({ error: { message: 'agent must be "careful" or "vulnerable".' } });
+    expect(handleBillingTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('the PayPal environment of api/billing/tasks', () => {
+  const LIVE = { mode: 'live', paypalLive: { clientId: 'live-id', secret: 'live-secret' } };
+  const send = (agent: string, headers: Record<string, string> = {}, client = '10.9.0.1') =>
+    POST(new Request('http://test/api/billing/tasks', { method: 'POST', body: JSON.stringify({ ...{ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, agent }), headers: { 'x-forwarded-for': client, ...headers } }));
+  const apiKey = { 'x-pg-auth': 'api-key:key-1' };
+
+  afterEach(() => {
+    handleBillingTask.mockReset();
+    settings = { mode: 'test', paypalLive: { clientId: '', secret: '' } };
+    vi.unstubAllEnvs();
+  });
+
+  it('runs an API-key request on live PayPal when live mode is really on', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    handleBillingTask.mockResolvedValue({ reply: 'Done', steps: [] });
+    expect((await send('careful', apiKey, '10.9.0.2')).status).toBe(200);
+    expect(handleBillingTask.mock.calls[0]).toEqual([{ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, 'careful', { environment: 'live' }]);
+  });
+
+  it('keeps the owner\'s own requests (the test pages) on the sandbox in live mode', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    handleBillingTask.mockResolvedValue({ reply: 'Done', steps: [] });
+    await send('careful', {}, '10.9.0.3');
+    expect(handleBillingTask.mock.calls[0][2]).toMatchObject({ environment: 'sandbox' });
+  });
+
+  it.each([
+    ['the server does not allow live mode', undefined, LIVE],
+    ['the live app is missing', 'true', { mode: 'live', paypalLive: { clientId: 'live-id', secret: '' } }],
+    ['the owner left test mode on', 'true', { ...LIVE, mode: 'test' }],
+  ])('fails closed to the sandbox for an API-key request when %s', async (_why, allow, saved) => {
+    if (allow) vi.stubEnv('ALLOW_LIVE_MODE', allow);
+    settings = saved;
+    handleBillingTask.mockResolvedValue({ reply: 'Done', steps: [] });
+    await send('careful', apiKey, '10.9.0.4');
+    expect(handleBillingTask.mock.calls[0][2]).toMatchObject({ environment: 'sandbox' });
+  });
+
+  it('never runs the vulnerable agent with real money', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    const res = await send('vulnerable', apiKey, '10.9.0.5');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: 'agent "vulnerable" runs only on the PayPal sandbox, never in live mode.' } });
     expect(handleBillingTask).not.toHaveBeenCalled();
   });
 });

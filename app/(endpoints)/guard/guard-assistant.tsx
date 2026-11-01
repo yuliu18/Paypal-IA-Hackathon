@@ -5,9 +5,12 @@
 // rejecting stay with the held queue above.
 
 import { useState, type FormEvent } from 'react';
+import { useTranslations } from 'next-intl';
 import { ASSISTANT_MAX_QUESTION } from '@/lib/guard/assistant';
+import { Spinner } from '../../ui/desk';
 
-const SUGGESTED = ['Why was the last refund blocked?', 'Summarise today', 'What is waiting for me?', 'Which customers were stopped most?'];
+// Message keys (guard.assistant.suggestions) of the suggested questions.
+const SUGGESTED = ['lastRefund', 'today', 'waiting', 'stoppedCustomers'] as const;
 
 // React escapes the text, and nothing parses it as markdown or HTML.
 export function AssistantAnswer({ answer }: { answer: string }) {
@@ -17,6 +20,7 @@ export function AssistantAnswer({ answer }: { answer: string }) {
 type Reply = { answer: string } | { error: string } | null;
 
 export function GuardAssistant() {
+  const t = useTranslations('guard.assistant');
   const [question, setQuestion] = useState('');
   const [reply, setReply] = useState<Reply>(null);
   const [pending, setPending] = useState(false);
@@ -33,28 +37,27 @@ export function GuardAssistant() {
       });
       const body = (await res.json().catch(() => ({}))) as { answer?: unknown; error?: { message?: unknown } };
       if (res.ok && typeof body.answer === 'string') setReply({ answer: body.answer });
-      else setReply({ error: typeof body.error?.message === 'string' ? body.error.message : 'The guard assistant failed.' });
+      else setReply({ error: typeof body.error?.message === 'string' ? body.error.message : t('failed') });
     } catch {
-      setReply({ error: 'The guard assistant could not be reached.' });
+      setReply({ error: t('unreachable') });
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <section className="mt-5 rounded-lg border border-pp-border bg-pp-surface px-5 py-4">
-      <h2 className="text-lg font-semibold text-pp-navy">Guard assistant</h2>
+    <section className="rounded-lg border border-pp-border bg-pp-surface px-5 py-4">
+      <h2 className="text-lg font-semibold">{t('title')}</h2>
       <p className="mt-1 text-sm text-pp-muted">
-        Ask about the guard&apos;s decisions. It reads the newest entries of the log, masked and without the tickets&apos; text, and can only explain:
-        it can&apos;t approve, reject or change rules.
+        {t('intro')}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {SUGGESTED.map((suggestion) => (
+        {SUGGESTED.map((key) => t(`suggestions.${key}`)).map((suggestion) => (
           <button
             key={suggestion}
             type="button"
             onClick={() => setQuestion(suggestion)}
-            className="rounded-full border border-pp-border px-3 py-1 text-xs font-semibold text-pp-blue hover:bg-pp-highlight"
+            className="rounded-md border border-pp-border px-2.5 py-1 text-left text-xs font-semibold text-pp-blue hover:border-pp-blue"
           >
             {suggestion}
           </button>
@@ -65,16 +68,17 @@ export function GuardAssistant() {
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           maxLength={ASSISTANT_MAX_QUESTION}
-          placeholder="Ask about the guard's decisions"
-          aria-label="Question for the guard assistant"
-          className="min-w-0 flex-1 rounded border border-pp-border px-3 py-1.5 text-sm"
+          placeholder={t('placeholder')}
+          aria-label={t('inputLabel')}
+          className="min-w-0 flex-1 rounded-md border border-pp-border px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
           disabled={pending || !question.trim()}
-          className="rounded bg-pp-blue px-4 py-1.5 text-sm font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-md bg-pp-blue px-4 py-1.5 text-sm font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60"
         >
-          {pending ? 'Thinking…' : 'Ask'}
+          {pending && <Spinner />}
+          {pending ? t('thinking') : t('ask')}
         </button>
       </form>
       {reply && ('answer' in reply ? <AssistantAnswer answer={reply.answer} /> : <p className="mt-3 text-sm text-pp-danger">{reply.error}</p>)}

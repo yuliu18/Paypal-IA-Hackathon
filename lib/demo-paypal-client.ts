@@ -1,18 +1,20 @@
 // A small PayPal REST client for the demo's sample data (lib/demo-subscription.ts,
-// lib/demo-dispute-payment.ts). Sandbox only, like everything the demo creates.
+// lib/demo-dispute-payment.ts) and the shop's checkout (lib/shop/checkout.ts). The sandbox, like
+// everything the demo creates, unless the checkout passes the environment of a live order.
 
-import { accessToken, PAYPAL_API, PayPalApiError } from './paypal.ts';
+import { accessToken, payPalApi, PayPalApiError, type PaymentEnvironment } from './paypal.ts';
 
 // `appUrl`: where PayPal sends the buyer back after approving; without a return URL its checkout
 // loops back to the login instead of completing.
-export type DemoDeps = { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; file?: string; appUrl?: string };
+// `environment`: only the checkout of a live order passes 'live'; the sample data never does.
+export type DemoDeps = { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; file?: string; appUrl?: string; environment?: PaymentEnvironment };
 
 // The app's base URL for PayPal's return links: the request's origin, else APP_URL, else local.
 export const appBase = (appUrl?: string) => (appUrl || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
-export function demoClient({ fetch = globalThis.fetch, token = accessToken }: DemoDeps) {
+export function demoClient({ environment = 'sandbox', fetch = globalThis.fetch, token = () => accessToken(environment) }: DemoDeps) {
   async function call<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${PAYPAL_API}${path}`, {
+    const res = await fetch(`${payPalApi(environment)}${path}`, {
       method,
       headers: {
         Authorization: `Bearer ${await token()}`,

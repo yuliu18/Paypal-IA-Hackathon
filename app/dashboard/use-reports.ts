@@ -2,9 +2,11 @@
 
 import { useRef, useState } from 'react';
 import { findReport, loadReports, saveReports, upsert, type SavedReport, type StoredReports } from './reports-store';
+import type { Translate } from './translate';
 
-export function useReports() {
-  const [store, setStore] = useState(loadReports);
+// `t` builds the built-in report in the app's language when no edited copy of it is saved.
+export function useReports(t: Translate) {
+  const [store, setStore] = useState(() => loadReports(t));
   // The latest reports, for handlers that run one after another before React re-renders.
   const storeRef = useRef(store);
 

@@ -1,6 +1,7 @@
 import { handleSalesChat } from '@/lib/agent/handle-sales-chat';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
 import { clientAddress } from '@/lib/demo-auth';
+import { requestEnvironment } from '@/lib/settings/live-mode';
 import { shopOrigin } from '@/lib/shop/checkout';
 
 // Runs the demo sales agent on one customer message: the customer who writes wants to buy from the
@@ -33,6 +34,18 @@ export async function POST(request: Request) {
   if (message.length > MAX_MESSAGE_LENGTH) return error(400, `message must be at most ${MAX_MESSAGE_LENGTH} characters.`);
   if (agent !== 'careful' && agent !== 'vulnerable') return error(400, 'agent must be "careful" or "vulnerable".');
 
+  // Live PayPal (real money) only for an API-key request while live mode is really on
+  // (lib/settings/live-mode.ts); the test pages, with the owner's session, always get the sandbox.
+  let environment: Awaited<ReturnType<typeof requestEnvironment>>;
+  try {
+    environment = await requestEnvironment(request.headers);
+  } catch (cause) {
+    console.error('The PayPal environment could not be decided', cause);
+    return error(502, 'The settings could not be read. Try again in a moment.');
+  }
+  // The vulnerable agent is a demonstration: it never runs with real money.
+  if (environment === 'live' && agent === 'vulnerable') return error(400, 'agent "vulnerable" runs only on the PayPal sandbox, never in live mode.');
+
   const slot = chats.acquire(clientAddress(request.headers), Date.now());
   if (!slot.ok) {
     const seconds = Math.ceil(slot.retryAfterMs / 1000);
@@ -45,7 +58,7 @@ export async function POST(request: Request) {
 
   try {
     // The buyer comes back to the shop's own origin (APP_URL, else the local dev server), never one the request names.
-    return Response.json(await handleSalesChat({ customerEmail, message }, agent, { shopOrigin: shopOrigin() }));
+    return Response.json(await handleSalesChat({ customerEmail, message }, agent, { shopOrigin: shopOrigin(), environment }));
   } catch (cause) {
     // The cause can carry provider responses or configuration names, so it stays in the server log.
     console.error('Sales agent failed', cause);

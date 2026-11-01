@@ -1,0 +1,27 @@
+{
+  "tagline": "Firewall for AI agents on PayPal",
+  "expand": "Expand menu",
+  "collapse": "Collapse menu",
+  "groups": {
+    "test": "Test a model",
+    "sandbox": "Sandbox"
+  },
+  "items": {
+    "overview": "Overview",
+    "guard": "Guard log",
+    "dashboard": "Dashboard",
+    "support": "Support",
+    "billing": "Billing",
+    "sales": "Sales",
+    "evaluate": "Evaluate a model",
+    "settings": "Settings",
+    "apiDocs": "API docs"
+  },
+  "signOut": "Sign out",
+  "apiDocs": {
+    "title": "API docs",
+    "intro": "Your shop's own app calls these three endpoints with an API key from Settings › API keys. Use Authorize to paste a key and try them here: with a key, a request runs on live PayPal while live mode is on; without one, your session is used and it always runs on the sandbox.",
+    "download": "Download the OpenAPI document",
+    "failed": "Swagger UI could not load (it comes from cdn.jsdelivr.net). The OpenAPI document is still available below."
+  }
+}

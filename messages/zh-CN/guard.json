@@ -1,0 +1,105 @@
+{
+  "title": "守卫日志",
+  "summary": "你的代理向 PayPal 发出的每一次调用，以及守卫如何处理它。被暂扣和被拦截的调用从未到达 PayPal。",
+  "chain": {
+    "tampered": "<strong>黑匣子已被篡改：</strong>第 #{row} 行 {reason}。从该行起的记录均不可信。",
+    "intact": "黑匣子完好，共 {count, number} 行",
+    "howChain": "每一行都带有前一行的哈希值，因此任何被编辑、重排或删除的行都会破坏链条。",
+    "howCheck": "每次访问都会检查新行，旧行至少每分钟完整检查一次。",
+    "howHead": "从头重写的日志同样能形成链条：请在别处保存链头 {head}… 的副本，以便发现这种情况。"
+  },
+  "tally": {
+    "latest": "最近 {count, number} 项决定中",
+    "figure": "{n, number}",
+    "passed": "已转交 PayPal",
+    "waiting": "等待你处理",
+    "stopped": "已拦截"
+  },
+  "download": {
+    "label": "下载 {format}",
+    "title": "守卫的每一项决定，以及由谁做出。邮箱和卡号均已遮蔽。"
+  },
+  "amount": {
+    "unreadable": "金额无法读取",
+    "fullRemaining": "剩余全部金额"
+  },
+  "columns": {
+    "id": "#",
+    "at": "时间",
+    "tool": "工具",
+    "outcome": "结果",
+    "verdict": "裁决",
+    "amount": "金额",
+    "customer": "工单客户",
+    "reasons": "原因",
+    "args": "参数",
+    "detail": "详情",
+    "decides": "处理的暂扣记录",
+    "environment": "环境"
+  },
+  "grid": {
+    "search": "搜索所有列…",
+    "searchLabel": "搜索所有列"
+  },
+  "loading": "正在加载 PayPal 数据…",
+  "error": {
+    "title": "无法加载这些 PayPal 数据",
+    "detail": "请检查 <code>{file}</code> 中的 API 凭据，并确认沙盒应用具备此端点所需的功能。",
+    "retry": "重试"
+  },
+  "held": {
+    "title": "等待你批准",
+    "running": "正在交由守卫检查…",
+    "count": "{count, number} 项已暂扣",
+    "intro": "批准后，该调用会在 PayPal 看到之前再次经过守卫的检查。",
+    "empty": "目前没有暂扣的调用。",
+    "showFirst": "只显示前 {count} 项",
+    "showAll": "显示全部 {count} 项",
+    "heading": "<strong>{action}</strong>{hasAmount, select, yes { {amount}} other {}}<muted>，客户 {customer}</muted>",
+    "why": "原因",
+    "approve": "批准",
+    "reject": "拒绝",
+    "kinds": {
+      "refund": "退款",
+      "cancellation": "取消订阅",
+      "dispute": "接受争议索赔",
+      "invoice": "创建发票",
+      "order": "创建订单",
+      "invoiceSending": "发送发票",
+      "invoiceReminder": "发送发票提醒"
+    },
+    "reasons": {
+      "approvalRequired": "超出审批限额",
+      "intentUncertain": "AI 评判不确定",
+      "intentJudgeUnavailable": "AI 评判不可用"
+    },
+    "invalidRequest": "无效的决定请求",
+    "failed": "无法处理该决定；未记录任何内容。",
+    "live": "真实 · 真实资金"
+  },
+  "assistant": {
+    "title": "询问这些决定",
+    "intro": "询问守卫的决定。它读取日志中最新的记录（已遮蔽，且不含工单正文），只能解释：不能批准、拒绝或修改规则。",
+    "suggestions": {
+      "lastRefund": "为什么上一笔退款被拦截了？",
+      "today": "总结一下今天",
+      "waiting": "有什么在等我处理？",
+      "stoppedCustomers": "哪些客户被拦截得最多？"
+    },
+    "placeholder": "询问守卫的决定",
+    "inputLabel": "向守卫助手提问",
+    "thinking": "思考中…",
+    "ask": "提问",
+    "failed": "守卫助手出错了。",
+    "unreachable": "无法连接守卫助手。"
+  },
+  "environment": {
+    "sandbox": "沙盒",
+    "live": "真实"
+  },
+  "liveMode": {
+    "on": "真实模式已开启：你店铺应用的调用会转移真实资金。",
+    "failClosed": "真实模式已开启，但此服务器以测试模式运行：所有调用都使用沙盒。",
+    "settings": "模式设置"
+  }
+}

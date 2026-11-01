@@ -1,0 +1,100 @@
+{
+  "title": "Vue d'ensemble",
+  "hero": {
+    "heading": "Un pare-feu entre vos agents IA et votre compte PayPal.",
+    "intro": "Vos agents de support, de facturation et de vente n’atteignent PayPal qu’à travers le guard. Il vérifie chaque appel par rapport à vos règles et à la demande du client lui-même, retient les appels risqués pour que vous les approuviez et bloque les autres avant que PayPal ne les voie. Un modèle trompé ou défaillant ne peut pas déplacer de l’argent qu’il ne devrait pas.",
+    "trySupport": "Essayez de tromper l’agent de support",
+    "seeDecisions": "Voir toutes les décisions"
+  },
+  "tally": {
+    "none": "Vos agents n’ont encore fait aucun appel à PayPal.",
+    "opening": "Vos agents ont fait {calls, plural, one {# appel à PayPal} other {# appels à PayPal}}",
+    "onlyOutcome": {
+      "allowed": "{opening} et {calls, plural, one {il est passé} other {tous sont passés}}.",
+      "held": "{opening} et {calls, plural, one {il a été retenu pour vous} other {tous ont été retenus pour vous}}.",
+      "blocked": "{opening} et {calls, plural, one {il a été bloqué} other {tous ont été bloqués}}."
+    },
+    "outcome": {
+      "allowed": "{count, plural, one {# est passé} other {# sont passés}}",
+      "held": "{count, plural, one {# a été retenu pour vous} other {# ont été retenus pour vous}}",
+      "blocked": "{count, plural, one {# a été bloqué} other {# ont été bloqués}}"
+    },
+    "mixed": "{opening}. {outcomes}.",
+    "listTwo": "{first} et {second}",
+    "listThree": "{first}, {second} et {third}"
+  },
+  "checkpoint": {
+    "heading": "Derniers appels au guard",
+    "guardLog": "Journal du guard",
+    "empty": "Aucun agent n’a encore appelé PayPal. Envoyez un ticket sur la <link>page du support</link> et ses appels apparaîtront ici.",
+    "call": "<strong>{action}</strong>{hasAmount, select, yes { de {amount}} other {}}<muted> pour {customer}</muted>",
+    "byAgent": "Agent de {agent}, {time}",
+    "agents": {
+      "support": "support",
+      "billing": "facturation",
+      "sales": "vente"
+    },
+    "actions": {
+      "refund": "Remboursement",
+      "disputeAcceptance": "Acceptation de litige",
+      "cancellation": "Annulation",
+      "invoice": "Facture",
+      "invoiceSending": "Envoi de facture",
+      "reminder": "Relance",
+      "order": "Commande",
+      "other": "Autre"
+    },
+    "timeAgo": {
+      "justNow": "à l’instant",
+      "minutes": "il y a {n} min",
+      "hours": "il y a {n} h",
+      "days": "{n, plural, one {il y a # jour} other {il y a # jours}}"
+    }
+  },
+  "agents": {
+    "heading": "Mettez un agent au travail",
+    "intro": "Chacun a ses propres outils PayPal et le même guard. Demandez-lui quelque chose de normal, puis essayez de le tromper.",
+    "tryToFool": "Essayez de le tromper",
+    "support": {
+      "title": "Agent de support",
+      "does": "Répond au ticket d’un client : rembourse une commande, accepte un litige, annule un abonnement.",
+      "open": "Ouvrir le poste du support"
+    },
+    "billing": {
+      "title": "Agent de facturation",
+      "does": "Facture les clients de la boutique : crée et envoie des factures PayPal, envoie des relances.",
+      "open": "Ouvrir le poste de facturation"
+    },
+    "sales": {
+      "title": "Agent de vente",
+      "does": "Vend le catalogue : crée la commande PayPal que le client paie.",
+      "open": "Ouvrir le poste de vente"
+    }
+  },
+  "evaluate": {
+    "heading": "Testez un modèle avant de lui faire confiance",
+    "intro": "L’évaluation exécute les tickets que votre boutique attend et une série d’attaques contre le modèle choisi, et mesure à quelle fréquence il fait son travail et à quelle fréquence seul le guard a gardé l’argent en place.",
+    "link": "Évaluer un modèle"
+  },
+  "rules": {
+    "heading": "Vos règles pour {business}",
+    "passesAlone": "Passe tout seul",
+    "youApprove": "Vous approuvez",
+    "upTo": "jusqu’à {amount}",
+    "mostADay": "Maximum par jour",
+    "agentsAndJudge": "Agents et juge",
+    "customProvider": "Fournisseur personnalisé",
+    "noModel": "aucun modèle",
+    "noApiKey": " (pas de clé API)",
+    "paypal": "PayPal",
+    "sandbox": "Sandbox, argent fictif",
+    "noCredentials": "Pas encore d’identifiants d’app",
+    "change": "Modifier les règles",
+    "live": "Réel : argent réel pour l'app de votre boutique"
+  },
+  "liveMode": {
+    "on": "Le mode réel est activé : les appels de l'app de votre boutique déplacent de l'argent réel.",
+    "failClosed": "Le mode réel est activé, mais ce serveur fonctionne en mode test : chaque appel utilise le sandbox.",
+    "settings": "Réglages du mode"
+  }
+}

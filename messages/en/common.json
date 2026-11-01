@@ -1,0 +1,10 @@
+{
+  "appDescription": "A firewall between a shop's AI agents and its PayPal account: every payment call is checked, held for a person or stopped.",
+  "on": "On",
+  "off": "Off",
+  "verdicts": {
+    "passed": "Passed",
+    "held": "Held",
+    "stopped": "Stopped"
+  }
+}

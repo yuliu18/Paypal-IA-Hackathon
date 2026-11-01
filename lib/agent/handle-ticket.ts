@@ -3,24 +3,22 @@
 // Server-side only: it reads the shop's policy, limits and PayPal and LLM credentials from its settings.
 
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/mcp';
-import { accessToken } from '@/lib/paypal';
+import { accessToken, type PaymentEnvironment } from '@/lib/paypal';
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
 import { allNotifiers } from '@/lib/guard/adapters/all-notifiers';
 import { emailNotifier } from '@/lib/guard/adapters/email-channel';
 import { createTelegramNotifier } from '@/lib/guard/adapters/telegram-notifier';
 import { createWebhookNotifier } from '@/lib/guard/adapters/webhook-notifier';
-import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
-import { payPalDisputeLookup } from '@/lib/guard/adapters/paypal-dispute-lookup';
-import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
-import { payPalOrderBinder } from '@/lib/guard/adapters/paypal-order-binder';
+import { payPalAdapters } from '@/lib/guard/adapters/paypal-environment';
 import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
-import { payPalSubscriptionLookup } from '@/lib/guard/adapters/paypal-subscription-lookup';
+import { inEnvironment } from '@/lib/guard/environment-audit';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard, decideHeldCall, type HeldDecision } from '@/lib/guard/guard';
 import { auditLog } from '@/lib/guard/runtime';
 import { clientHeaders } from '@/lib/llm/openai-compatible';
 import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { withDefaultModels } from '@/lib/settings/catalog';
+import { liveModeStatus } from '@/lib/settings/live-mode';
 import { loadSettings, type ShopSettings } from '@/lib/settings/settings';
 import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
 import { checkoutUrls, shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
@@ -55,10 +53,13 @@ const SUPPORT_ACTIONS = { orders: { get: true }, payments: { createRefund: true 
 
 // The support agent never gets the invoice tools or create_order; only a person's approval of a
 // held invoice action or order (decideHeld) needs them to run it.
-export async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS) {
+// `environment`: the request's (lib/settings/live-mode.ts); the toolkit runs on live PayPal only
+// for exactly 'live' (its own default is live, so the sandbox is always asked for explicitly), and
+// a live token is refused unless live mode is really on (lib/paypal.ts accessToken).
+export async function payPalToolkit(actions: Record<string, Record<string, boolean>> = SUPPORT_ACTIONS, environment: PaymentEnvironment = 'sandbox') {
   return new PayPalAgentToolkit({
-    accessToken: await accessToken(),
-    configuration: { actions, context: { sandbox: true } },
+    accessToken: await accessToken(environment),
+    configuration: { actions, context: { sandbox: environment !== 'live' } },
   });
 }
 
@@ -79,14 +80,17 @@ export function heldNotifier(shop: ShopSettings) {
 export type Redactions = { ticket: number; reply: number };
 
 // `liftDailyCap`: for the /evaluate page's tickets only (lib/evaluation withoutDailyCap).
+// `environment`: the PayPal environment the request runs in (lib/settings/live-mode.ts
+// requestEnvironment); the sandbox unless the caller says otherwise.
 export async function handleTicket(
   received: SupportTicket,
   mode: AgentMode = 'careful',
-  { liftDailyCap = false }: { liftDailyCap?: boolean } = {},
+  { liftDailyCap = false, environment = 'sandbox' }: { liftDailyCap?: boolean; environment?: PaymentEnvironment } = {},
 ): Promise<{ reply: string; steps: AgentStep[]; redacted: Redactions }> {
   const shop = await loadSettings();
   const llm = await llmConfig(shop.ai);
-  const paypal = await payPalToolkit();
+  const paypal = await payPalToolkit(SUPPORT_ACTIONS, environment);
+  const { captures, subscriptions, disputes } = payPalAdapters(environment);
   // Agent, judge and black box all get the ticket without card numbers.
   const { ticket, removed: ticketRemoved } = privateTicket(received);
 
@@ -95,10 +99,10 @@ export async function handleTicket(
       upstream,
       task: { mandate: { customerEmail: ticket.customerEmail }, instructions: shop.business.refundPolicy, untrustedInput: ticket.message },
       judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
-      captures: payPalCaptureLookup,
-      subscriptions: payPalSubscriptionLookup,
-      disputes: payPalDisputeLookup,
-      audit: auditLog(),
+      captures,
+      subscriptions,
+      disputes,
+      audit: inEnvironment(auditLog(), environment),
       limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
       notifier: heldNotifier(shop),
     });
@@ -121,28 +125,46 @@ export async function handleTicket(
 // guard held. Approval re-checks the policy before PayPal runs it; an order is re-checked against
 // the catalogue and `shopOrigin` (lib/shop/checkout.ts shopOrigin), and bound to its customer once
 // created. Orders are created, never captured: only the shop's return route captures them.
+// The decision runs in the PayPal environment the held call was made in (its audit entry): a live
+// hold is approved on live PayPal, and only while live mode is on; a rejection never reaches PayPal.
 export async function decideHeld(heldId: string, approve: boolean, { shopOrigin = defaultShopOrigin() }: { shopOrigin?: string } = {}): Promise<HeldDecision> {
-  const { limits } = await loadSettings();
-  const paypal = await payPalToolkit({
+  const settings = await loadSettings();
+  const log = auditLog();
+  const held = await log.get(heldId);
+  const environment: PaymentEnvironment = held?.environment === 'live' ? 'live' : 'sandbox';
+  if (approve && environment === 'live' && !liveModeStatus(settings).active) {
+    return { outcome: 'refused', message: `Held entry ${heldId} ran on live PayPal and live mode is off now: turn live mode on in Settings to approve it, or reject it` };
+  }
+  const actions = {
     ...SUPPORT_ACTIONS,
     orders: { ...SUPPORT_ACTIONS.orders, create: true },
     invoices: { create: true, get: true, send: true, sendReminder: true },
-  });
+  };
+  // A rejection is recorded without calling PayPal, so it needs no token (and works for a live
+  // hold after live mode was turned off).
+  const paypal = approve ? await payPalToolkit(actions, environment) : rejectionToolkit(actions);
+  const { captures, subscriptions, disputes, invoices, binder } = payPalAdapters(environment);
   return withClient(paypal, 'payment-guard-approval', (upstream) =>
     decideHeldCall(
       {
         upstream,
-        captures: payPalCaptureLookup,
-        subscriptions: payPalSubscriptionLookup,
-        disputes: payPalDisputeLookup,
-        invoices: payPalInvoiceLookup,
+        captures,
+        subscriptions,
+        disputes,
+        invoices,
         customers: seedCustomerDirectory,
-        orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
-        audit: auditLog(),
-        limits,
+        orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder },
+        audit: inEnvironment(log, environment),
+        limits: settings.limits,
       },
       heldId,
       approve,
     ),
   );
+}
+
+// The toolkit a rejection hands the guard: decideHeldCall records a rejection and returns before
+// any call reaches it, so it holds no token and points at the sandbox.
+function rejectionToolkit(actions: Record<string, Record<string, boolean>>) {
+  return new PayPalAgentToolkit({ accessToken: 'unused: a rejection never calls PayPal', configuration: { actions, context: { sandbox: true } } });
 }

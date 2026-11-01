@@ -1,0 +1,470 @@
+{
+  "metadata": {
+    "title": "Tableau de bord"
+  },
+  "header": {
+    "dragHint": "Faites glisser un widget depuis <b>{compose}</b> pour commencer.",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "discard": "Abandonner",
+    "save": "Enregistrer",
+    "guide": "Guide",
+    "view": "Afficher",
+    "edit": "Modifier",
+    "sandbox": "Sandbox PayPal",
+    "refreshing": "Actualisation…",
+    "updated": "Mis à jour {when}",
+    "justNow": "à l’instant",
+    "minutesAgo": "il y a {minutes} min",
+    "hoursAgo": "il y a {hours} h",
+    "utc": "{time} UTC",
+    "refresh": "Actualiser les données",
+    "builtWith": "Conçu avec <logo></logo>"
+  },
+  "sidebar": {
+    "reports": "Rapports",
+    "reportName": "Nom du rapport",
+    "actionsFor": "Actions pour {name}",
+    "rename": "Renommer",
+    "duplicate": "Dupliquer",
+    "resetToDefault": "Réinitialiser",
+    "delete": "Supprimer",
+    "pagesOf": "Pages de {name}",
+    "pageName": "Nom de la page",
+    "doubleClickToRename": "Double-cliquez pour renommer",
+    "removePageNamed": "Retirer la page {title}",
+    "removePage": "Retirer la page",
+    "addPage": "Ajouter une page",
+    "newReport": "Nouveau rapport",
+    "resetDemo": "Réinitialiser la démo",
+    "savedHereResetHint": "Les rapports sont enregistrés dans ce navigateur. La réinitialisation rétablit les rapports de la démo.",
+    "savedHere": "Les rapports sont enregistrés dans ce navigateur."
+  },
+  "reports": {
+    "pageNumber": "Page {number}",
+    "copyName": "{name} (copie)"
+  },
+  "dialogs": {
+    "cancel": "Annuler",
+    "unsaved": {
+      "title": "Enregistrer les modifications de « {name} » ?",
+      "discard": "Abandonner les modifications",
+      "save": "Enregistrer",
+      "body": "Les modifications de ce rapport ne sont pas encore enregistrées."
+    },
+    "create": {
+      "title": "Nouveau rapport",
+      "submit": "Créer le rapport",
+      "intro": "Partez d’une page vierge et construisez-la avec les widgets de {compose}.",
+      "nameLabel": "Nom du rapport",
+      "defaultName": "Rapport sans titre"
+    },
+    "delete": {
+      "titleReset": "Réinitialiser le rapport ?",
+      "title": "Supprimer le rapport ?",
+      "reset": "Réinitialiser",
+      "delete": "Supprimer",
+      "bodyReset": "« {name} » reviendra au rapport fourni avec l’application. Les modifications que vous y avez enregistrées seront perdues.",
+      "body": "« {name} » sera supprimé de ce navigateur. Cette action est irréversible."
+    },
+    "resetDemo": {
+      "title": "Réinitialiser la démo ?",
+      "confirm": "Réinitialiser la démo",
+      "body": "Tous les rapports que vous avez créés seront supprimés et « {name} » reviendra à son état d’origine, modifications non enregistrées comprises. Cette action est irréversible."
+    }
+  },
+  "empty": {
+    "title": "Pas encore de données PayPal",
+    "body": "Ce compte sandbox n’a ni factures, ni produits, ni plans, ni transactions. Créez-en dans la sandbox PayPal, puis actualisez pour construire des rapports.",
+    "link": "Ouvrir le PayPal Developer Dashboard"
+  },
+  "error": {
+    "title": "Impossible de charger vos données PayPal",
+    "body": "La sandbox PayPal n’a pas répondu comme prévu. Vérifiez les identifiants de l’API dans <code>.env.local</code> et réessayez.",
+    "reference": "Référence : {digest}",
+    "retry": "Réessayer"
+  },
+  "guide": {
+    "title": "Comment utiliser ce tableau de bord",
+    "intro": "Conçu avec AG Studio. Gardez ce guide ouvert pendant que vous essayez chaque étape.",
+    "close": "Fermer le guide",
+    "read": {
+      "title": "Lire une page",
+      "body": "Chaque widget répond à une question ; son titre dit laquelle. Survolez une barre ou une bande pour voir ses chiffres."
+    },
+    "filter": {
+      "title": "Filtrer d’un clic",
+      "click": "Cliquez sur un agent dans <b>{flow}</b>, ou sur une barre d’un graphique, et tous les autres widgets de la page n’affichent plus que cela. Cliquez à nouveau pour l’effacer.",
+      "panel": "Ouvrez <b>{filters}</b> sur le bord droit pour voir les filtres de la page et ceux que vous avez cliqués."
+    },
+    "pages": {
+      "title": "Passer d’une page ou d’un rapport à l’autre",
+      "menu": "Les pages du rapport ouvert sont listées dans le menu de gauche, sous <b>{dashboard}</b>. <b>{addPage}</b> en ajoute une vide ; double-cliquez sur une page ou un rapport pour le renommer.",
+      "reports": "<b>{newReport}</b> démarre un rapport vierge. Le menu <b>⋯</b> d’un rapport propose <b>{rename}</b>, <b>{duplicate}</b> et supprimer. <b>{resetDemo}</b> rétablit le rapport intégré et retire ceux que vous avez créés."
+    },
+    "edit": {
+      "title": "Modifier une page",
+      "open": "Appuyez sur <b>{edit}</b>. Deux panneaux s’ouvrent à droite : <b>{compose}</b> et <b>{data}</b>.",
+      "add": "<b>Ajouter un widget :</b> dans <b>{compose}</b>, ouvrez <b>{widgets}</b> et faites-en glisser un sur la page. Ou faites glisser un champ depuis <b>{data}</b> (un agent, un client, un montant) sur la page, et Studio en fait un graphique.",
+      "change": "<b>Modifier un widget :</b> cliquez dessus. Sa configuration s’affiche dans <b>{compose}</b> : type de graphique, champs de chaque axe, tri et titres.",
+      "move": "<b>Déplacer ou redimensionner :</b> faites glisser un widget pour le déplacer, ou ses bords pour le redimensionner. Sa barre d’outils le duplique ou le supprime.",
+      "save": "Annuler et rétablir se trouvent à côté de <b>{save}</b>. <b>{save}</b> conserve le rapport dans ce navigateur ; <b>{discard}</b> abandonne les modifications ; <b>{view}</b> quitte la modification."
+    },
+    "guardWidget": {
+      "title": "Ajouter le widget du guard",
+      "body": "Dans <b>{compose}</b> › <b>{widgets}</b>, le groupe <b>{group}</b> contient <b>{flow}</b> : les appels de chaque agent à travers le guard jusqu’à ce qu’il en a fait. Faites-le glisser sur n’importe quelle page."
+    },
+    "export": {
+      "title": "Exporter",
+      "body": "La barre d’outils d’un tableau ou d’un graphique télécharge ses lignes en CSV, ou le graphique en image."
+    },
+    "ai": {
+      "title": "Demander à l’IA",
+      "on": "En mode <b>{edit}</b>, ouvrez l’<b>{assistant}</b> et décrivez le widget voulu, par exemple « remboursements bloqués par client ». Il le construit sur la page, et vous le gardez ou l’abandonnez comme toute autre modification.",
+      "off": "L’<b>{assistant}</b> crée des widgets à partir d’une phrase. Il apparaît en mode modification dès qu’une clé OpenAI est configurée sur le serveur (voir le README)."
+    }
+  },
+  "flow": {
+    "verdicts": {
+      "passed": "Acceptés vers PayPal",
+      "held": "Retenus pour vous",
+      "stopped": "Bloqués par le guard"
+    },
+    "verdictsInline": {
+      "passed": "acceptés vers PayPal",
+      "held": "retenus pour vous",
+      "stopped": "bloqués par le guard"
+    },
+    "agent": "Agent {name}",
+    "agentCalls": "{n, plural, one {{count} appel} other {{count} appels}}",
+    "verdictCalls": "{n, plural, one {{count} appel} other {{count} appels}}, {percent}",
+    "band": "Agent {agent} : {n, plural, one {{count} appel} other {{count} appels}} {verdict}",
+    "gate": "Payment guard",
+    "noCalls": "Aucun appel pour l’instant.",
+    "summaryItem": "{count} {verdict}"
+  },
+  "widgets": {
+    "guardFlow": "Flux à travers le guard",
+    "agentMapping": "Agent",
+    "verdictsMapping": "Acceptés, retenus, bloqués",
+    "menuGroup": "Payment guard"
+  },
+  "ai": {
+    "stoppedMost": {
+      "label": "Quel agent a été le plus bloqué ?",
+      "prompt": "Quel agent IA le guard de paiement a-t-il bloqué le plus souvent, et pour quelles raisons ? Utilise les décisions et les infractions du guard. Réponds en français."
+    },
+    "protectedVsMoved": {
+      "label": "Argent protégé ou sorti",
+      "prompt": "Combien d’argent le guard a-t-il protégé en bloquant, par rapport à ce que les agents ont sorti et facturé ? Détaille par agent et par action. Réponds en français."
+    },
+    "waiting": {
+      "label": "Qu’est-ce qui attend une personne ?",
+      "prompt": "Liste les actions retenues qui attendent encore une approbation, de la plus ancienne à la plus récente, avec l’agent, l’action, le client et le montant. Réponds en français."
+    },
+    "blockRate": {
+      "label": "Tracer le taux de blocage",
+      "prompt": "Ajoute un graphique en courbes du taux de blocage du guard par jour, séparé par agent. Mets les titres en français."
+    },
+    "summarise": {
+      "label": "Résumer cette page",
+      "prompt": "Résume ce que montre cette page : chaque widget, les champs qu’il lit et ce qui ressort. Réponds en français."
+    }
+  },
+  "report": {
+    "name": "Vue d’ensemble PayPal",
+    "pages": {
+      "guard": "Opérations IA",
+      "activity": "Activité des agents",
+      "revenue": "Revenus et trésorerie",
+      "receivables": "Créances",
+      "catalogue": "Catalogue"
+    },
+    "guard": {
+      "flow": {
+        "title": "Flux à travers le guard",
+        "subtitle": "Chaque appel de vos agents, de l’agent jusqu’à ce que le guard en a fait. Cliquez sur un agent pour filtrer la page."
+      },
+      "kpiProtected": {
+        "title": "Resté dans la boutique",
+        "caption": "Remboursements et litiges bloqués"
+      },
+      "kpiMoved": {
+        "title": "Rendu aux clients",
+        "caption": "Remboursements et litiges acceptés"
+      },
+      "kpiWaiting": {
+        "title": "En attente de vous",
+        "caption": "À décider dans le journal du guard"
+      },
+      "kpiWithheld": {
+        "title": "Données masquées",
+        "caption": "Infos clients cachées aux agents"
+      },
+      "timeline": {
+        "title": "Décisions par jour",
+        "subtitle": "Chaque barre est une journée d’appels : vert acceptés vers PayPal, ambre retenus pour vous, rouge bloqués"
+      },
+      "byAction": {
+        "title": "Ce que les agents ont tenté",
+        "subtitle": "Appels par action, les plus bloqués d’abord : vert acceptés, ambre retenus, rouge bloqués"
+      },
+      "reasons": {
+        "title": "Pourquoi des appels ont été bloqués",
+        "subtitle": "La règle enfreinte par chaque appel bloqué, la plus fréquente d’abord"
+      }
+    },
+    "activity": {
+      "customers": {
+        "title": "Clients derrière les appels bloqués",
+        "subtitle": "Appels bloqués par le guard, par client concerné"
+      },
+      "decisions": {
+        "title": "Toutes les décisions, les plus récentes d’abord",
+        "subtitle": "Cliquez sur une ligne pour filtrer les graphiques ci-dessus"
+      }
+    },
+    "revenue": {
+      "kpiSales": {
+        "title": "Ventes (31 jours)",
+        "caption": "Paiements des clients à la boutique"
+      },
+      "kpiBalance": {
+        "title": "Solde disponible",
+        "caption": "Sur le compte PayPal en ce moment"
+      },
+      "kpiInvoiced": {
+        "title": "Facturé",
+        "caption": "Factures envoyées, toutes devises"
+      },
+      "inOut": {
+        "title": "Entrées et sorties d’argent par jour",
+        "subtitle": "Crédits et débits du grand livre PayPal"
+      },
+      "eventTypes": {
+        "title": "Activité du grand livre par type",
+        "subtitle": "Nombre de transactions PayPal, les plus fréquentes d’abord"
+      },
+      "ledger": {
+        "title": "Grand livre PayPal, le plus récent d’abord",
+        "subtitle": "Les 31 derniers jours d’activité du compte"
+      }
+    },
+    "receivables": {
+      "currency": {
+        "title": "Devise"
+      },
+      "kpiOutstanding": {
+        "title": "Reste dû",
+        "caption": "Factures ouvertes et partiellement payées"
+      },
+      "kpiOverdue": {
+        "title": "En retard",
+        "caption": "Échéance dépassée"
+      },
+      "kpiOpen": {
+        "title": "Factures ouvertes",
+        "caption": "En attente de paiement"
+      },
+      "byInvoiceDate": {
+        "title": "Reste dû par date de facture",
+        "subtitle": "Ce qui reste dû, et la part en retard"
+      },
+      "aging": {
+        "title": "Créances par client et statut",
+        "subtitle": "Le plus gros solde d’abord"
+      },
+      "openInvoices": {
+        "title": "Factures ouvertes, les plus en retard d’abord"
+      }
+    },
+    "catalogue": {
+      "kpiProducts": {
+        "title": "Produits",
+        "caption": "Vendus par abonnement"
+      },
+      "kpiPlans": {
+        "title": "Plans de facturation",
+        "caption": "Tous produits confondus"
+      },
+      "kpiMonthly": {
+        "title": "Prix mensuel moyen",
+        "caption": "Ramené à un mois, en USD"
+      },
+      "kpiTrial": {
+        "title": "Jours d’essai moyens",
+        "caption": "Avant le premier prélèvement"
+      },
+      "plans": {
+        "title": "Catalogue des plans"
+      }
+    }
+  },
+  "data": {
+    "calendar": "Calendrier",
+    "tables": {
+      "customers": "Clients",
+      "invoices": "Factures",
+      "invoiceItems": "Lignes de facture",
+      "invoicePayments": "Paiements de factures",
+      "products": "Produits",
+      "plans": "Plans de facturation",
+      "transactions": "Transactions",
+      "payouts": "Versements",
+      "balances": "Soldes",
+      "guardDecisions": "Décisions du guard",
+      "guardViolations": "Infractions du guard"
+    },
+    "fields": {
+      "customers": {
+        "id": "ID client",
+        "name": "Client",
+        "company": "Entreprise",
+        "email": "E-mail"
+      },
+      "invoices": {
+        "id": "ID de facture",
+        "number": "Facture",
+        "customerId": "ID client",
+        "status": "Statut de la facture",
+        "statusGroup": "Groupe de statut",
+        "currency": "Devise",
+        "paymentTerm": "Conditions de paiement",
+        "invoiceDate": "Date de facture",
+        "dueDate": "Date d’échéance",
+        "total": "Total de la facture",
+        "issuedAmount": "Facturé",
+        "paidAmount": "Payé",
+        "refundedAmount": "Remboursé",
+        "netCollected": "Encaissé net",
+        "isReceivable": "Est une créance",
+        "outstanding": "Reste dû",
+        "overdueAmount": "En retard",
+        "daysOverdue": "Jours de retard",
+        "agingBucket": "Tranche d’ancienneté",
+        "daysToPay": "Jours avant paiement",
+        "taxTotal": "Taxes"
+      },
+      "invoiceItems": {
+        "id": "ID de ligne",
+        "invoiceId": "ID de facture",
+        "name": "Article",
+        "unit": "Unité",
+        "quantity": "Quantité",
+        "unitPrice": "Prix unitaire",
+        "gross": "Brut",
+        "discount": "Remise de la ligne",
+        "tax": "Taxe de la ligne",
+        "lineTotal": "Total de la ligne"
+      },
+      "invoicePayments": {
+        "id": "ID de paiement",
+        "invoiceId": "ID de facture",
+        "kind": "Type de paiement",
+        "method": "Moyen de paiement",
+        "date": "Date de paiement",
+        "amount": "Montant du paiement",
+        "signedAmount": "Trésorerie nette"
+      },
+      "products": {
+        "id": "ID de produit",
+        "name": "Produit",
+        "type": "Type de produit",
+        "category": "Catégorie de produit",
+        "description": "Description du produit"
+      },
+      "plans": {
+        "id": "ID de plan",
+        "productId": "ID de produit",
+        "name": "Plan",
+        "status": "Statut du plan",
+        "billingInterval": "Facturation",
+        "price": "Prix",
+        "monthlyPrice": "Prix mensuel",
+        "trialDays": "Jours d’essai",
+        "setupFee": "Frais de mise en service"
+      },
+      "transactions": {
+        "id": "ID de transaction",
+        "date": "Date de la transaction",
+        "eventType": "Type d’événement",
+        "status": "Statut de la transaction",
+        "direction": "Sens",
+        "currency": "Devise de la transaction",
+        "amount": "Montant de la transaction",
+        "fee": "Frais de la transaction",
+        "net": "Net de la transaction",
+        "sales": "Ventes",
+        "moneyIn": "Entrée d’argent",
+        "moneyOut": "Sortie d’argent",
+        "endingBalance": "Solde final",
+        "counterparty": "Contrepartie",
+        "note": "Note de la transaction"
+      },
+      "payouts": {
+        "id": "ID de versement",
+        "campaign": "Campagne",
+        "recipient": "Bénéficiaire",
+        "date": "Date du versement",
+        "status": "Statut du versement",
+        "amount": "Montant du versement",
+        "fee": "Frais du versement",
+        "note": "Note du versement"
+      },
+      "balances": {
+        "currency": "Devise du solde",
+        "total": "Solde total",
+        "available": "Solde disponible",
+        "withheld": "Solde bloqué"
+      },
+      "guardDecisions": {
+        "id": "Entrée du guard",
+        "at": "Heure",
+        "day": "Date de la décision",
+        "tool": "Outil",
+        "verdict": "Verdict",
+        "decision": "Décision",
+        "outcome": "Résultat du guard",
+        "customer": "Client du ticket",
+        "currency": "Devise du guard",
+        "requested": "Remboursement demandé",
+        "agent": "Agent",
+        "action": "Action",
+        "moved": "Argent sorti",
+        "protected": "Argent protégé",
+        "billed": "Argent facturé",
+        "awaitingApproval": "En attente d’approbation",
+        "allowed": "Acceptée",
+        "held": "Retenue",
+        "blocked": "Bloquée",
+        "withheld": "Données personnelles masquées",
+        "decidedBy": "Décidé par",
+        "dayText": "Jour"
+      },
+      "guardViolations": {
+        "id": "ID d’infraction",
+        "decisionId": "ID d’entrée du guard",
+        "code": "Code d’infraction",
+        "reason": "Motif du blocage",
+        "message": "Détail de l’infraction"
+      }
+    },
+    "measures": {
+      "collectionRate": "Taux d’encaissement",
+      "overdueShare": "Part en retard",
+      "refundRate": "Taux de remboursement",
+      "allowedCalls": "Acceptés",
+      "heldCalls": "Retenus",
+      "blockedCalls": "Bloqués",
+      "moneyMoved": "Sorti",
+      "moneyBilled": "Facturé",
+      "moneyProtected": "Protégé",
+      "moneyInTotal": "Entrées",
+      "moneyOutTotal": "Sorties",
+      "salesTotal": "Ventes",
+      "outstandingTotal": "Reste dû",
+      "overdueTotal": "En retard",
+      "blockRate": "Taux de blocage"
+    }
+  }
+}

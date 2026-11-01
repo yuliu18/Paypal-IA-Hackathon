@@ -1,5 +1,6 @@
 'use server';
 
+import { getTranslations } from 'next-intl/server';
 import { seedSandbox } from '@/lib/demo-seed';
 import { evaluationDispute } from '@/lib/evaluation/dispute';
 import { cancellationNote, disputeNote, evaluationCases, fullEvaluationCases, type EvalCase } from '@/lib/evaluation/evaluation';
@@ -27,6 +28,6 @@ export async function prepareEvaluationAction(full: boolean): Promise<Prepared> 
     };
   } catch (error) {
     console.error('Evaluation could not create sample payments', error);
-    return { ok: false, message: 'The sample payments could not be created. Details are in the server log.' };
+    return { ok: false, message: (await getTranslations('evaluate'))('seedFailed') };
   }
 }

@@ -1,0 +1,247 @@
+{
+  "title": "Ajustes",
+  "intro": "Adapta los agentes y su guard de pagos a tu negocio. Los cambios se aplican a la siguiente conversación.",
+  "locked": "Solo lectura: este servidor define SETTINGS_LOCKED, así que las claves y los límites de la demo pública no se pueden cambiar.",
+  "lockedError": "Los ajustes son de solo lectura en este servidor (SETTINGS_LOCKED).",
+  "sectionsLabel": "Secciones de ajustes",
+  "hasError": "tiene un error",
+  "sections": {
+    "language": "Idioma",
+    "business": "Negocio",
+    "limits": "Límites",
+    "ai": "Modelo de IA",
+    "paypal": "App de PayPal",
+    "notifications": "Notificaciones",
+    "api-keys": "Claves de API"
+  },
+  "language": {
+    "title": "Idioma",
+    "detail": "El idioma de los menús, botones y páginas. Se aplica al instante, solo en este navegador, sin pulsar Guardar ajustes.",
+    "label": "Idioma de la interfaz",
+    "saving": "Cambiando…",
+    "failed": "No se pudo cambiar el idioma. Inténtalo de nuevo."
+  },
+  "keyHint": {
+    "saved": "{thing, select, url {URL guardada} password {Contraseña guardada} token {Token guardado} other {Clave guardada}} {hint}. Déjalo en blanco para conservarla.",
+    "env": "Se usa {variable} del entorno del servidor ({hint}). Déjalo en blanco para conservarla.",
+    "unreadable": "{thing, select, url {La URL guardada} password {La contraseña guardada} token {El token guardado} other {La clave guardada}} ya no se puede leer (cambió su clave de cifrado). Vuelve a introducirla.",
+    "none": "{thing, select, url {Aún no hay URL.} password {Aún no hay contraseña.} token {Aún no hay token.} other {Aún no hay clave.}}"
+  },
+  "picker": {
+    "choose": "Elige…",
+    "search": "Buscar…",
+    "noMatches": "Sin resultados",
+    "useCustom": "Usar «{value}»"
+  },
+  "groups": {
+    "Global": "Global",
+    "China": "China",
+    "Gateway": "Pasarela",
+    "Local": "Local",
+    "More providers": "Más proveedores",
+    "Other": "Otro",
+    "listed": "Listados por el proveedor"
+  },
+  "model": {
+    "context": "contexto de {size}",
+    "free": "gratis",
+    "price": "${input} / ${output} por 1M",
+    "count": "{count} modelos"
+  },
+  "testConnection": "Probar conexión",
+  "business": {
+    "detail": "Para quién trabajan los agentes y la política de reembolsos que siguen. El juez de IA del guard revisa cada reembolso con esta política.",
+    "name": "Nombre del negocio",
+    "contactEmails": "Emails de contacto",
+    "contactEmailsHint": "Las únicas direcciones, además de la del cliente, que pueden aparecer en las respuestas.",
+    "refundPolicy": "Política de reembolsos"
+  },
+  "limits": {
+    "detail": "El guard los aplica decida lo que decida la IA: ningún prompt puede subirlos.",
+    "currency": "Moneda",
+    "noDecimals": "sin decimales",
+    "autoRefundUpTo": "Reembolsar automáticamente hasta",
+    "autoRefundUpToHint": "Los reembolsos menores se hacen solos.",
+    "approvalUpTo": "Pedir a una persona hasta",
+    "approvalUpToHint": "Los reembolsos mayores esperan en /guard; por encima de este importe se bloquean.",
+    "dailyCap": "Tope diario",
+    "dailyCapHint": "Total que el agente puede reembolsar al día."
+  },
+  "ai": {
+    "detail": "El modelo que mueve a los agentes y el que juzga sus llamadas. Sirve cualquier proveedor con una API compatible con OpenAI: en la nube, chino o en tu propia máquina.",
+    "provider": "Proveedor",
+    "providerHint": "{count} proveedores del catálogo de models.dev, más cualquier URL compatible con OpenAI.",
+    "custom": "Personalizado (cualquier URL compatible con OpenAI)",
+    "baseUrl": "URL base",
+    "apiKey": "Clave de API",
+    "apiKeyPlaceholder": "Pega tu clave de API",
+    "removeKey": "Borrar la clave guardada",
+    "agentModel": "Modelo del agente",
+    "agentModelHint": "Responde los tickets y llama a las herramientas de PayPal. Solo se listan modelos que pueden llamar herramientas.",
+    "providerDefault": "Predeterminado del proveedor",
+    "providerDefaultNamed": "Predeterminado del proveedor ({name})",
+    "judgeModel": "Modelo juez",
+    "judgeModelHint": "Revisa cada reembolso con la política.",
+    "sameAsAgent": "El mismo que el agente",
+    "connectedModels": "Conectado: {count} modelos para elegir.",
+    "connectedAgent": "Conectado con el modelo del agente."
+  },
+  "paypal": {
+    "detail": "Los agentes llegan a PayPal mediante apps REST que creas en el PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials): una app de sandbox para probar y, cuando estés listo, una app live para dinero real.",
+    "clientId": "Client ID",
+    "secret": "Secret",
+    "removeSecret": "Borrar el secret guardado",
+    "connected": "Conectado al sandbox de PayPal.",
+    "needCredentials": "Introduce primero el client ID y el secret.",
+    "sandboxTitle": "App de sandbox (dinero de prueba)",
+    "sandboxDetail": "Pega aquí su client ID y su secret de sandbox. El dinero del sandbox es ficticio. Las páginas de prueba, la evaluación y los datos de ejemplo usan siempre esta app.",
+    "liveTitle": "App live (dinero real)",
+    "liveDetail": "El client ID y el secret de la pestaña Live de Apps & Credentials. Solo se usa en modo real, y solo para las llamadas de la app de tu tienda con una clave API. Guardar otra app live desactiva el modo real.",
+    "liveNoEnv": "Aún no hay secret. El secret live solo se guarda aquí; nunca se lee del entorno del servidor.",
+    "connectedLive": "Conectado a PayPal live."
+  },
+  "notifications": {
+    "detail": "Cuando el guard retiene una llamada para una persona, avisa a cada canal activo. El mensaje indica el importe, el email del cliente enmascarado y las reglas, nunca el texto del ticket.",
+    "webhook": {
+      "title": "Slack o Discord",
+      "detail": "Un mensaje en un canal del chat de tu equipo, mediante un webhook entrante.",
+      "url": "URL del webhook",
+      "remove": "Borrar el webhook guardado",
+      "guide": "Cómo conseguir un webhook de Slack o Discord",
+      "step1": "<strong>Slack:</strong> en <link>api.slack.com/apps</link>, crea una app desde cero en tu workspace, abre <em>Incoming Webhooks</em>, actívalos, pulsa <em>Add New Webhook to Workspace</em>, elige el canal y copia la URL.",
+      "step2": "<strong>Discord:</strong> en tu servidor, abre <em>Edit Channel</em> del canal → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em> y luego <em>Copy Webhook URL</em>.",
+      "step3": "Pega la URL arriba y guarda. La URL funciona como una contraseña: quien la tenga puede publicar en el canal."
+    },
+    "email": {
+      "title": "Email",
+      "detail": "Un email a los emails de contacto de Negocio, a través de tu propio servidor de correo (SMTP) cuando están definidos su servidor, usuario y contraseña; si no, a través de Resend.",
+      "from": "Remitente",
+      "fromHint": "Con SMTP, déjalo en blanco para enviar desde el usuario. Con Resend, un remitente de un dominio verificado allí, u onboarding@resend.dev para probar.",
+      "smtpHost": "Servidor SMTP",
+      "smtpPort": "Puerto SMTP",
+      "smtpPortHint": "587 (STARTTLS) o 465 (TLS). En blanco es 587.",
+      "smtpUser": "Usuario SMTP",
+      "smtpPassword": "Contraseña SMTP",
+      "smtpPasswordForgets": "Cambiar el servidor o el usuario la olvida.",
+      "smtpPasswordPlaceholder": "Contraseña de aplicación",
+      "removeSmtpPassword": "Borrar la contraseña SMTP guardada",
+      "smtpGuide": "Cómo configurar el email con tu propio correo (SMTP)",
+      "smtpStep1": "<strong>Gmail:</strong> activa la verificación en 2 pasos de la cuenta y crea una contraseña de aplicación en <link>myaccount.google.com/apppasswords</link>. Usa el servidor <code>smtp.gmail.com</code>, el puerto <code>587</code>, tu dirección de Gmail como usuario y la contraseña de aplicación de 16 letras, sin espacios. Tu contraseña normal no funciona.",
+      "smtpStep2": "<strong>Outlook o Microsoft 365:</strong> servidor <code>smtp.office365.com</code>, puerto <code>587</code>, tu dirección y contraseña (una contraseña de aplicación si la cuenta usa inicio de sesión en dos pasos). Puede que tu administrador tenga que permitir SMTP para el buzón.",
+      "smtpStep3": "<strong>El correo de tu hosting:</strong> el servidor, el puerto y el usuario están en los ajustes de email del panel de tu hosting, a menudo <code>mail.your-domain.com</code> con tu dirección completa como usuario.",
+      "smtpStep4": "Deja el remitente en blanco: la mayoría de servidores de correo solo envían desde la cuenta con la que inicias sesión.",
+      "smtpStep5": "La contraseña solo viaja cifrada (TLS) y solo se envía al servidor y al usuario con los que se guardó.",
+      "resendKey": "Clave de API de Resend",
+      "removeResendKey": "Borrar la clave de Resend guardada",
+      "resendGuide": "Cómo configurar el email con Resend",
+      "resendStep1": "Regístrate en <link>resend.com</link> (basta el plan gratuito), abre <em>API Keys</em>, crea una clave con permiso de envío y pégala arriba.",
+      "resendStep2": "<strong>Para probar:</strong> usa <code>onboarding@resend.dev</code> como remitente y pon el email de tu cuenta de Resend en Emails de contacto de Negocio. El remitente de prueba de Resend solo entrega a esa dirección y puede acabar en spam.",
+      "resendStep3": "<strong>En serio:</strong> en Resend, abre <em>Domains</em>, añade tu dominio, añade los registros DNS que muestra y, cuando esté verificado, usa una dirección suya, como <code>guard@your-domain.com</code>.",
+      "resendStep4": "Cada email de contacto de Negocio recibe el mensaje."
+    },
+    "telegram": {
+      "title": "Telegram",
+      "detail": "Un mensaje de tu propio bot de Telegram a un chat, un grupo o un canal.",
+      "token": "Token del bot de Telegram",
+      "chatId": "Chat id de Telegram",
+      "chatIdHint": "Escribe a tu bot, abre api.telegram.org/bot{token}/getUpdates y copia chat.id, o usa @nombredelcanal.",
+      "removeToken": "Borrar el token del bot guardado",
+      "guide": "Cómo configurar Telegram",
+      "step1": "En Telegram, abre <link>@BotFather</link>, envía <code>/newbot</code>, elige un nombre y un nombre de usuario que termine en <code>bot</code>, y pega arriba el token que te da (<code>123456789:AA…</code>).",
+      "step2": "Abre un chat con tu nuevo bot, pulsa <em>Start</em> y envíale cualquier mensaje. Para un grupo, añade el bot al grupo y envía un mensaje allí.",
+      "step3": "En un navegador, abre <code>{url}</code>, con tu token justo después de <code>bot</code> y sin espacios ni <code>{brackets}</code>. Copia el número de <code>{chat}</code> en Chat id de Telegram. El id de un grupo empieza por <code>-100</code>.",
+      "step4": "Si muestra <code>{empty}</code>, el bot aún no tiene mensajes: envíale uno y recarga.",
+      "step5": "Define <code>APP_URL</code> en el servidor para que el mensaje enlace a la página del guard; sin ella, Telegram muestra <code>/guard</code> como un comando del bot."
+    }
+  },
+  "save": {
+    "button": "Guardar ajustes",
+    "saving": "Guardando…",
+    "scope": "Guarda todas las secciones, no solo esta.",
+    "saved": "Guardado. El siguiente ticket usa estos ajustes.",
+    "checkFields": "Revisa los campos marcados."
+  },
+  "apiKeys": {
+    "title": "Claves de API",
+    "detail": "La app de tu tienda llama a los agentes con una clave en lugar de iniciar sesión, en la cabecera Authorization.",
+    "needsDatabase": "Las claves de API se guardan en la base de datos: configura DATABASE_URL para crearlas.",
+    "unreadable": "No se pudieron leer las claves de la base de datos. Inténtalo más tarde.",
+    "name": "Nombre de la clave",
+    "namePlaceholder": "App de pago",
+    "create": "Crear clave",
+    "creating": "Creando…",
+    "created": "Tu nueva clave «{name}»",
+    "onceNote": "Cópiala ahora: no la volverás a ver. Solo se guardan sus 4 últimos caracteres.",
+    "copy": "Copiar",
+    "copied": "Copiada",
+    "example": "Llama al agente de soporte con una clave",
+    "scope": "Una clave solo sirve en los tres endpoints de los agentes: POST /api/support/tickets, /api/billing/tasks y /api/sales/chats. Nada más la acepta.",
+    "listTitle": "Tus claves",
+    "empty": "Aún no hay claves.",
+    "columns": {
+      "name": "Nombre",
+      "key": "Clave",
+      "created": "Creada",
+      "lastUsed": "Último uso",
+      "status": "Estado"
+    },
+    "never": "Nunca",
+    "active": "Activa",
+    "revokedAt": "Revocada {at}",
+    "revoke": "Revocar",
+    "revokeConfirm": "¿Revocar la clave «{name}»? Las apps que la usan dejan de funcionar al instante.",
+    "errors": {
+      "invalid-name": "Ponle a la clave un nombre de 1 a 60 caracteres.",
+      "not-found": "Esa clave ya está revocada.",
+      "unavailable": "Las claves de API se guardan en la base de datos: configura DATABASE_URL para crearlas.",
+      "locked": "Los ajustes son de solo lectura en este servidor (SETTINGS_LOCKED).",
+      "failed": "No ha funcionado. Inténtalo de nuevo; los detalles están en el log del servidor."
+    }
+  },
+  "liveMode": {
+    "title": "Modo",
+    "detail": "El modo de prueba hace todas las llamadas en el sandbox de PayPal. El modo real permite que las llamadas de la app de tu tienda muevan dinero real con tu app live.",
+    "test": "Prueba",
+    "live": "Real",
+    "badge": {
+      "test": "Modo de prueba",
+      "live": "Modo real"
+    },
+    "current": {
+      "test": "Modo de prueba: todas las llamadas van al sandbox de PayPal, con dinero ficticio.",
+      "live": "Modo real: las llamadas de la app de tu tienda con una clave API usan tu app live de PayPal y mueven dinero real. Las páginas de prueba y la evaluación siguen en el sandbox."
+    },
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba porque {reason}. Todas las llamadas usan el sandbox.",
+    "reasons": {
+      "server": "no permite el modo real (ALLOW_LIVE_MODE no es true)",
+      "app": "falta el client ID o el secret de la app live, o no se puede leer"
+    },
+    "disabled": {
+      "server": "Este servidor no permite el modo real",
+      "app": "Guarda primero el client ID y el secret de la app live.",
+      "locked": "La configuración es de solo lectura en este servidor (SETTINGS_LOCKED)."
+    },
+    "howBack": "Para volver, pulsa Prueba: el cambio es inmediato.",
+    "dashboardNote": "El panel siempre lee la cuenta de sandbox; los datos live en el panel están en la hoja de ruta.",
+    "dialog": {
+      "title": "¿Activar el modo real?",
+      "warning": "El modo real mueve dinero real.",
+      "money": "Los reembolsos, cancelaciones, aceptaciones de disputas, facturas y pedidos que el guard deje pasar se ejecutan en tu cuenta live de PayPal, con dinero real.",
+      "scope": "Solo lo usan las llamadas de la app de tu tienda con una clave API. Las páginas de prueba (Support, Billing, Sales) y la evaluación siguen en el sandbox.",
+      "check": "Antes de cambiar, el guard pide un token a PayPal live con las credenciales de tu app live.",
+      "back": "Para volver, pulsa Prueba en esta sección: el cambio es inmediato.",
+      "confirmLabel": "Escribe {word} para confirmar",
+      "confirm": "Activar el modo real",
+      "cancel": "Cancelar",
+      "checking": "Comprobando con PayPal…"
+    },
+    "errors": {
+      "locked": "La configuración es de solo lectura en este servidor (SETTINGS_LOCKED).",
+      "server": "Este servidor no permite el modo real",
+      "app": "Guarda primero el client ID y el secret de la app live.",
+      "confirmation": "Escribe exactamente {word} para confirmar.",
+      "check": "PayPal live no aceptó la app live, así que sigue el modo de prueba: {detail}",
+      "unreadable": "No se pudo leer la configuración guardada, así que no se cambió nada. Inténtalo de nuevo en un momento."
+    }
+  }
+}

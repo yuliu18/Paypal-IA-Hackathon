@@ -1,30 +1,65 @@
 'use client';
 
-import { startTransition, useActionState, useRef, useState, useTransition } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import type { KeyStatus, SettingsForm, SettingsView } from '@/lib/settings/settings';
 import type { CatalogModel, CatalogProvider } from '@/lib/settings/catalog';
 import { CURRENCIES } from '@/lib/settings/currencies';
-import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
+import { catalogModelsAction, saveSettingsAction, testAiAction, testLivePayPalAction, testPayPalAction } from './actions';
 import { Picker, type PickerOption } from './picker';
 import { latestOnly } from './picker-logic';
+import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './sections';
+import { PageHeader } from '../ui/page-header';
+import { primaryButton, Spinner } from '../ui/desk';
+import { LanguagePicker } from './language-picker';
+import { ApiKeysSection, type ApiKeysView } from './api-keys-section';
+import { LiveModeSection } from './live-mode-section';
+import type { LiveModeStatus } from '@/lib/settings/live-mode';
 
 type Check = { ok: boolean; message: string } | null;
+// The page's text, from messages/<locale>/settings.json.
+type T = ReturnType<typeof useTranslations<'settings'>>;
 
 // Every one-line field is h-10, so inputs and pickers line up.
 const input =
-  'h-10 w-full rounded border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
+  'h-10 w-full rounded-md border border-pp-border bg-pp-surface px-3 py-2 text-sm text-pp-ink focus:border-pp-blue focus:outline-none disabled:bg-pp-canvas disabled:text-pp-muted';
 const button =
-  'rounded border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-navy hover:bg-pp-highlight disabled:opacity-60';
+  'rounded-md border border-pp-border bg-pp-surface px-3 py-1.5 text-sm font-semibold text-pp-ink hover:border-pp-blue disabled:opacity-60';
 
-function Section({ title, detail, children }: { title: string; detail: string; children: React.ReactNode }) {
+// One section of the form. Only the open one shows; the others stay in the form, hidden, so one
+// save keeps every field.
+// `cards`: the section is a stack of cards of its own (one per notification channel) rather than one card.
+function Section({ id, open, title, detail, cards, children }: { id: SettingsSectionId; open: SettingsSectionId; title: string; detail: string; cards?: boolean; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-pp-border bg-pp-surface p-6">
-      <h2 className="text-lg font-semibold text-pp-navy">{title}</h2>
-      <p className="mt-1 text-sm text-pp-muted">{detail}</p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
+    <section id={`settings-${id}`} hidden={id !== open} className={cards ? '' : 'rounded-lg border border-pp-border bg-pp-surface p-6'}>
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
+      {cards ? <div className="mt-5 space-y-4">{children}</div> : <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>}
     </section>
   );
 }
+
+// One notification channel: its own card, saying whether it is set up.
+function Channel({ title, detail, on, children }: { title: string; detail: string; on: boolean; children: React.ReactNode }) {
+  const common = useTranslations('common');
+  return (
+    <div className="rounded-lg border border-pp-border bg-pp-surface p-6">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="font-semibold">{title}</h3>
+        <span
+          className={`rounded-[3px] border px-2 py-0.5 text-xs font-semibold ${on ? 'border-pp-success/40 bg-pp-success-tint text-pp-success' : 'border-pp-border bg-pp-canvas text-pp-muted'}`}
+        >
+          {on ? common('on') : common('off')}
+        </span>
+      </div>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
+    </div>
+  );
+}
+
+const isSet = (status: KeyStatus) => status.source === 'saved' || status.source === 'env';
 
 function Field({ label, error, hint, wide, children }: { label: string; error?: string; hint?: React.ReactNode; wide?: boolean; children: React.ReactNode }) {
   return (
@@ -58,22 +93,28 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
 }
 
 // `thing`: what the field holds, e.g. the webhook URL, which is kept as secret as a key.
-function keyHint(status: KeyStatus, variable: string, thing = 'key') {
-  return {
-    saved: `Saved ${thing} ${status.hint}. Leave blank to keep it.`,
-    env: `Using ${variable} from the server environment (${status.hint}). Leave blank to keep it.`,
-    unreadable: `The saved ${thing} cannot be read any more (its encryption key changed). Enter it again.`,
-    none: `No ${thing} yet.`,
-  }[status.source];
+function keyHint(t: T, status: KeyStatus, variable: string, thing: 'key' | 'url' | 'password' | 'token' = 'key') {
+  return t(`keyHint.${status.source}`, { thing, variable, hint: status.hint });
 }
+
+// Inline markup the setup guides' messages may use: <strong>, <em>, <code> and one <link>.
+const markup = {
+  strong: (chunks: React.ReactNode) => <strong>{chunks}</strong>,
+  em: (chunks: React.ReactNode) => <em>{chunks}</em>,
+  code: (chunks: React.ReactNode) => <code>{chunks}</code>,
+};
+const linkTo = (href: string) => ({ ...markup, link: (chunks: React.ReactNode) => <ExternalLink href={href}>{chunks}</ExternalLink> });
 
 const GROUPS = ['Global', 'China', 'Gateway', 'Local', 'More providers'] as const;
 
 const tokens = (n: number) => (n >= 1_000_000 ? `${Number((n / 1_000_000).toFixed(1))}M` : `${Math.round(n / 1000)}k`);
 
 // "128k context · $0.30 / $1.20 per 1M" (input / output per million tokens), as far as the catalog knows.
-function modelDetail(model: CatalogModel) {
-  const parts = [model.context && `${tokens(model.context)} context`, model.input === 0 && model.output === 0 ? 'free' : model.input !== undefined && model.output !== undefined && `$${model.input} / $${model.output} per 1M`];
+function modelDetail(t: T, model: CatalogModel) {
+  const parts = [
+    model.context && t('model.context', { size: tokens(model.context) }),
+    model.input === 0 && model.output === 0 ? t('model.free') : model.input !== undefined && model.output !== undefined && t('model.price', { input: model.input, output: model.output }),
+  ];
   return parts.filter(Boolean).join(' · ') || undefined;
 }
 
@@ -83,7 +124,20 @@ function CheckResult({ check }: { check: Check }) {
 
 // The shop owner's settings: business, refund limits, AI provider, PayPal and the held-refund
 // channels (webhook, email, Telegram). Keys and the webhook URL are write-only: the page only ever receives their last 4 characters.
-export function SettingsEditor({ view, providers, initialModels }: { view: SettingsView; providers: CatalogProvider[]; initialModels: CatalogModel[] }) {
+export function SettingsEditor({
+  view,
+  providers,
+  initialModels,
+  apiKeys,
+  liveMode,
+}: {
+  view: SettingsView;
+  providers: CatalogProvider[];
+  initialModels: CatalogModel[];
+  apiKeys: ApiKeysView;
+  liveMode: LiveModeStatus;
+}) {
+  const t = useTranslations('settings');
   const formRef = useRef<HTMLFormElement>(null);
   const [state, save, saving] = useActionState(saveSettingsAction, null);
   const [provider, setProvider] = useState(view.form.provider);
@@ -98,9 +152,20 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   const [liveModels, setLiveModels] = useState<string[]>([]);
   const [aiCheck, setAiCheck] = useState<Check>(null);
   const [payPalCheck, setPayPalCheck] = useState<Check>(null);
+  const [livePayPalCheck, setLivePayPalCheck] = useState<Check>(null);
   const [testing, startTesting] = useTransition();
   const errors: Partial<Record<keyof SettingsForm | 'form', string>> = state && !state.ok ? state.errors : {};
   const defaults = view.form;
+  // The open section is in the address (/settings?section=limits), so the side menu's list of
+  // sections (./settings-nav.tsx) and the page agree on it.
+  const router = useRouter();
+  const open = sectionFrom(useSearchParams().get('section'));
+  // A rejected save opens the first section with a field it names.
+  useEffect(() => {
+    if (!state || state.ok) return;
+    const withError = firstSectionWithError(state.errors);
+    if (withError) router.replace(`/settings?section=${withError}`, { scroll: false });
+  }, [state, router]);
 
   function chooseProvider(id: string) {
     setProvider(id);
@@ -126,13 +191,13 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
     ...GROUPS.flatMap((group) =>
       providers
         .filter((p) => p.group === group)
-        .map((p) => ({ value: p.id, label: p.label, group, icon: p.logo, detail: p.modelCount ? `${p.modelCount} models` : undefined })),
+        .map((p) => ({ value: p.id, label: p.label, group: t(`groups.${group}`), icon: p.logo, detail: p.modelCount ? t('model.count', { count: p.modelCount }) : undefined })),
     ),
-    { value: 'custom', label: 'Custom (any OpenAI-compatible URL)', group: 'Other' },
+    { value: 'custom', label: t('ai.custom'), group: t('groups.Other') },
   ];
   const modelOptions: PickerOption[] = [
-    ...catalogModels.map((m) => ({ value: m.id, label: m.name, detail: modelDetail(m) })),
-    ...liveModels.filter((id) => !catalogModels.some((m) => m.id === id)).map((id) => ({ value: id, label: id, group: 'Listed by the provider' })),
+    ...catalogModels.map((m) => ({ value: m.id, label: m.name, detail: modelDetail(t, m) })),
+    ...liveModels.filter((id) => !catalogModels.some((m) => m.id === id)).map((id) => ({ value: id, label: id, group: t('groups.listed') })),
   ];
 
   function testAi() {
@@ -140,14 +205,21 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
       const result = await testAiAction(new FormData(formRef.current!));
       setLiveModels(result.ok ? result.models : []);
       if (!result.ok) return setAiCheck({ ok: false, message: result.error });
-      setAiCheck({ ok: true, message: result.models.length ? `Connected: ${result.models.length} models to choose from.` : 'Connected with the agent model.' });
+      setAiCheck({ ok: true, message: result.models.length ? t('ai.connectedModels', { count: result.models.length }) : t('ai.connectedAgent') });
     });
   }
 
   function testPayPalConnection() {
     startTesting(async () => {
       const result = await testPayPalAction(new FormData(formRef.current!));
-      setPayPalCheck(result.ok ? { ok: true, message: 'Connected to PayPal sandbox.' } : { ok: false, message: result.error });
+      setPayPalCheck(result.ok ? { ok: true, message: t('paypal.connected') } : { ok: false, message: result.error });
+    });
+  }
+
+  function testLivePayPalConnection() {
+    startTesting(async () => {
+      const result = await testLivePayPalAction(new FormData(formRef.current!));
+      setLivePayPalCheck(result.ok ? { ok: true, message: t('paypal.connectedLive') } : { ok: false, message: result.error });
     });
   }
 
@@ -159,269 +231,289 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl p-8 font-paypal text-pp-ink">
-      <h1 className="text-[28px] font-semibold text-pp-navy">Settings</h1>
-      <p className="mt-1 text-pp-muted">Adapt the support agent and its payment guard to your business. Changes apply to the next ticket.</p>
+    <main className="mx-auto w-full max-w-6xl px-6 py-8 font-paypal text-pp-ink md:px-10">
+      <PageHeader title={t('title')}>{t('intro')}</PageHeader>
       {view.locked && (
-        <p className="mt-4 rounded border border-pp-warning bg-pp-surface p-3 text-sm text-pp-warning">
-          Read-only: this server sets SETTINGS_LOCKED, so the public demo&apos;s keys and limits can&apos;t be changed.
+        <p className="mt-6 rounded-lg border border-pp-warning/40 bg-pp-warning-tint px-4 py-3 text-sm text-pp-warning">
+          {t('locked')}
         </p>
       )}
 
-      <form ref={formRef} onSubmit={submit} className="mt-6">
-        <fieldset disabled={view.locked} className="space-y-6">
-          <Section title="Business" detail="Who the agent works for and the refund policy it follows. The guard's judge checks every refund against this policy.">
-            <Field label="Business name" error={errors.name}>
+      <form ref={formRef} onSubmit={submit} className="mt-8 max-w-4xl">
+        <div className="min-w-0 space-y-6">
+        <Section id="language" open={open} title={t('language.title')} detail={t('language.detail')}>
+          <LanguagePicker />
+        </Section>
+        <fieldset disabled={view.locked} className="min-w-0 space-y-6">
+          <Section id="business" open={open} title={t('sections.business')} detail={t('business.detail')}>
+            <Field label={t('business.name')} error={errors.name}>
               <input name="name" defaultValue={defaults.name} className={input} />
             </Field>
-            <Field label="Contact emails" error={errors.contactEmails} hint="The only addresses besides the customer's that replies may include.">
+            <Field label={t('business.contactEmails')} error={errors.contactEmails} hint={t('business.contactEmailsHint')}>
               <input name="contactEmails" defaultValue={defaults.contactEmails} placeholder="help@yourshop.com" className={input} />
             </Field>
-            <Field label="Refund policy" error={errors.refundPolicy} wide>
-              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={4} className={`${input} h-auto`} />
+            <Field label={t('business.refundPolicy')} error={errors.refundPolicy} wide>
+              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={8} className={`${input} h-auto leading-relaxed`} />
             </Field>
           </Section>
 
-          <Section title="Limits" detail="Enforced by the guard whatever the AI decides: no prompt can raise them.">
-            <Field label="Currency" error={errors.currency}>
+          <Section id="limits" open={open} title={t('sections.limits')} detail={t('limits.detail')}>
+            <Field label={t('limits.currency')} error={errors.currency}>
               <Picker
                 name="currency"
                 value={currency}
                 onChange={setCurrency}
-                options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? 'no decimals' : undefined }))}
+                options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? t('limits.noDecimals') : undefined }))}
                 disabled={view.locked}
               />
             </Field>
-            <Field label="Refund automatically up to" error={errors.autoRefundUpTo} hint="Smaller refunds run on their own.">
+            <Field label={t('limits.autoRefundUpTo')} error={errors.autoRefundUpTo} hint={t('limits.autoRefundUpToHint')}>
               <input name="autoRefundUpTo" defaultValue={defaults.autoRefundUpTo} inputMode="decimal" className={input} />
             </Field>
-            <Field label="Ask a person up to" error={errors.approvalUpTo} hint="Larger refunds wait on /guard; above this they are blocked.">
+            <Field label={t('limits.approvalUpTo')} error={errors.approvalUpTo} hint={t('limits.approvalUpToHint')}>
               <input name="approvalUpTo" defaultValue={defaults.approvalUpTo} inputMode="decimal" className={input} />
             </Field>
-            <Field label="Daily cap" error={errors.dailyCap} hint="Total the agent may refund per day.">
+            <Field label={t('limits.dailyCap')} error={errors.dailyCap} hint={t('limits.dailyCapHint')}>
               <input name="dailyCap" defaultValue={defaults.dailyCap} inputMode="decimal" className={input} />
             </Field>
           </Section>
 
-          <Section title="AI" detail="Any provider with an OpenAI-compatible API: cloud, Chinese or running on your own machine.">
-            <Field label="Provider" hint={`${providers.length} providers from the models.dev catalog, plus any OpenAI-compatible URL.`}>
+          <Section id="ai" open={open} title={t('sections.ai')} detail={t('ai.detail')}>
+            <Field label={t('ai.provider')} hint={t('ai.providerHint', { count: providers.length })}>
               <Picker name="provider" value={provider} onChange={chooseProvider} options={providerOptions} disabled={view.locked} />
             </Field>
-            <Field label="Base URL" error={errors.baseUrl}>
+            <Field label={t('ai.baseUrl')} error={errors.baseUrl}>
               <input name="baseUrl" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} readOnly={provider !== 'custom'} className={input} />
             </Field>
-            <Field label="API key" error={errors.apiKey} hint={keyHint(view.ai.apiKey, 'LLM_API_KEY')} wide>
-              <input name="apiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.ai.apiKey.hint || 'Paste your API key'} className={input} />
+            <Field label={t('ai.apiKey')} error={errors.apiKey} hint={keyHint(t, view.ai.apiKey, 'LLM_API_KEY')} wide>
+              <input name="apiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.ai.apiKey.hint || t('ai.apiKeyPlaceholder')} className={input} />
             </Field>
             {view.ai.apiKey.source === 'saved' && (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearApiKey" /> Remove the saved key
+                <input type="checkbox" name="clearApiKey" /> {t('ai.removeKey')}
               </label>
             )}
-            <Field label="Agent model" error={errors.agentModel} hint="Answers the tickets and calls PayPal tools. Only models that can call tools are listed.">
+            <Field label={t('ai.agentModel')} error={errors.agentModel} hint={t('ai.agentModelHint')}>
               <Picker
                 name="agentModel"
                 value={agentModel}
                 onChange={setAgentModel}
-                options={[{ value: '', label: catalogModels[0] ? `Provider default (${catalogModels[0].name})` : 'Provider default' }, ...modelOptions]}
+                options={[{ value: '', label: catalogModels[0] ? t('ai.providerDefaultNamed', { name: catalogModels[0].name }) : t('ai.providerDefault') }, ...modelOptions]}
                 allowCustom
                 disabled={view.locked}
               />
             </Field>
-            <Field label="Judge model" error={errors.judgeModel} hint="Checks each refund against the policy.">
+            <Field label={t('ai.judgeModel')} error={errors.judgeModel} hint={t('ai.judgeModelHint')}>
               <Picker
                 name="judgeModel"
                 value={judgeModel}
                 onChange={setJudgeModel}
-                options={[{ value: '', label: 'Same as the agent' }, ...modelOptions]}
+                options={[{ value: '', label: t('ai.sameAsAgent') }, ...modelOptions]}
                 allowCustom
                 disabled={view.locked}
               />
             </Field>
             <div className="flex items-center gap-3 sm:col-span-2">
               <button type="button" onClick={testAi} disabled={testing} className={button}>
-                Test connection
+                {t('testConnection')}
               </button>
               <CheckResult check={aiCheck} />
             </div>
           </Section>
 
-          <Section title="PayPal" detail="Sandbox REST app credentials from developer.paypal.com. Money in the sandbox is fictitious.">
-            <Field label="Client ID" error={errors.paypalClientId}>
+          <Section id="paypal" open={open} title={t('sections.paypal')} detail={t('paypal.detail')}>
+            <div className="sm:col-span-2">
+              <h3 className="font-semibold">{t('paypal.sandboxTitle')}</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{t('paypal.sandboxDetail')}</p>
+            </div>
+            <Field label={t('paypal.clientId')} error={errors.paypalClientId}>
               <input name="paypalClientId" defaultValue={defaults.paypalClientId} autoComplete="off" className={input} />
             </Field>
-            <Field label="Secret" error={errors.paypalSecret} hint={keyHint(view.paypal.secret, 'PAYPAL_SECRET')}>
+            <Field label={t('paypal.secret')} error={errors.paypalSecret} hint={keyHint(t, view.paypal.secret, 'PAYPAL_SECRET')}>
               <input name="paypalSecret" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.paypal.secret.hint} className={input} />
             </Field>
             {view.paypal.secret.source === 'saved' && (
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearPaypalSecret" /> Remove the saved secret
+                <input type="checkbox" name="clearPaypalSecret" /> {t('paypal.removeSecret')}
               </label>
             )}
             <div className="flex items-center gap-3 sm:col-span-2">
               <button type="button" onClick={testPayPalConnection} disabled={testing} className={button}>
-                Test connection
+                {t('testConnection')}
               </button>
               <CheckResult check={payPalCheck} />
             </div>
+
+            <div className="border-t border-pp-gridline pt-5 sm:col-span-2">
+              <h3 className="font-semibold">{t('paypal.liveTitle')}</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{t('paypal.liveDetail')}</p>
+            </div>
+            <Field label={t('paypal.clientId')} error={errors.paypalLiveClientId}>
+              <input name="paypalLiveClientId" defaultValue={defaults.paypalLiveClientId} autoComplete="off" className={input} />
+            </Field>
+            <Field label={t('paypal.secret')} error={errors.paypalLiveSecret} hint={view.paypalLive.secret.source === 'none' ? t('paypal.liveNoEnv') : keyHint(t, view.paypalLive.secret, '')}>
+              <input name="paypalLiveSecret" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.paypalLive.secret.hint} className={input} />
+            </Field>
+            {view.paypalLive.secret.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearPaypalLiveSecret" /> {t('paypal.removeSecret')}
+              </label>
+            )}
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <button type="button" onClick={testLivePayPalConnection} disabled={testing} className={button}>
+                {t('testConnection')}
+              </button>
+              <CheckResult check={livePayPalCheck} />
+            </div>
           </Section>
 
-          <Section title="Notifications" detail="When the guard holds a refund for a person, it tells every channel set here: a Slack or Discord webhook, an email, a Telegram chat. The message names the amount, the masked customer email and the rules, never the ticket's text.">
-            <Field label="Webhook URL" error={errors.webhookUrl} hint={keyHint(view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'URL')} wide>
-              <input
-                name="webhookUrl"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.webhookUrl.hint || 'https://hooks.slack.com/services/…'}
-                className={input}
-              />
-            </Field>
-            {view.notifications.webhookUrl.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearWebhookUrl" /> Remove the saved webhook
-              </label>
-            )}
-            <SetupGuide title="How to get a Slack or Discord webhook">
-              <li>
-                <strong>Slack:</strong> on <ExternalLink href="https://api.slack.com/apps">api.slack.com/apps</ExternalLink>, create an app from scratch in your workspace, open{' '}
-                <em>Incoming Webhooks</em>, turn them on, click <em>Add New Webhook to Workspace</em>, pick the channel and copy the URL.
-              </li>
-              <li>
-                <strong>Discord:</strong> in your server, open the channel&apos;s <em>Edit Channel</em> → <em>Integrations</em> → <em>Webhooks</em> → <em>New Webhook</em>, then{' '}
-                <em>Copy Webhook URL</em>.
-              </li>
-              <li>Paste the URL above and save. The URL works as a password: anyone who has it can post to the channel.</li>
-            </SetupGuide>
-            <p className="text-sm text-pp-muted sm:col-span-2">
-              Email goes to the contact emails above, through your own mail server (SMTP) when its server, login and password are set, otherwise through Resend.
-            </p>
-            <Field
-              label="From address"
-              error={errors.emailFrom}
-              hint="With SMTP, leave blank to send from the login. With Resend, a sender on a domain verified there, or onboarding@resend.dev to try it."
-              wide
+          <Section
+            id="notifications"
+            open={open}
+            cards
+            title={t('sections.notifications')}
+            detail={t('notifications.detail')}
+          >
+            <Channel title={t('notifications.webhook.title')} detail={t('notifications.webhook.detail')} on={isSet(view.notifications.webhookUrl)}>
+              <Field label={t('notifications.webhook.url')} error={errors.webhookUrl} hint={keyHint(t, view.notifications.webhookUrl, 'GUARD_WEBHOOK_URL', 'url')} wide>
+                <input
+                  name="webhookUrl"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.webhookUrl.hint || 'https://hooks.slack.com/services/…'}
+                  className={input}
+                />
+              </Field>
+              {view.notifications.webhookUrl.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearWebhookUrl" /> {t('notifications.webhook.remove')}
+                </label>
+              )}
+              <SetupGuide title={t('notifications.webhook.guide')}>
+                <li>{t.rich('notifications.webhook.step1', linkTo('https://api.slack.com/apps'))}</li>
+                <li>{t.rich('notifications.webhook.step2', markup)}</li>
+                <li>{t('notifications.webhook.step3')}</li>
+              </SetupGuide>
+            </Channel>
+            <Channel
+              title={t('notifications.email.title')}
+              detail={t('notifications.email.detail')}
+              on={Boolean(defaults.smtpHost && isSet(view.notifications.smtpPassword)) || isSet(view.notifications.resendApiKey)}
             >
-              <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
-            </Field>
-            <Field label="SMTP server" error={errors.smtpHost}>
-              <input name="smtpHost" defaultValue={defaults.smtpHost} autoComplete="off" placeholder="smtp.gmail.com" className={input} />
-            </Field>
-            <Field label="SMTP port" error={errors.smtpPort} hint="587 (STARTTLS) or 465 (TLS). Blank means 587.">
-              <input name="smtpPort" inputMode="numeric" defaultValue={defaults.smtpPort} autoComplete="off" placeholder="587" className={input} />
-            </Field>
-            <Field label="SMTP login" error={errors.smtpUser}>
-              <input name="smtpUser" defaultValue={defaults.smtpUser} autoComplete="off" placeholder="you@gmail.com" className={input} />
-            </Field>
-            <Field
-              label="SMTP password"
-              error={errors.smtpPassword}
-              hint={`${keyHint(view.notifications.smtpPassword, 'SMTP_PASSWORD', 'password')} Changing the server or login forgets it.`}
-            >
-              <input
-                name="smtpPassword"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.smtpPassword.hint || 'App password'}
-                className={input}
-              />
-            </Field>
-            {view.notifications.smtpPassword.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearSmtpPassword" /> Remove the saved SMTP password
-              </label>
-            )}
-            <SetupGuide title="How to set up email with your own mail (SMTP)">
-              <li>
-                <strong>Gmail:</strong> turn on 2-Step Verification for the account, then create an app password on{' '}
-                <ExternalLink href="https://myaccount.google.com/apppasswords">myaccount.google.com/apppasswords</ExternalLink>. Use server <code>smtp.gmail.com</code>,
-                port <code>587</code>, your Gmail address as login and the 16-letter app password, without spaces. Your normal password does not work.
-              </li>
-              <li>
-                <strong>Outlook or Microsoft 365:</strong> server <code>smtp.office365.com</code>, port <code>587</code>, your address and password (an app password if
-                the account uses two-step sign-in). Your administrator may need to allow SMTP for the mailbox.
-              </li>
-              <li>
-                <strong>Your hosting&apos;s mail:</strong> the server, port and login are in your hosting panel&apos;s email settings, often <code>mail.your-domain.com</code>{' '}
-                with your full address as login.
-              </li>
-              <li>Leave the from address blank: most mail servers only send from the account you log in with.</li>
-              <li>The password only travels encrypted (TLS), and is only ever sent to the server and login it was saved with.</li>
-            </SetupGuide>
-            <Field label="Resend API key" error={errors.resendApiKey} hint={keyHint(view.notifications.resendApiKey, 'RESEND_API_KEY')}>
-              <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
-            </Field>
-            {view.notifications.resendApiKey.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearResendApiKey" /> Remove the saved Resend key
-              </label>
-            )}
-            <SetupGuide title="How to set up email with Resend">
-              <li>
-                Sign up on <ExternalLink href="https://resend.com">resend.com</ExternalLink> (the free plan is enough), open <em>API Keys</em>, create a key with sending
-                access and paste it above.
-              </li>
-              <li>
-                <strong>To try it:</strong> use <code>onboarding@resend.dev</code> as the from address and put your Resend account&apos;s email in Contact emails under
-                Business. Resend&apos;s test sender only delivers to that address, and may land in spam.
-              </li>
-              <li>
-                <strong>For real:</strong> in Resend, open <em>Domains</em>, add your domain, add the DNS records it shows, and once it is verified use an address on it,
-                like <code>guard@your-domain.com</code>.
-              </li>
-              <li>Every contact email under Business gets the message.</li>
-            </SetupGuide>
-            <Field label="Telegram bot token" error={errors.telegramBotToken} hint={keyHint(view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
-              <input
-                name="telegramBotToken"
-                type="password"
-                autoComplete="off"
-                disabled={!view.canStoreKeys}
-                placeholder={view.notifications.telegramBotToken.hint || '123456789:AA…'}
-                className={input}
-              />
-            </Field>
-            <Field label="Telegram chat id" error={errors.telegramChatId} hint="Message your bot, then open api.telegram.org/bot<token>/getUpdates and copy chat.id, or use @channelname.">
-              <input name="telegramChatId" defaultValue={defaults.telegramChatId} autoComplete="off" placeholder="-1001234567890" className={input} />
-            </Field>
-            {view.notifications.telegramBotToken.source === 'saved' && (
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                <input type="checkbox" name="clearTelegramBotToken" /> Remove the saved bot token
-              </label>
-            )}
-            <SetupGuide title="How to set up Telegram">
-              <li>
-                In Telegram, open <ExternalLink href="https://t.me/BotFather">@BotFather</ExternalLink>, send <code>/newbot</code>, choose a name and a username ending in{' '}
-                <code>bot</code>, and paste the token it gives you (<code>123456789:AA…</code>) above.
-              </li>
-              <li>
-                Open a chat with your new bot, press <em>Start</em> and send it any message. For a group, add the bot to the group and send a message there.
-              </li>
-              <li>
-                In a browser, open <code>https://api.telegram.org/bot&lt;token&gt;/getUpdates</code>, with your token right after <code>bot</code> and no spaces or{' '}
-                <code>&lt; &gt;</code>. Copy the number in <code>&quot;chat&quot;: {'{'} &quot;id&quot;: … {'}'}</code> into Telegram chat id. A group&apos;s id starts with{' '}
-                <code>-100</code>.
-              </li>
-              <li>
-                If it shows <code>&quot;result&quot;: []</code>, the bot has no message yet: send it one and reload.
-              </li>
-              <li>
-                Set <code>APP_URL</code> on the server so the message links to the guard page; without it, Telegram shows <code>/guard</code> as a bot command.
-              </li>
-            </SetupGuide>
+              <Field
+                label={t('notifications.email.from')}
+                error={errors.emailFrom}
+                hint={t('notifications.email.fromHint')}
+                wide
+              >
+                <input name="emailFrom" type="email" defaultValue={defaults.emailFrom} autoComplete="off" placeholder="guard@your-domain.com" className={input} />
+              </Field>
+              <Field label={t('notifications.email.smtpHost')} error={errors.smtpHost}>
+                <input name="smtpHost" defaultValue={defaults.smtpHost} autoComplete="off" placeholder="smtp.gmail.com" className={input} />
+              </Field>
+              <Field label={t('notifications.email.smtpPort')} error={errors.smtpPort} hint={t('notifications.email.smtpPortHint')}>
+                <input name="smtpPort" inputMode="numeric" defaultValue={defaults.smtpPort} autoComplete="off" placeholder="587" className={input} />
+              </Field>
+              <Field label={t('notifications.email.smtpUser')} error={errors.smtpUser}>
+                <input name="smtpUser" defaultValue={defaults.smtpUser} autoComplete="off" placeholder="you@gmail.com" className={input} />
+              </Field>
+              <Field
+                label={t('notifications.email.smtpPassword')}
+                error={errors.smtpPassword}
+                hint={`${keyHint(t, view.notifications.smtpPassword, 'SMTP_PASSWORD', 'password')} ${t('notifications.email.smtpPasswordForgets')}`}
+              >
+                <input
+                  name="smtpPassword"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.smtpPassword.hint || t('notifications.email.smtpPasswordPlaceholder')}
+                  className={input}
+                />
+              </Field>
+              {view.notifications.smtpPassword.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearSmtpPassword" /> {t('notifications.email.removeSmtpPassword')}
+                </label>
+              )}
+              <SetupGuide title={t('notifications.email.smtpGuide')}>
+                <li>{t.rich('notifications.email.smtpStep1', linkTo('https://myaccount.google.com/apppasswords'))}</li>
+                <li>{t.rich('notifications.email.smtpStep2', markup)}</li>
+                <li>{t.rich('notifications.email.smtpStep3', markup)}</li>
+                <li>{t('notifications.email.smtpStep4')}</li>
+                <li>{t('notifications.email.smtpStep5')}</li>
+              </SetupGuide>
+              <Field label={t('notifications.email.resendKey')} error={errors.resendApiKey} hint={keyHint(t, view.notifications.resendApiKey, 'RESEND_API_KEY')}>
+                <input name="resendApiKey" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.notifications.resendApiKey.hint || 're_…'} className={input} />
+              </Field>
+              {view.notifications.resendApiKey.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearResendApiKey" /> {t('notifications.email.removeResendKey')}
+                </label>
+              )}
+              <SetupGuide title={t('notifications.email.resendGuide')}>
+                <li>{t.rich('notifications.email.resendStep1', linkTo('https://resend.com'))}</li>
+                <li>{t.rich('notifications.email.resendStep2', markup)}</li>
+                <li>{t.rich('notifications.email.resendStep3', markup)}</li>
+                <li>{t('notifications.email.resendStep4')}</li>
+              </SetupGuide>
+            </Channel>
+            <Channel title={t('notifications.telegram.title')} detail={t('notifications.telegram.detail')} on={isSet(view.notifications.telegramBotToken) && Boolean(defaults.telegramChatId)}>
+              <Field label={t('notifications.telegram.token')} error={errors.telegramBotToken} hint={keyHint(t, view.notifications.telegramBotToken, 'TELEGRAM_BOT_TOKEN', 'token')}>
+                <input
+                  name="telegramBotToken"
+                  type="password"
+                  autoComplete="off"
+                  disabled={!view.canStoreKeys}
+                  placeholder={view.notifications.telegramBotToken.hint || '123456789:AA…'}
+                  className={input}
+                />
+              </Field>
+              <Field label={t('notifications.telegram.chatId')} error={errors.telegramChatId} hint={t('notifications.telegram.chatIdHint', { token: '<token>' })}>
+                <input name="telegramChatId" defaultValue={defaults.telegramChatId} autoComplete="off" placeholder="-1001234567890" className={input} />
+              </Field>
+              {view.notifications.telegramBotToken.source === 'saved' && (
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" name="clearTelegramBotToken" /> {t('notifications.telegram.removeToken')}
+                </label>
+              )}
+              <SetupGuide title={t('notifications.telegram.guide')}>
+                <li>{t.rich('notifications.telegram.step1', linkTo('https://t.me/BotFather'))}</li>
+                <li>{t.rich('notifications.telegram.step2', markup)}</li>
+                <li>
+                  {t.rich('notifications.telegram.step3', {
+                    ...markup,
+                    url: 'https://api.telegram.org/bot<token>/getUpdates',
+                    brackets: '< >',
+                    chat: '"chat": { "id": … }',
+                  })}
+                </li>
+                <li>{t.rich('notifications.telegram.step4', { ...markup, empty: '"result": []' })}</li>
+                <li>{t.rich('notifications.telegram.step5', markup)}</li>
+              </SetupGuide>
+            </Channel>
           </Section>
 
-          <div className="flex items-center gap-4">
-            <button type="submit" disabled={saving} className="rounded bg-pp-blue px-5 py-2 font-semibold text-white hover:bg-pp-blue-dark disabled:opacity-60">
-              {saving ? 'Saving…' : 'Save settings'}
+          {/* The language and the API keys save on their own, so the form's button stays out of their sections. */}
+          <div hidden={open === 'language' || open === 'api-keys'} className="flex flex-wrap items-center gap-4">
+            <button type="submit" disabled={saving} className={primaryButton}>
+              {saving && <Spinner />}
+              {saving ? t('save.saving') : t('save.button')}
             </button>
-            {state?.ok && <span className="text-sm text-pp-success">Saved. The next ticket uses these settings.</span>}
+            <span className="text-sm text-pp-muted">{t('save.scope')}</span>
+            {state?.ok && <span className="text-sm text-pp-success">{t('save.saved')}</span>}
             {errors.form && <span className="text-sm text-pp-danger">{errors.form}</span>}
-            {state && !state.ok && !errors.form && <span className="text-sm text-pp-danger">Check the highlighted fields.</span>}
+            {state && !state.ok && !errors.form && <span className="text-sm text-pp-danger">{t('save.checkFields')}</span>}
           </div>
         </fieldset>
+        </div>
       </form>
+      {/* Outside the settings form: a form can't hold another. */}
+      <div className="max-w-4xl">
+        <ApiKeysSection hidden={open !== 'api-keys'} view={apiKeys} locked={view.locked} />
+        <LiveModeSection hidden={open !== 'paypal'} status={liveMode} locked={view.locked} />
+      </div>
     </main>
   );
 }

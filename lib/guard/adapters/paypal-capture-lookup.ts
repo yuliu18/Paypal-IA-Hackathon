@@ -1,7 +1,7 @@
 // CaptureLookup backed by the PayPal REST API: a capture plus its order give the amount,
 // what is already refunded, and which customer the shop charged.
 
-import { getCapture, getOrder, type Capture, type Money as PayPalMoney, type Order } from '@/lib/paypal';
+import { getCapture, getOrder, type Capture, type Money as PayPalMoney, type Order, type PaymentEnvironment } from '@/lib/paypal';
 import type { CaptureFacts, Money } from '../domain/policy';
 import type { CaptureLookup } from '../ports';
 
@@ -38,11 +38,16 @@ export function toCaptureFacts(capture: Capture, order: Order): CaptureFacts {
   };
 }
 
-export const payPalCaptureLookup: CaptureLookup = {
-  async getCapture(captureId) {
-    const capture = await getCapture(captureId);
-    const orderId = capture.supplementary_data?.related_ids?.order_id;
-    if (!orderId) throw new Error(`Capture ${captureId} has no related order`);
-    return toCaptureFacts(capture, await getOrder(orderId));
-  },
-};
+// `environment`: the PayPal environment the request runs in; the sandbox unless told otherwise.
+export function createPayPalCaptureLookup({ environment = 'sandbox' }: { environment?: PaymentEnvironment } = {}): CaptureLookup {
+  return {
+    async getCapture(captureId) {
+      const capture = await getCapture(captureId, environment);
+      const orderId = capture.supplementary_data?.related_ids?.order_id;
+      if (!orderId) throw new Error(`Capture ${captureId} has no related order`);
+      return toCaptureFacts(capture, await getOrder(orderId, environment));
+    },
+  };
+}
+
+export const payPalCaptureLookup = createPayPalCaptureLookup();

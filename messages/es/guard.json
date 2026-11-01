@@ -1,0 +1,105 @@
+{
+  "title": "Registro del guard",
+  "summary": "Cada llamada que tus agentes hicieron a PayPal y lo que el guard hizo con ella. Las llamadas retenidas y bloqueadas nunca llegaron a PayPal.",
+  "chain": {
+    "tampered": "<strong>Caja negra manipulada:</strong> fila #{row} {reason}. No se puede confiar en las entradas a partir de ahí.",
+    "intact": "Caja negra intacta, {count, plural, one {# fila} other {# filas}}",
+    "howChain": "Cada fila lleva el hash de la anterior, así que una fila editada, reordenada o borrada rompe la cadena.",
+    "howCheck": "Las filas nuevas se comprueban en cada visita y las antiguas, completas, al menos una vez por minuto.",
+    "howHead": "Un registro reescrito desde cero también encadenaría: guarda en otro sitio una copia de la cabeza {head}… para detectarlo."
+  },
+  "tally": {
+    "latest": "En las últimas {count, number} decisiones",
+    "figure": "{n, number}",
+    "passed": "pasaron a PayPal",
+    "waiting": "{count, plural, one {te espera} other {te esperan}}",
+    "stopped": "bloqueadas"
+  },
+  "download": {
+    "label": "Descargar {format}",
+    "title": "Cada decisión del guard, con quién la tomó. Los correos y las tarjetas van enmascarados."
+  },
+  "amount": {
+    "unreadable": "Importe ilegible",
+    "fullRemaining": "Todo el importe restante"
+  },
+  "columns": {
+    "id": "#",
+    "at": "Hora",
+    "tool": "Herramienta",
+    "outcome": "Resultado",
+    "verdict": "Veredicto",
+    "amount": "Importe",
+    "customer": "Cliente del ticket",
+    "reasons": "Motivos",
+    "args": "Argumentos",
+    "detail": "Detalle",
+    "decides": "Decide la entrada retenida",
+    "environment": "Entorno"
+  },
+  "grid": {
+    "search": "Buscar en todas las columnas…",
+    "searchLabel": "Buscar en todas las columnas"
+  },
+  "loading": "Cargando datos de PayPal…",
+  "error": {
+    "title": "No pudimos cargar estos datos de PayPal",
+    "detail": "Revisa las credenciales de la API en <code>{file}</code> y que la app del sandbox tenga las funciones que necesita este endpoint.",
+    "retry": "Reintentar"
+  },
+  "held": {
+    "title": "Esperando tu aprobación",
+    "running": "Pasándola por el guard…",
+    "count": "{count, plural, one {# retenida} other {# retenidas}}",
+    "intro": "Al aprobar, la llamada vuelve a pasar por las comprobaciones del guard antes de que PayPal la vea.",
+    "empty": "No hay nada retenido ahora mismo.",
+    "showFirst": "Mostrar las primeras {count}",
+    "showAll": "Mostrar las {count}",
+    "heading": "<strong>{action}</strong>{hasAmount, select, yes { de {amount}} other {}}<muted> para {customer}</muted>",
+    "why": "Por qué",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "kinds": {
+      "refund": "Reembolso",
+      "cancellation": "Cancelar suscripción",
+      "dispute": "Aceptar reclamación de disputa",
+      "invoice": "Crear factura",
+      "order": "Crear pedido",
+      "invoiceSending": "Enviar factura",
+      "invoiceReminder": "Enviar recordatorio de factura"
+    },
+    "reasons": {
+      "approvalRequired": "Supera el límite de aprobación",
+      "intentUncertain": "Juez de IA indeciso",
+      "intentJudgeUnavailable": "Juez de IA no disponible"
+    },
+    "invalidRequest": "Solicitud de decisión no válida",
+    "failed": "No se pudo procesar la decisión; no se registró nada.",
+    "live": "Real · dinero real"
+  },
+  "assistant": {
+    "title": "Pregunta por estas decisiones",
+    "intro": "Pregunta por las decisiones del guard. Lee las entradas más recientes del registro, enmascaradas y sin el texto de los tickets, y solo puede explicar: no puede aprobar, rechazar ni cambiar reglas.",
+    "suggestions": {
+      "lastRefund": "¿Por qué se bloqueó el último reembolso?",
+      "today": "Resume el día de hoy",
+      "waiting": "¿Qué está esperándome?",
+      "stoppedCustomers": "¿Qué clientes fueron bloqueados más veces?"
+    },
+    "placeholder": "Pregunta por las decisiones del guard",
+    "inputLabel": "Pregunta para el asistente del guard",
+    "thinking": "Pensando…",
+    "ask": "Preguntar",
+    "failed": "El asistente del guard falló.",
+    "unreachable": "No se pudo contactar con el asistente del guard."
+  },
+  "environment": {
+    "sandbox": "Sandbox",
+    "live": "Real"
+  },
+  "liveMode": {
+    "on": "El modo real está activado: las llamadas de la app de tu tienda mueven dinero real.",
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba: todas las llamadas usan el sandbox.",
+    "settings": "Ajustes del modo"
+  }
+}

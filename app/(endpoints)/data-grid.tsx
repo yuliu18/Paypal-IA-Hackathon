@@ -6,6 +6,7 @@
 // built-in `cellDataType: 'dateString'` ('YYYY-MM-DD') or `'dateTimeString'` ('YYYY-MM-DDThh:mm:ssZ').
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   ClientSideRowModelModule,
   ColumnAutoSizeModule,
@@ -63,6 +64,7 @@ const defaultColDef: ColDef<Row> = { filter: true };
 const autoSizeStrategy = { type: 'fitCellContents' } as const;
 
 export function DataGrid({ rows, columns }: { rows: Row[]; columns: ColDef<Row>[] }) {
+  const t = useTranslations('guard.grid');
   const [search, setSearch] = useState('');
 
   return (
@@ -71,8 +73,8 @@ export function DataGrid({ rows, columns }: { rows: Row[]; columns: ColDef<Row>[
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search all columns…"
-        aria-label="Search all columns"
+        placeholder={t('search')}
+        aria-label={t('searchLabel')}
         className="h-10 w-72 rounded border border-pp-border px-3 text-sm outline-none focus:border-pp-blue"
       />
       <div className="min-h-0 flex-1">
