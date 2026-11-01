@@ -27,3 +27,9 @@ export function sectionHasError(errors: Record<string, string | undefined>, id: 
 export function firstSectionWithError(errors: Record<string, string | undefined>): SettingsSectionId | undefined {
   return SETTINGS_SECTIONS.find((s) => hasError(errors, s.fields))?.id;
 }
+
+// The section the address names (/settings?section=limits), shared by the page and the side menu
+// that links to each section; the language when it names none or one that doesn't exist.
+export function sectionFrom(value: string | null): SettingsSectionId {
+  return SETTINGS_SECTIONS.find((s) => s.id === value)?.id ?? 'language';
+}

@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Suspense } from 'react';
 import { setNavSlot } from './nav-slot';
+import { SettingsNav } from './settings/settings-nav';
 import { BrandMark } from './ui/brand-mark';
 
 // The control panel's side menu, on every page, grouped by what the owner came to do: watch the
@@ -63,6 +65,7 @@ export function AppNav() {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const onDashboard = pathname.startsWith('/dashboard');
+  const onSettings = pathname.startsWith('/settings');
   // The owner's choice holds until they move between the dashboard and the other pages.
   const [choice, setChoice] = useState<{ onDashboard: boolean; compact: boolean }>();
   const compact = choice?.onDashboard === onDashboard ? choice.compact : false;
@@ -109,6 +112,13 @@ export function AppNav() {
               <span className={label}>{t(item.label)}</span>
             </Link>
           ))}
+          {section.items.some((item) => item.href === '/settings') && onSettings && !compact && (
+            <div className="hidden md:block">
+              <Suspense fallback={null}>
+                <SettingsNav />
+              </Suspense>
+            </div>
+          )}
           {section.items.some((item) => item.href === '/dashboard') && onDashboard && !compact && (
             <div ref={setNavSlot} className="hidden md:block" />
           )}

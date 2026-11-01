@@ -1,6 +1,7 @@
 'use client';
 
-import { startTransition, useActionState, useRef, useState, useTransition } from 'react';
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { KeyStatus, SettingsForm, SettingsView } from '@/lib/settings/settings';
 import type { CatalogModel, CatalogProvider } from '@/lib/settings/catalog';
@@ -8,7 +9,8 @@ import { CURRENCIES } from '@/lib/settings/currencies';
 import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
 import { Picker, type PickerOption } from './picker';
 import { latestOnly } from './picker-logic';
-import { firstSectionWithError, sectionHasError, SETTINGS_SECTIONS, type SettingsSectionId } from './sections';
+import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './sections';
+import { SettingsNav } from './settings-nav';
 import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
@@ -28,7 +30,7 @@ const button =
 // `cards`: the section is a stack of cards of its own (one per notification channel) rather than one card.
 function Section({ id, open, title, detail, cards, children }: { id: SettingsSectionId; open: SettingsSectionId; title: string; detail: string; cards?: boolean; children: React.ReactNode }) {
   return (
-    <section id={`settings-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} hidden={id !== open} className={cards ? '' : 'rounded-lg border border-pp-border bg-pp-surface p-6'}>
+    <section id={`settings-${id}`} hidden={id !== open} className={cards ? '' : 'rounded-lg border border-pp-border bg-pp-surface p-6'}>
       <h2 className="text-lg font-semibold">{title}</h2>
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
       {cards ? <div className="mt-5 space-y-4">{children}</div> : <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>}
@@ -139,15 +141,16 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
   const [testing, startTesting] = useTransition();
   const errors: Partial<Record<keyof SettingsForm | 'form', string>> = state && !state.ok ? state.errors : {};
   const defaults = view.form;
-  const [open, setOpen] = useState<SettingsSectionId>('language');
-  // A rejected save opens the first section with a field it names (set during render, when a new
-  // answer arrives, rather than in an effect).
-  const [answered, setAnswered] = useState(state);
-  if (state !== answered) {
-    setAnswered(state);
-    const withError = firstSectionWithError(errors);
-    if (withError) setOpen(withError);
-  }
+  // The open section is in the address (/settings?section=limits), so the side menu's list of
+  // sections (./settings-nav.tsx) and the page agree on it.
+  const router = useRouter();
+  const open = sectionFrom(useSearchParams().get('section'));
+  // A rejected save opens the first section with a field it names.
+  useEffect(() => {
+    if (!state || state.ok) return;
+    const withError = firstSectionWithError(state.errors);
+    if (withError) router.replace(`/settings?section=${withError}`, { scroll: false });
+  }, [state, router]);
 
   function chooseProvider(id: string) {
     setProvider(id);
@@ -214,27 +217,10 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
         </p>
       )}
 
-      <form ref={formRef} onSubmit={submit} className="mt-8 grid items-start gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
-        <nav role="tablist" aria-label={t('sectionsLabel')} aria-orientation="vertical" className="flex gap-1 overflow-x-auto md:sticky md:top-8 md:flex-col">
-          {SETTINGS_SECTIONS.map((section) => {
-            const current = section.id === open;
-            return (
-              <button
-                key={section.id}
-                id={`tab-${section.id}`}
-                type="button"
-                role="tab"
-                aria-selected={current}
-                aria-controls={`settings-${section.id}`}
-                onClick={() => setOpen(section.id)}
-                className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm ${current ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-surface'}`}
-              >
-                {t(`sections.${section.id}`)}
-                {sectionHasError(errors, section.id) && <span className="size-2 rounded-full bg-pp-danger" aria-label={t('hasError')} />}
-              </button>
-            );
-          })}
-        </nav>
+      <div className="mt-6 md:hidden">
+        <SettingsNav row />
+      </div>
+      <form ref={formRef} onSubmit={submit} className="mt-8 max-w-4xl">
         <div className="min-w-0 space-y-6">
         <Section id="language" open={open} title={t('language.title')} detail={t('language.detail')}>
           <LanguagePicker />

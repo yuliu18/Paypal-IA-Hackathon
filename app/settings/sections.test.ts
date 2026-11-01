@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstSectionWithError, SETTINGS_SECTIONS } from './sections';
+import { firstSectionWithError, sectionFrom, SETTINGS_SECTIONS } from './sections';
 
 describe('settings sections', () => {
   it('lists the sections in the order the menu shows them', () => {
@@ -21,5 +21,13 @@ describe('settings sections', () => {
 
   it('puts the language first, which holds no field of the settings form', () => {
     expect(SETTINGS_SECTIONS[0]).toMatchObject({ id: 'language', fields: [] });
+  });
+});
+
+describe('sectionFrom', () => {
+  it("opens the section the address names, and the language when it names none or an unknown one", () => {
+    expect(sectionFrom('limits')).toBe('limits');
+    expect(sectionFrom(null)).toBe('language');
+    expect(sectionFrom('nope')).toBe('language');
   });
 });
