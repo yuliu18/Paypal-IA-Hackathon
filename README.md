@@ -63,7 +63,9 @@ Set it up once:
 2. Open the app: with no owner yet, `/login` shows **Create the owner account** (email, and a password of at least 12 characters with a lowercase letter, an uppercase letter and a digit). That account is the owner; from then on `/login` only signs in, and the app refuses any second set-up.
 3. Close sign-up at Neon Auth too, so nobody can create accounts directly against its endpoint: `neon neon-auth config email-password update --disable-sign-up true`. The app already lets in only the owner (the oldest account), whatever other accounts exist; this keeps the user table clean.
 
-To start over (a forgotten password, a new owner), delete the owner with `neon neon-auth user delete <user-id>` and turn sign-up back on with `--disable-sign-up false`; the set-up form returns within 5 minutes (the owner is cached per server process).
+**Forgot your password?** on `/login` leads to `/login/forgot`: type the owner's email and Neon Auth emails a code (from its shared sender `auth@mail.myneon.app` until you set up custom SMTP, which production needs: [checklist](https://neon.com/docs/auth/production-checklist.md); codes work on the shared sender, reset links would not). Enter the code with a new password (same rule as above) on `/login/reset`; every session of the owner is then signed out (a browser's cached session lasts up to 5 more minutes). The page answers the same for any address and only the owner's address gets a code; a client may ask 5 times per 15 minutes, the owner's address gets at most one code a minute, and wrong codes count toward the sign-in lockout (10 per 15 minutes). With the demo password these pages are not offered.
+
+To start over (a new owner), delete the owner with `neon neon-auth user delete <user-id>` and turn sign-up back on with `--disable-sign-up false`; the set-up form returns within 5 minutes (the owner is cached per server process).
 
 ## Settings
 

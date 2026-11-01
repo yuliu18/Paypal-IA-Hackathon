@@ -28,6 +28,32 @@ describe('isPublicRequest', () => {
   });
 });
 
+describe('isPublicRequest for password recovery', () => {
+  it('opens the forgot-password and reset pages (read only) and their two form posts', () => {
+    for (const pathname of ['/login/forgot', '/login/reset']) {
+      expect(isPublicRequest({ method: 'GET', pathname })).toBe(true);
+      expect(isPublicRequest({ method: 'HEAD', pathname })).toBe(true);
+      expect(isPublicRequest({ method: 'POST', pathname })).toBe(false);
+    }
+    for (const pathname of ['/api/auth/forgot', '/api/auth/reset']) {
+      expect(isPublicRequest({ method: 'POST', pathname })).toBe(true);
+      expect(isPublicRequest({ method: 'GET', pathname })).toBe(false);
+    }
+  });
+
+  it('opens nothing else under them', () => {
+    for (const pathname of ['/login/forgot/../../guard', '/login/forgot/', '/login/reset/x', '/login/other', '/login/forgotten', '/api/auth/forgot/x', '/api/auth/reset/', '/api/auth/reset-password', '/api/auth/email-otp/reset-password']) {
+      expect(isPublicRequest({ method: 'GET', pathname })).toBe(false);
+      expect(isPublicRequest({ method: 'POST', pathname })).toBe(false);
+    }
+  });
+
+  it('refuses a Server Action call on them', () => {
+    expect(isPublicRequest({ method: 'GET', pathname: '/login/forgot', serverAction: true })).toBe(false);
+    expect(isPublicRequest({ method: 'POST', pathname: '/api/auth/reset', serverAction: true })).toBe(false);
+  });
+});
+
 describe('neonAccess', () => {
   it('lets in the owner only', () => {
     expect(neonAccess({ userId: 'owner-1', ownerId: 'owner-1' })).toBe('allow');

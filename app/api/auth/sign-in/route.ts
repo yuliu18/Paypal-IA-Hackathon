@@ -1,12 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { safeNextPath } from '@/lib/auth/access';
 import { backToLogin, field, refuseFormPost, seeOther } from '@/lib/auth/form-post';
+import { limits } from '@/lib/auth/limits';
 import { owner } from '@/lib/auth/owner';
 import { neonAuth } from '@/lib/auth/server';
-import { clientAddress, FailedAttempts } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/demo-auth';
 
-// 10 wrong passwords lock that client out of signing in for 15 minutes (Neon Auth limits too).
-const failures = new FailedAttempts({ maxFailures: 10, windowMs: 15 * 60_000 });
+// 10 wrong passwords (or reset codes) lock that client out for 15 minutes (Neon Auth limits too).
+const failures = limits.signInFailures;
 
 // The sign-in form's post (app/login). Only the owner's account may sign in here.
 export async function POST(request: NextRequest) {

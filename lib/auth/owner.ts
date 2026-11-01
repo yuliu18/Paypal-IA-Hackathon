@@ -33,3 +33,12 @@ async function oldestUserId(): Promise<string | null> {
 // One per server process (kept on globalThis across dev reloads).
 const globalForOwner = globalThis as typeof globalThis & { ownerLookup?: OwnerLookup };
 export const owner: OwnerLookup = (globalForOwner.ownerLookup ??= createOwnerLookup(oldestUserId, { ttlMs: 5 * 60_000 }));
+
+// The owner's email address, or null while there is no owner. Not remembered: it is read only by
+// the password-recovery endpoints. Errors propagate.
+export async function ownerEmail(): Promise<string | null> {
+  const id = await owner.ownerId();
+  if (id === null) return null;
+  const rows = await query<{ email: string }>('SELECT email FROM neon_auth."user" WHERE id = $1', [id]);
+  return rows[0]?.email ?? null;
+}

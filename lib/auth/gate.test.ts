@@ -103,6 +103,17 @@ describe('gate with Neon Auth', () => {
     expect((await gate(request('/api/auth/get-session'), deps())).status).toBe(401);
   });
 
+  it('lets anyone reach password recovery without a session, and nothing beyond it', async () => {
+    const session = vi.fn();
+    expect(passedThrough(await gate(request('/login/forgot'), deps({ session })))).toBe(true);
+    expect(passedThrough(await gate(request('/login/reset?email=a%40b.example'), deps({ session })))).toBe(true);
+    expect(passedThrough(await gate(request('/api/auth/forgot', { method: 'POST' }), deps({ session })))).toBe(true);
+    expect(passedThrough(await gate(request('/api/auth/reset', { method: 'POST' }), deps({ session })))).toBe(true);
+    expect(session).not.toHaveBeenCalled();
+    expect((await gate(request('/api/auth/forgot/x', { method: 'POST' }), deps())).status).toBe(401);
+    expect((await gate(request('/login/reset', { method: 'POST', headers: { 'next-action': 'abc123' } }), deps())).status).toBe(307);
+  });
+
   it('refuses a Server Action posted to the login page without a session', async () => {
     const response = await gate(request('/login', { method: 'POST', headers: { 'next-action': 'abc123' } }), deps());
     expect(passedThrough(response)).toBe(false);
