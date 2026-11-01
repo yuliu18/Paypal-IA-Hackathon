@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { aiEnabled, aiModels } from "@/lib/ai";
 import { latestDashboardData } from "@/lib/dashboard-data";
 import { readGuardDashboardRows } from "@/lib/guard/dashboard-rows";
 import { auditLog } from "@/lib/guard/runtime";
 import { Dashboard } from "./dashboard";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("dashboard.metadata");
+  return { title: t("title") };
+}
 
 // How many of the guard's newest decisions the report reads; older ones stay in the log and on /guard.
 const GUARD_ROWS = 5000;

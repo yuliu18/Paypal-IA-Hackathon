@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { CloseIcon, MoreIcon, PlusIcon, RefreshIcon, ReportIcon } from './ui/icons';
 import { pagesFor, type ReportPage } from '../page-titles';
 import type { SavedReport } from '../reports-store';
@@ -81,6 +82,8 @@ export function ReportsSidebar({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const t = TONES[tone];
+  const say = useTranslations('dashboard');
+  const numbered = (number: number) => say('reports.pageNumber', { number });
 
   const finishRename = (value: string, commit: (title: string) => void) => {
     setRenaming(null);
@@ -89,12 +92,12 @@ export function ReportsSidebar({
 
   return (
     <>
-      <p className={t.title}>Reports</p>
+      <p className={t.title}>{say('sidebar.reports')}</p>
       <ul className={t.list}>
         {reports.map((report) => {
           const active = report.id === activeId;
           const open = expanded[report.id] ?? active;
-          const pages = active ? activePages : pagesFor(report);
+          const pages = active ? activePages : pagesFor(report, numbered);
 
           return (
             <li key={report.id}>
@@ -102,7 +105,7 @@ export function ReportsSidebar({
                 {renaming === report.id ? (
                   <RenameInput
                     value={report.name}
-                    label="Report name"
+                    label={say('sidebar.reportName')}
                     className="ml-1 w-[calc(100%-8px)] py-2 text-[15px]"
                     onDone={(value) => finishRename(value, (name) => onRenameReport(report.id, name))}
                     onCancel={() => setRenaming(null)}
@@ -131,7 +134,7 @@ export function ReportsSidebar({
                 <div className="absolute right-1 top-1/2 -translate-y-1/2">
                   <button
                     type="button"
-                    aria-label={`Actions for ${report.name}`}
+                    aria-label={say('sidebar.actionsFor', { name: report.name })}
                     aria-haspopup="menu"
                     aria-expanded={menuFor === report.id}
                     onClick={() => setMenuFor(menuFor === report.id ? null : report.id)}
@@ -148,7 +151,7 @@ export function ReportsSidebar({
                         setRenaming(report.id);
                       }}
                     >
-                      Rename
+                      {say('sidebar.rename')}
                     </MenuItem>
                     <MenuItem
                       onClick={() => {
@@ -156,7 +159,7 @@ export function ReportsSidebar({
                         onDuplicate(report.id);
                       }}
                     >
-                      Duplicate
+                      {say('sidebar.duplicate')}
                     </MenuItem>
                     <MenuItem
                       danger
@@ -165,14 +168,14 @@ export function ReportsSidebar({
                         onDelete(report.id);
                       }}
                     >
-                      {report.builtIn ? 'Reset to default' : 'Delete'}
+                      {report.builtIn ? say('sidebar.resetToDefault') : say('sidebar.delete')}
                     </MenuItem>
                   </Menu>
                 </div>
               </div>
 
               {open && (
-                <ul className={`mb-2 mt-1 space-y-0.5 border-l ${tone === 'menu' ? 'ml-4 pl-2' : 'ml-[26px] pl-3'} ${t.pages}`} aria-label={`${report.name} pages`}>
+                <ul className={`mb-2 mt-1 space-y-0.5 border-l ${tone === 'menu' ? 'ml-4 pl-2' : 'ml-[26px] pl-3'} ${t.pages}`} aria-label={say('sidebar.pagesOf', { name: report.name })}>
                   {pages.map((page) => {
                     const selected = active && page.id === selectedPageId;
                     return (
@@ -180,7 +183,7 @@ export function ReportsSidebar({
                         {renaming === page.id ? (
                           <RenameInput
                             value={page.title}
-                            label="Page name"
+                            label={say('sidebar.pageName')}
                             className="w-full py-1.5 text-sm"
                             onDone={(value) => finishRename(value, (title) => onRenamePage(page.id, title))}
                             onCancel={() => setRenaming(null)}
@@ -192,7 +195,7 @@ export function ReportsSidebar({
                             onClick={() => onSelectPage(report.id, page.id)}
                             onDoubleClick={() => active && editing && setRenaming(page.id)}
                             aria-current={selected ? 'page' : undefined}
-                            title={active && editing ? 'Double-click to rename' : undefined}
+                            title={active && editing ? say('sidebar.doubleClickToRename') : undefined}
                             className={`block w-full truncate pr-8 text-left text-sm transition-colors ${tone === 'menu' ? 'rounded px-2 py-1.5' : 'rounded-full py-2 pl-4'} ${t.page(selected)}`}
                           >
                             {page.title}
@@ -201,8 +204,8 @@ export function ReportsSidebar({
                         {active && editing && pages.length > 1 && renaming !== page.id && (
                           <button
                             type="button"
-                            aria-label={`Remove page ${page.title}`}
-                            title="Remove page"
+                            aria-label={say('sidebar.removePageNamed', { title: page.title })}
+                            title={say('sidebar.removePage')}
                             onClick={() => onRemovePage(page.id)}
                             className={`absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full opacity-0 focus-visible:opacity-100 group-hover:opacity-100 ${t.remove}`}
                           >
@@ -223,7 +226,7 @@ export function ReportsSidebar({
                         }}
                         className={`flex w-full items-center text-left text-sm ${tone === 'menu' ? 'gap-2.5 rounded px-2 py-1.5' : 'gap-1.5 rounded-full py-2 pl-4 font-semibold'} ${t.add}`}
                       >
-                        <PlusIcon className="size-4" /> Add page
+                        <PlusIcon className="size-4" /> {say('sidebar.addPage')}
                       </button>
                     </li>
                   )}
@@ -237,27 +240,27 @@ export function ReportsSidebar({
         // In the side menu: plain menu entries, like the rest of the menu.
         <div className={t.footer}>
           <button type="button" onClick={onCreate} className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-sm ${t.add}`}>
-            <PlusIcon className="size-4" /> New report
+            <PlusIcon className="size-4" /> {say('sidebar.newReport')}
           </button>
           <button
             type="button"
             onClick={onReset}
             disabled={!ready}
-            title="Reports are saved in this browser. Reset brings back the demo reports."
+            title={say('sidebar.savedHereResetHint')}
             className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-sm ${t.add}`}
           >
-            <RefreshIcon className="size-4" /> Reset demo
+            <RefreshIcon className="size-4" /> {say('sidebar.resetDemo')}
           </button>
         </div>
       ) : (
         <div className={t.footer}>
           <Button variant="primary" className="w-full" onClick={onCreate}>
-            <PlusIcon /> New report
+            <PlusIcon /> {say('sidebar.newReport')}
           </Button>
           <p className={`mt-2 text-center text-xs ${t.note}`}>
-            Reports are saved in this browser.{' '}
+            {say('sidebar.savedHere')}{' '}
             <button type="button" onClick={onReset} disabled={!ready} className={`font-semibold hover:underline ${t.reset}`}>
-              Reset demo
+              {say('sidebar.resetDemo')}
             </button>
           </p>
         </div>

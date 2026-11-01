@@ -7,11 +7,14 @@
 // and clicking an agent cross-filters the rest of the page by that agent.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { AgWidgetField, AgWidgetParams } from 'ag-studio';
 import { BrandMark } from '../../ui/brand-mark';
+import type { Translate } from '../translate';
 import { flowLayout, spreadLabels, VERDICTS, type FlowRow, type Verdict } from './guard-flow-layout';
 
-const VERDICT_LABEL: Record<Verdict, string> = { passed: 'Passed to PayPal', held: 'Held for you', stopped: 'Stopped by the guard' };
+// Its text is the dashboard's `flow.*` messages: a verdict's label (`flow.verdicts`) and the same
+// inside a sentence (`flow.verdictsInline`). Agent names are data ('support') and stay as they are.
 const VERDICT_COLOR: Record<Verdict, string> = { passed: 'var(--pp-series-1)', held: 'var(--pp-series-2)', stopped: 'var(--pp-series-3)' };
 // Bands in a solid pale tint of their verdict rather than see-through: where two cross, one lies on
 // the other instead of mixing into grey.
@@ -52,6 +55,7 @@ export function GuardFlowWidget(params: AgWidgetParams) {
   const [hovered, setHovered] = useState<string>();
   const [selected, setSelected] = useState<string>();
   const [ref, size] = useSize();
+  const t = useTranslations('dashboard');
 
   useEffect(() => {
     if (!agentField || valueFields.length < VERDICTS.length) {
@@ -100,7 +104,7 @@ export function GuardFlowWidget(params: AgWidgetParams) {
   const lit = (agent: string) => !focus || focus === agent;
 
   return (
-    <div ref={ref} className="relative h-full w-full font-paypal text-pp-ink" role="img" aria-label={describe(flow, total)}>
+    <div ref={ref} className="relative h-full w-full font-paypal text-pp-ink" role="img" aria-label={describe(flow, total, t)}>
       {size.width > 0 && total > 0 && (
         <svg width={size.width} height={size.height} className="block overflow-visible">
           <g transform={`translate(${LEFT} ${TOP})`}>
@@ -113,7 +117,14 @@ export function GuardFlowWidget(params: AgWidgetParams) {
                 strokeWidth={1}
                 className="transition-[fill] duration-150"
               >
-                <title>{`${capitalize(ribbon.agent)} agent: ${count(ribbon.value)} ${ribbon.value === 1 ? 'call' : 'calls'} ${VERDICT_LABEL[ribbon.verdict].toLowerCase()}`}</title>
+                <title>
+                  {t('flow.band', {
+                    agent: capitalize(ribbon.agent),
+                    count: count(ribbon.value),
+                    n: ribbon.value,
+                    verdict: t(`flow.verdictsInline.${ribbon.verdict}`),
+                  })}
+                </title>
               </path>
             ))}
             {flow.agents.map((agent) => (
@@ -133,7 +144,7 @@ export function GuardFlowWidget(params: AgWidgetParams) {
           style={{ left: gateX }}
         >
           <BrandMark className="size-4" />
-          Payment guard
+          {t('flow.gate')}
         </span>
       )}
 
@@ -149,15 +160,15 @@ export function GuardFlowWidget(params: AgWidgetParams) {
           className={`absolute left-0 flex w-[124px] -translate-y-1/2 flex-col items-end rounded px-1 text-right ${lit(agent.name) ? '' : 'opacity-40'}`}
           style={{ top: TOP + agentLabelY[i] }}
         >
-          <span className="text-[13px] font-semibold">{capitalize(agent.name)} agent</span>
-          <span className="text-xs text-pp-muted">{count(agent.total)} calls</span>
+          <span className="text-[13px] font-semibold">{t('flow.agent', { name: capitalize(agent.name) })}</span>
+          <span className="text-xs text-pp-muted">{t('flow.agentCalls', { count: count(agent.total), n: agent.total })}</span>
         </button>
       ))}
       {flow.verdicts.map((verdict, i) => (
         <div key={verdict.key} className="absolute right-0 w-[170px] -translate-y-1/2 pl-2" style={{ top: TOP + verdictLabelY[i] }}>
-          <p className="text-[13px] font-semibold">{VERDICT_LABEL[verdict.key]}</p>
+          <p className="text-[13px] font-semibold">{t(`flow.verdicts.${verdict.key}`)}</p>
           <p className="text-xs text-pp-muted">
-            {count(verdict.total)} calls, {percent(verdict.total, total)}
+            {t('flow.verdictCalls', { count: count(verdict.total), n: verdict.total, percent: percent(verdict.total, total) })}
           </p>
         </div>
       ))}
@@ -166,7 +177,7 @@ export function GuardFlowWidget(params: AgWidgetParams) {
 }
 
 // The drawing in words, for screen readers.
-function describe(flow: ReturnType<typeof flowLayout>, total: number): string {
-  if (total === 0) return 'No calls yet.';
-  return flow.verdicts.map((v) => `${count(v.total)} ${VERDICT_LABEL[v.key].toLowerCase()}`).join(', ');
+function describe(flow: ReturnType<typeof flowLayout>, total: number, t: Translate): string {
+  if (total === 0) return t('flow.noCalls');
+  return flow.verdicts.map((v) => t('flow.summaryItem', { count: count(v.total), verdict: t(`flow.verdictsInline.${v.key}`) })).join(', ');
 }

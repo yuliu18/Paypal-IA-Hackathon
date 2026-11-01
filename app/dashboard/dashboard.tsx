@@ -12,6 +12,7 @@
 
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   AgStudioAiModule,
   enableStudioDevValidations,
@@ -50,6 +51,7 @@ import { DashboardSkeleton } from './components/skeleton';
 import * as reportState from './report-state';
 import { buildAi } from './studio/ai';
 import { buildStudioData, hasData } from './studio/data';
+import { studioLocaleText } from './studio/locale';
 import { agStudioPayPalTheme } from './studio/theme';
 import { dashboardWidgets } from './studio/widgets';
 import { useReports } from './use-reports';
@@ -82,7 +84,12 @@ export function Dashboard(props: DashboardProps) {
 }
 
 function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
-  const { store, latest, update, editReport } = useReports();
+  // The shell, the built-in report, the data's names and Studio's own labels all follow the app's
+  // language. Studio reads its text (localeText, data, ai, widgets) when it is created.
+  const t = useTranslations('dashboard');
+  const locale = useLocale();
+  const numbered = (number: number) => t('reports.pageNumber', { number });
+  const { store, latest, update, editReport } = useReports(t);
   const apiRef = useRef<AgStudioApi | null>(null);
 
   // The open report as it is in Studio now, unsaved edits included, for drawing the shell.
@@ -100,9 +107,11 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
   // its state is read from Studio.
   const [initialState] = useState(() => reportState.withFiltersPanelFor('view', saved.state));
   const state = studioState ?? initialState;
-  const studioData = useMemo(() => buildStudioData(data), [data]);
+  const studioData = useMemo(() => buildStudioData(data, t), [data, t]);
   // `ai` is read once, when Studio is created.
-  const ai = useMemo(() => (aiModels?.length ? buildAi(aiModels) : undefined), [aiModels]);
+  const ai = useMemo(() => (aiModels?.length ? buildAi(aiModels, t) : undefined), [aiModels, t]);
+  const widgets = useMemo(() => dashboardWidgets(t), [t]);
+  const [localeText] = useState(() => studioLocaleText(locale));
 
   // --- Driving Studio ---------------------------------------------------------------
   const load = (
@@ -142,7 +151,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
     editReport(saved.id, (report) => ({
       ...report,
       // Titles for exactly the pages being saved.
-      pageTitles: pageTitlesFor({ pageTitles: report.pageTitles, state: current }),
+      pageTitles: pageTitlesFor({ pageTitles: report.pageTitles, state: current }, numbered),
       state: current,
       updatedAt: new Date().toISOString(),
     }));
@@ -164,7 +173,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
     if (report && id !== saved.id) guard(() => load(report));
   };
   const createReport = (name: string) => {
-    const report = blankReport(name);
+    const report = blankReport(name, t);
     update((current) => upsert(current, report));
     load(report, report.state.selectedPageId, 'edit');
   };
@@ -172,16 +181,16 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
     guard(() => {
       const source = findReport(reports, id);
       if (!source) return;
-      const copy = copyOf(source);
+      const copy = copyOf(source, t);
       update((current) => upsert(current, copy));
       load(copy);
     });
   const resetDemo = () => {
-    update(initialReports);
-    load(defaultReport(), undefined, 'view');
+    update(() => initialReports(t));
+    load(defaultReport(t), undefined, 'view');
   };
   const deleteReport = (report: SavedReport) => {
-    update((current) => remove(current, report.id));
+    update((current) => remove(current, report.id, t));
     if (report.id !== saved.id) return;
     const { reports: next, activeId } = latest();
     load(findReport(next, activeId) ?? next[0]);
@@ -216,7 +225,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
 
   const navSlot = useNavSlot();
   const editing = mode === 'edit';
-  const pages = pagesFor({ pageTitles: saved.pageTitles, state });
+  const pages = pagesFor({ pageTitles: saved.pageTitles, state }, numbered);
 
   // The reports list lives in the app's side menu under "Dashboard" (app/nav-slot.ts), or in the
   // dashboard's own panel while the menu is collapsed.
@@ -277,7 +286,8 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
               style={{ height: '100%', width: '100%' }}
               theme={agStudioPayPalTheme}
               layout={{ widgetBorderEnabled: true }}
-              widgets={dashboardWidgets}
+              widgets={widgets}
+              localeText={localeText}
               data={studioData}
               ai={ai}
               initialState={initialState}
@@ -336,7 +346,7 @@ function ReportsDashboard({ data, licenseKey, aiModels }: DashboardProps) {
       />
       <ResetDemoDialog
         open={dialog?.kind === 'reset'}
-        builtInName={defaultReport().name}
+        builtInName={t('report.name')}
         onCancel={() => setDialog(null)}
         onConfirm={() => {
           resetDemo();

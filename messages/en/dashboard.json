@@ -1,0 +1,470 @@
+{
+  "metadata": {
+    "title": "Dashboard"
+  },
+  "header": {
+    "dragHint": "Drag a widget from <b>{compose}</b> to get started.",
+    "undo": "Undo",
+    "redo": "Redo",
+    "discard": "Discard",
+    "save": "Save",
+    "guide": "Guide",
+    "view": "View",
+    "edit": "Edit",
+    "sandbox": "PayPal sandbox",
+    "refreshing": "Refreshing…",
+    "updated": "Updated {when}",
+    "justNow": "just now",
+    "minutesAgo": "{minutes} min ago",
+    "hoursAgo": "{hours} h ago",
+    "utc": "{time} UTC",
+    "refresh": "Refresh data",
+    "builtWith": "Built with <logo></logo>"
+  },
+  "sidebar": {
+    "reports": "Reports",
+    "reportName": "Report name",
+    "actionsFor": "Actions for {name}",
+    "rename": "Rename",
+    "duplicate": "Duplicate",
+    "resetToDefault": "Reset to default",
+    "delete": "Delete",
+    "pagesOf": "{name} pages",
+    "pageName": "Page name",
+    "doubleClickToRename": "Double-click to rename",
+    "removePageNamed": "Remove page {title}",
+    "removePage": "Remove page",
+    "addPage": "Add page",
+    "newReport": "New report",
+    "resetDemo": "Reset demo",
+    "savedHereResetHint": "Reports are saved in this browser. Reset brings back the demo reports.",
+    "savedHere": "Reports are saved in this browser."
+  },
+  "reports": {
+    "pageNumber": "Page {number}",
+    "copyName": "{name} (copy)"
+  },
+  "dialogs": {
+    "cancel": "Cancel",
+    "unsaved": {
+      "title": "Save changes to “{name}”?",
+      "discard": "Discard changes",
+      "save": "Save",
+      "body": "Your changes to this report haven't been saved yet."
+    },
+    "create": {
+      "title": "New report",
+      "submit": "Create report",
+      "intro": "Start from a blank page and build it with the widgets in {compose}.",
+      "nameLabel": "Report name",
+      "defaultName": "Untitled report"
+    },
+    "delete": {
+      "titleReset": "Reset to default?",
+      "title": "Delete report?",
+      "reset": "Reset",
+      "delete": "Delete",
+      "bodyReset": "“{name}” will go back to the report shipped with the app. Your saved changes to it will be lost.",
+      "body": "“{name}” will be removed from this browser. This can't be undone."
+    },
+    "resetDemo": {
+      "title": "Reset the demo?",
+      "confirm": "Reset demo",
+      "body": "All reports you've created will be deleted and “{name}” will go back to its original state, including any unsaved changes. This can't be undone."
+    }
+  },
+  "empty": {
+    "title": "No PayPal data yet",
+    "body": "This sandbox account has no invoices, products, plans or transactions. Create some in the PayPal sandbox, then refresh to build reports from them.",
+    "link": "Open PayPal Developer Dashboard"
+  },
+  "error": {
+    "title": "We couldn't load your PayPal data",
+    "body": "The PayPal sandbox didn't respond as expected. Check the API credentials in <code>.env.local</code> and try again.",
+    "reference": "Reference: {digest}",
+    "retry": "Try again"
+  },
+  "guide": {
+    "title": "How to use this dashboard",
+    "intro": "Built with AG Studio. Keep this open while you try each step.",
+    "close": "Close the guide",
+    "read": {
+      "title": "Read a page",
+      "body": "Each widget answers one question; its title says which. Point at a bar or a band to see its numbers."
+    },
+    "filter": {
+      "title": "Filter by clicking",
+      "click": "Click an agent in <b>{flow}</b>, or a bar in a chart, and every other widget on the page shows only that. Click it again to clear it.",
+      "panel": "Open <b>{filters}</b> at the right edge for the page's filters and the ones you clicked."
+    },
+    "pages": {
+      "title": "Move between pages and reports",
+      "menu": "The pages of the open report are listed in the left menu under <b>{dashboard}</b>. <b>{addPage}</b> adds an empty one; double-click a page or a report to rename it.",
+      "reports": "<b>{newReport}</b> starts a blank report. A report's <b>⋯</b> menu has <b>{rename}</b>, <b>{duplicate}</b> and delete. <b>{resetDemo}</b> brings back the built-in report and removes the ones you made."
+    },
+    "edit": {
+      "title": "Edit a page",
+      "open": "Press <b>{edit}</b>. Two panels open at the right: <b>{compose}</b> and <b>{data}</b>.",
+      "add": "<b>Add a widget:</b> in <b>{compose}</b>, open <b>{widgets}</b> and drag one onto the page. Or drag a field from <b>{data}</b> (an agent, a customer, an amount) onto the page and Studio makes a chart of it.",
+      "change": "<b>Change a widget:</b> click it. Its setup shows in <b>{compose}</b>: chart type, the fields on each axis, sorting and its titles.",
+      "move": "<b>Move or resize:</b> drag a widget to move it, or drag its edges to resize it. Its toolbar duplicates or deletes it.",
+      "save": "Undo and redo are next to <b>{save}</b>. <b>{save}</b> keeps the report in this browser; <b>{discard}</b> drops the changes; <b>{view}</b> leaves editing."
+    },
+    "guardWidget": {
+      "title": "Add the guard's own widget",
+      "body": "In <b>{compose}</b> › <b>{widgets}</b>, the <b>{group}</b> group has <b>{flow}</b>: every agent's calls through the guard to what it did. Drag it onto any page."
+    },
+    "export": {
+      "title": "Export",
+      "body": "A table or chart's toolbar downloads its rows as CSV, or the chart as an image."
+    },
+    "ai": {
+      "title": "Ask the AI",
+      "on": "In <b>{edit}</b>, open the <b>{assistant}</b> and describe the widget you want, for example “stopped refunds by customer”. It builds it on the page, and you keep or discard it like any other change.",
+      "off": "The <b>{assistant}</b> builds widgets from a sentence. It appears in Edit mode once an OpenAI key is set on the server (see the README)."
+    }
+  },
+  "flow": {
+    "verdicts": {
+      "passed": "Passed to PayPal",
+      "held": "Held for you",
+      "stopped": "Stopped by the guard"
+    },
+    "verdictsInline": {
+      "passed": "passed to paypal",
+      "held": "held for you",
+      "stopped": "stopped by the guard"
+    },
+    "agent": "{name} agent",
+    "agentCalls": "{count} calls",
+    "verdictCalls": "{count} calls, {percent}",
+    "band": "{agent} agent: {count} {n, plural, one {call} other {calls}} {verdict}",
+    "gate": "Payment guard",
+    "noCalls": "No calls yet.",
+    "summaryItem": "{count} {verdict}"
+  },
+  "widgets": {
+    "guardFlow": "Flow through the guard",
+    "agentMapping": "Agent",
+    "verdictsMapping": "Passed, held, stopped",
+    "menuGroup": "Payment guard"
+  },
+  "ai": {
+    "stoppedMost": {
+      "label": "Which agent was stopped most?",
+      "prompt": "Which AI agent did the payment guard stop most often, and for which reasons? Use the guard decisions and violations."
+    },
+    "protectedVsMoved": {
+      "label": "Money protected vs moved",
+      "prompt": "How much money did the guard protect by blocking, compared with what the agents moved and billed? Break it down by agent and action."
+    },
+    "waiting": {
+      "label": "What waits for a person?",
+      "prompt": "List the held actions still awaiting approval, oldest first, with the agent, action, customer and amount."
+    },
+    "blockRate": {
+      "label": "Chart the block rate",
+      "prompt": "Add a line chart of the guard block rate per day, split by agent."
+    },
+    "summarise": {
+      "label": "Summarise this page",
+      "prompt": "Summarise what this page shows: every widget, the fields it reads, and what stands out."
+    }
+  },
+  "report": {
+    "name": "PayPal overview",
+    "pages": {
+      "guard": "AI operations",
+      "activity": "Agent activity",
+      "revenue": "Revenue & cash",
+      "receivables": "Receivables",
+      "catalogue": "Catalogue"
+    },
+    "guard": {
+      "flow": {
+        "title": "Flow through the guard",
+        "subtitle": "Every call your agents made, from the agent to what the guard did with it. Click an agent to filter the page."
+      },
+      "kpiProtected": {
+        "title": "Kept in the shop",
+        "caption": "Refunds and claims the guard stopped"
+      },
+      "kpiMoved": {
+        "title": "Paid back to customers",
+        "caption": "Refunds and claims that went through"
+      },
+      "kpiWaiting": {
+        "title": "Waiting for you",
+        "caption": "Held calls to approve or reject in the guard log"
+      },
+      "kpiWithheld": {
+        "title": "Personal data withheld",
+        "caption": "Customer details kept from the agents"
+      },
+      "timeline": {
+        "title": "Decisions per day",
+        "subtitle": "Each bar is one day of calls: green passed to PayPal, amber held for you, red stopped"
+      },
+      "byAction": {
+        "title": "What the agents tried to do",
+        "subtitle": "Calls by action, most stopped first: green passed, amber held, red stopped"
+      },
+      "reasons": {
+        "title": "Why calls were stopped",
+        "subtitle": "The rule each stopped call broke, most frequent first"
+      }
+    },
+    "activity": {
+      "customers": {
+        "title": "Customers behind stopped calls",
+        "subtitle": "Calls the guard stopped, by the customer they were made for"
+      },
+      "decisions": {
+        "title": "Every decision, newest first",
+        "subtitle": "Click a row to filter the charts above"
+      }
+    },
+    "revenue": {
+      "kpiSales": {
+        "title": "Sales (31 days)",
+        "caption": "Payments customers made to the shop"
+      },
+      "kpiBalance": {
+        "title": "Available balance",
+        "caption": "In the PayPal account now"
+      },
+      "kpiInvoiced": {
+        "title": "Invoiced",
+        "caption": "Sent invoices, all currencies"
+      },
+      "inOut": {
+        "title": "Money in and out per day",
+        "subtitle": "Credits and debits on the PayPal ledger"
+      },
+      "eventTypes": {
+        "title": "Ledger activity by type",
+        "subtitle": "Number of PayPal transactions, most frequent first"
+      },
+      "ledger": {
+        "title": "PayPal ledger, newest first",
+        "subtitle": "Last 31 days of account activity"
+      }
+    },
+    "receivables": {
+      "currency": {
+        "title": "Currency"
+      },
+      "kpiOutstanding": {
+        "title": "Outstanding",
+        "caption": "Open and partially paid invoices"
+      },
+      "kpiOverdue": {
+        "title": "Overdue",
+        "caption": "Past their due date"
+      },
+      "kpiOpen": {
+        "title": "Open invoices",
+        "caption": "Waiting for payment"
+      },
+      "byInvoiceDate": {
+        "title": "Outstanding by invoice date",
+        "subtitle": "Still owed, and how much of it is past due"
+      },
+      "aging": {
+        "title": "Receivables by customer and status",
+        "subtitle": "Largest balance first"
+      },
+      "openInvoices": {
+        "title": "Open invoices, most overdue first"
+      }
+    },
+    "catalogue": {
+      "kpiProducts": {
+        "title": "Products",
+        "caption": "Sold as subscriptions"
+      },
+      "kpiPlans": {
+        "title": "Billing plans",
+        "caption": "Across all products"
+      },
+      "kpiMonthly": {
+        "title": "Avg monthly price",
+        "caption": "Normalised to one month, USD"
+      },
+      "kpiTrial": {
+        "title": "Avg trial days",
+        "caption": "Before the first charge"
+      },
+      "plans": {
+        "title": "Plan catalogue"
+      }
+    }
+  },
+  "data": {
+    "calendar": "Calendar",
+    "tables": {
+      "customers": "Customers",
+      "invoices": "Invoices",
+      "invoiceItems": "Invoice Line Items",
+      "invoicePayments": "Invoice Payments",
+      "products": "Products",
+      "plans": "Billing Plans",
+      "transactions": "Transactions",
+      "payouts": "Payouts",
+      "balances": "Balances",
+      "guardDecisions": "Guard Decisions",
+      "guardViolations": "Guard Violations"
+    },
+    "fields": {
+      "customers": {
+        "id": "Customer ID",
+        "name": "Customer",
+        "company": "Company",
+        "email": "Email"
+      },
+      "invoices": {
+        "id": "Invoice ID",
+        "number": "Invoice",
+        "customerId": "Customer ID",
+        "status": "Invoice Status",
+        "statusGroup": "Status Group",
+        "currency": "Currency",
+        "paymentTerm": "Payment Term",
+        "invoiceDate": "Invoice Date",
+        "dueDate": "Due Date",
+        "total": "Invoice Total",
+        "issuedAmount": "Invoiced",
+        "paidAmount": "Paid",
+        "refundedAmount": "Refunded",
+        "netCollected": "Net Collected",
+        "isReceivable": "Is Receivable",
+        "outstanding": "Outstanding",
+        "overdueAmount": "Overdue",
+        "daysOverdue": "Days Overdue",
+        "agingBucket": "Aging Bucket",
+        "daysToPay": "Days to Pay",
+        "taxTotal": "Tax"
+      },
+      "invoiceItems": {
+        "id": "Line ID",
+        "invoiceId": "Invoice ID",
+        "name": "Item",
+        "unit": "Unit",
+        "quantity": "Quantity",
+        "unitPrice": "Unit Price",
+        "gross": "Gross",
+        "discount": "Line Discount",
+        "tax": "Line Tax",
+        "lineTotal": "Line Total"
+      },
+      "invoicePayments": {
+        "id": "Payment ID",
+        "invoiceId": "Invoice ID",
+        "kind": "Payment Kind",
+        "method": "Payment Method",
+        "date": "Payment Date",
+        "amount": "Payment Amount",
+        "signedAmount": "Net Cash"
+      },
+      "products": {
+        "id": "Product ID",
+        "name": "Product",
+        "type": "Product Type",
+        "category": "Product Category",
+        "description": "Product Description"
+      },
+      "plans": {
+        "id": "Plan ID",
+        "productId": "Product ID",
+        "name": "Plan",
+        "status": "Plan Status",
+        "billingInterval": "Billed",
+        "price": "Price",
+        "monthlyPrice": "Monthly Price",
+        "trialDays": "Trial Days",
+        "setupFee": "Setup Fee"
+      },
+      "transactions": {
+        "id": "Transaction ID",
+        "date": "Transaction Date",
+        "eventType": "Event Type",
+        "status": "Transaction Status",
+        "direction": "Direction",
+        "currency": "Transaction Currency",
+        "amount": "Transaction Amount",
+        "fee": "Transaction Fee",
+        "net": "Transaction Net",
+        "sales": "Sales",
+        "moneyIn": "Money In",
+        "moneyOut": "Money Out",
+        "endingBalance": "Ending Balance",
+        "counterparty": "Counterparty",
+        "note": "Transaction Note"
+      },
+      "payouts": {
+        "id": "Payout ID",
+        "campaign": "Campaign",
+        "recipient": "Recipient",
+        "date": "Payout Date",
+        "status": "Payout Status",
+        "amount": "Payout Amount",
+        "fee": "Payout Fee",
+        "note": "Payout Note"
+      },
+      "balances": {
+        "currency": "Balance Currency",
+        "total": "Total Balance",
+        "available": "Available Balance",
+        "withheld": "Withheld Balance"
+      },
+      "guardDecisions": {
+        "id": "Guard Entry",
+        "at": "Time",
+        "day": "Decision Date",
+        "tool": "Tool",
+        "verdict": "Verdict",
+        "decision": "Decision",
+        "outcome": "Guard Outcome",
+        "customer": "Ticket Customer",
+        "currency": "Guard Currency",
+        "requested": "Requested Refund",
+        "agent": "Agent",
+        "action": "Action",
+        "moved": "Money Moved",
+        "protected": "Money Protected",
+        "billed": "Money Billed",
+        "awaitingApproval": "Awaiting Approval",
+        "allowed": "Allowed",
+        "held": "Held",
+        "blocked": "Blocked",
+        "withheld": "Personal Data Withheld",
+        "decidedBy": "Decided By",
+        "dayText": "Day"
+      },
+      "guardViolations": {
+        "id": "Violation ID",
+        "decisionId": "Guard Entry ID",
+        "code": "Violation Code",
+        "reason": "Block Reason",
+        "message": "Violation Detail"
+      }
+    },
+    "measures": {
+      "collectionRate": "Collection rate",
+      "overdueShare": "Overdue share",
+      "refundRate": "Refund rate",
+      "allowedCalls": "Passed",
+      "heldCalls": "Held",
+      "blockedCalls": "Stopped",
+      "moneyMoved": "Moved out",
+      "moneyBilled": "Billed",
+      "moneyProtected": "Protected",
+      "moneyInTotal": "Money in",
+      "moneyOutTotal": "Money out",
+      "salesTotal": "Sales",
+      "outstandingTotal": "Outstanding",
+      "overdueTotal": "Overdue",
+      "blockRate": "Block rate"
+    }
+  }
+}

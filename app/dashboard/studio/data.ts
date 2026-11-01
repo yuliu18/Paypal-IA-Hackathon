@@ -10,6 +10,7 @@ import type {
   AgRelationDefinition,
 } from 'ag-studio';
 import type { DashboardData } from '@/lib/dashboard-data';
+import type { Translate } from '../translate';
 
 // --- Helpers ----------------------------------------------------------------------
 
@@ -19,8 +20,8 @@ const CALENDAR_ID = 'calendar';
 // shop's PayPal sandbox account and every amount the guard records are in USD.
 type FieldFormat = AgFormat | 'usd';
 
-// [id, name, format, hide?]
-type FieldSpec = [id: string, name: string, format: FieldFormat, hide?: boolean];
+// [id, format, hide?]; the field's name is the message `data.fields.<table>.<id>`.
+type FieldSpec = [id: string, format: FieldFormat, hide?: boolean];
 
 // Numbers in English like the rest of the app, whatever the browser's language: a format pattern
 // ('#,##0') would group digits the browser's way, so a Spanish browser would read 5,148 as 5.148.
@@ -40,10 +41,10 @@ const formatOf = (format: FieldFormat) =>
     ? { format: 'currencyFormat' as const, formatOptions: USD }
     : { format, ...(NUMBER_OPTIONS[format] && { formatOptions: NUMBER_OPTIONS[format] }) };
 
-const fields = (specs: FieldSpec[]): AgFieldDefinition[] =>
-  specs.map(([id, name, format, hide]) => ({
+const fields = (t: Translate, table: string, specs: FieldSpec[]): AgFieldDefinition[] =>
+  specs.map(([id, format, hide]) => ({
     id,
-    name,
+    name: t(`data.fields.${table}.${id}`),
     ...formatOf(format),
     ...(hide && { hide }),
   }));
@@ -102,7 +103,10 @@ const total = (id: string, name: string, description: string, field: string, for
 export const hasData = (data: DashboardData) =>
   [data.invoices, data.transactions, data.products, data.plans, data.balances, data.guardDecisions].some((rows) => rows.length > 0);
 
-export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
+// Names (tables, fields, measures) are in the app's language through `t`, the dashboard's messages
+// (messages/<locale>/dashboard.json); descriptions stay in English, as they are mainly read by the AI.
+export function buildStudioData(data: DashboardData, t: Translate): AgDataSourcesDefinition {
+  const measure = (id: string) => t(`data.measures.${id}`);
   const dates = [
     ...data.invoices.map((r) => r.invoiceDate),
     ...data.invoicePayments.map((r) => r.date),
@@ -121,159 +125,165 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
     sources: [
       {
         id: 'customers',
+        name: t('data.tables.customers'),
         description: 'Invoice recipients, keyed by lower-cased email.',
         data: data.customers,
-        fields: fields([
-          ['id', 'Customer ID', 'textFormat', true],
-          ['name', 'Customer', 'textFormat'],
-          ['company', 'Company', 'textFormat'],
-          ['email', 'Email', 'textFormat'],
+        fields: fields(t, 'customers', [
+          ['id', 'textFormat', true],
+          ['name', 'textFormat'],
+          ['company', 'textFormat'],
+          ['email', 'textFormat'],
         ]),
       },
       {
         id: 'invoices',
+        name: t('data.tables.invoices'),
         description:
           'One row per invoice. Issued amount excludes drafts, scheduled and cancelled invoices. Outstanding and aging apply only to open or partially paid invoices.',
         data: data.invoices,
-        fields: fields([
-          ['id', 'Invoice ID', 'textFormat', true],
-          ['number', 'Invoice', 'textFormat'],
-          ['customerId', 'Customer ID', 'textFormat', true],
-          ['status', 'Invoice Status', 'textFormat'],
-          ['statusGroup', 'Status Group', 'textFormat'],
-          ['currency', 'Currency', 'textFormat'],
-          ['paymentTerm', 'Payment Term', 'textFormat'],
-          ['invoiceDate', 'Invoice Date', 'dateFormat'],
-          ['dueDate', 'Due Date', 'dateFormat'],
-          ['total', 'Invoice Total', 'currencyFormat'],
-          ['issuedAmount', 'Invoiced', 'currencyFormat'],
-          ['paidAmount', 'Paid', 'currencyFormat'],
-          ['refundedAmount', 'Refunded', 'currencyFormat'],
-          ['netCollected', 'Net Collected', 'currencyFormat'],
-          ['isReceivable', 'Is Receivable', 'booleanFormat'],
-          ['outstanding', 'Outstanding', 'currencyFormat'],
-          ['overdueAmount', 'Overdue', 'currencyFormat'],
-          ['daysOverdue', 'Days Overdue', 'integerFormat'],
-          ['agingBucket', 'Aging Bucket', 'textFormat'],
-          ['daysToPay', 'Days to Pay', 'integerFormat'],
-          ['taxTotal', 'Tax', 'currencyFormat'],
+        fields: fields(t, 'invoices', [
+          ['id', 'textFormat', true],
+          ['number', 'textFormat'],
+          ['customerId', 'textFormat', true],
+          ['status', 'textFormat'],
+          ['statusGroup', 'textFormat'],
+          ['currency', 'textFormat'],
+          ['paymentTerm', 'textFormat'],
+          ['invoiceDate', 'dateFormat'],
+          ['dueDate', 'dateFormat'],
+          ['total', 'currencyFormat'],
+          ['issuedAmount', 'currencyFormat'],
+          ['paidAmount', 'currencyFormat'],
+          ['refundedAmount', 'currencyFormat'],
+          ['netCollected', 'currencyFormat'],
+          ['isReceivable', 'booleanFormat'],
+          ['outstanding', 'currencyFormat'],
+          ['overdueAmount', 'currencyFormat'],
+          ['daysOverdue', 'integerFormat'],
+          ['agingBucket', 'textFormat'],
+          ['daysToPay', 'integerFormat'],
+          ['taxTotal', 'currencyFormat'],
         ]),
       },
       {
         id: 'invoiceItems',
-        name: 'Invoice Line Items',
+        name: t('data.tables.invoiceItems'),
         description: 'Invoice lines. Line total is after line discount and tax, before invoice-level discount and shipping.',
         data: data.invoiceItems,
-        fields: fields([
-          ['id', 'Line ID', 'textFormat', true],
-          ['invoiceId', 'Invoice ID', 'textFormat', true],
-          ['name', 'Item', 'textFormat'],
-          ['unit', 'Unit', 'textFormat'],
-          ['quantity', 'Quantity', 'decimalFormat'],
-          ['unitPrice', 'Unit Price', 'currencyFormat'],
-          ['gross', 'Gross', 'currencyFormat'],
-          ['discount', 'Line Discount', 'currencyFormat'],
-          ['tax', 'Line Tax', 'currencyFormat'],
-          ['lineTotal', 'Line Total', 'currencyFormat'],
+        fields: fields(t, 'invoiceItems', [
+          ['id', 'textFormat', true],
+          ['invoiceId', 'textFormat', true],
+          ['name', 'textFormat'],
+          ['unit', 'textFormat'],
+          ['quantity', 'decimalFormat'],
+          ['unitPrice', 'currencyFormat'],
+          ['gross', 'currencyFormat'],
+          ['discount', 'currencyFormat'],
+          ['tax', 'currencyFormat'],
+          ['lineTotal', 'currencyFormat'],
         ]),
       },
       {
         id: 'invoicePayments',
-        name: 'Invoice Payments',
+        name: t('data.tables.invoicePayments'),
         description: 'Payments and refunds recorded against invoices. Signed amount is negative for refunds; sum it for net cash.',
         data: data.invoicePayments,
-        fields: fields([
-          ['id', 'Payment ID', 'textFormat', true],
-          ['invoiceId', 'Invoice ID', 'textFormat', true],
-          ['kind', 'Payment Kind', 'textFormat'],
-          ['method', 'Payment Method', 'textFormat'],
-          ['date', 'Payment Date', 'dateFormat'],
-          ['amount', 'Payment Amount', 'currencyFormat'],
-          ['signedAmount', 'Net Cash', 'currencyFormat'],
+        fields: fields(t, 'invoicePayments', [
+          ['id', 'textFormat', true],
+          ['invoiceId', 'textFormat', true],
+          ['kind', 'textFormat'],
+          ['method', 'textFormat'],
+          ['date', 'dateFormat'],
+          ['amount', 'currencyFormat'],
+          ['signedAmount', 'currencyFormat'],
         ]),
       },
       {
         id: 'products',
+        name: t('data.tables.products'),
         description: 'Catalog products sold as subscriptions.',
         data: data.products,
-        fields: fields([
-          ['id', 'Product ID', 'textFormat', true],
-          ['name', 'Product', 'textFormat'],
-          ['type', 'Product Type', 'textFormat'],
-          ['category', 'Product Category', 'textFormat'],
-          ['description', 'Product Description', 'textFormat'],
+        fields: fields(t, 'products', [
+          ['id', 'textFormat', true],
+          ['name', 'textFormat'],
+          ['type', 'textFormat'],
+          ['category', 'textFormat'],
+          ['description', 'textFormat'],
         ]),
       },
       {
         id: 'plans',
-        name: 'Billing Plans',
+        name: t('data.tables.plans'),
         description: 'Subscription billing plans, in USD. Monthly price normalises weekly, quarterly and annual pricing to one month.',
         data: data.plans,
-        fields: fields([
-          ['id', 'Plan ID', 'textFormat', true],
-          ['productId', 'Product ID', 'textFormat', true],
-          ['name', 'Plan', 'textFormat'],
-          ['status', 'Plan Status', 'textFormat'],
-          ['billingInterval', 'Billed', 'textFormat'],
-          ['price', 'Price', 'currencyFormat'],
-          ['monthlyPrice', 'Monthly Price', 'currencyFormat'],
-          ['trialDays', 'Trial Days', 'integerFormat'],
-          ['setupFee', 'Setup Fee', 'currencyFormat'],
+        fields: fields(t, 'plans', [
+          ['id', 'textFormat', true],
+          ['productId', 'textFormat', true],
+          ['name', 'textFormat'],
+          ['status', 'textFormat'],
+          ['billingInterval', 'textFormat'],
+          ['price', 'currencyFormat'],
+          ['monthlyPrice', 'currencyFormat'],
+          ['trialDays', 'integerFormat'],
+          ['setupFee', 'currencyFormat'],
         ]),
       },
       {
         id: 'transactions',
+        name: t('data.tables.transactions'),
         description:
           'Account ledger from Transaction Search, last 31 days. Amounts are signed (debits negative); net is amount plus fee. ' +
           'Sales is the amount of a payment a customer made to the shop, 0 for every other transaction. Money in and money out split the amount by direction, both positive.',
         data: data.transactions,
-        fields: fields([
-          ['id', 'Transaction ID', 'textFormat'],
-          ['date', 'Transaction Date', 'dateTimeFormat'],
-          ['eventType', 'Event Type', 'textFormat'],
-          ['status', 'Transaction Status', 'textFormat'],
-          ['direction', 'Direction', 'textFormat'],
-          ['currency', 'Transaction Currency', 'textFormat', true],
-          ['amount', 'Transaction Amount', 'currencyFormat'],
-          ['fee', 'Transaction Fee', 'currencyFormat'],
-          ['net', 'Transaction Net', 'currencyFormat'],
-          ['sales', 'Sales', 'currencyFormat'],
-          ['moneyIn', 'Money In', 'currencyFormat'],
-          ['moneyOut', 'Money Out', 'currencyFormat'],
-          ['endingBalance', 'Ending Balance', 'currencyFormat'],
-          ['counterparty', 'Counterparty', 'textFormat'],
-          ['note', 'Transaction Note', 'textFormat'],
+        fields: fields(t, 'transactions', [
+          ['id', 'textFormat'],
+          ['date', 'dateTimeFormat'],
+          ['eventType', 'textFormat'],
+          ['status', 'textFormat'],
+          ['direction', 'textFormat'],
+          ['currency', 'textFormat', true],
+          ['amount', 'currencyFormat'],
+          ['fee', 'currencyFormat'],
+          ['net', 'currencyFormat'],
+          ['sales', 'currencyFormat'],
+          ['moneyIn', 'currencyFormat'],
+          ['moneyOut', 'currencyFormat'],
+          ['endingBalance', 'currencyFormat'],
+          ['counterparty', 'textFormat'],
+          ['note', 'textFormat'],
         ]),
       },
       {
         id: 'payouts',
+        name: t('data.tables.payouts'),
         description: 'Individual payouts sent from the account, as positive USD amounts, grouped into campaigns.',
         data: data.payouts,
-        fields: fields([
-          ['id', 'Payout ID', 'textFormat', true],
-          ['campaign', 'Campaign', 'textFormat'],
-          ['recipient', 'Recipient', 'textFormat'],
-          ['date', 'Payout Date', 'dateTimeFormat'],
-          ['status', 'Payout Status', 'textFormat'],
-          ['amount', 'Payout Amount', 'currencyFormat'],
-          ['fee', 'Payout Fee', 'currencyFormat'],
-          ['note', 'Payout Note', 'textFormat'],
+        fields: fields(t, 'payouts', [
+          ['id', 'textFormat', true],
+          ['campaign', 'textFormat'],
+          ['recipient', 'textFormat'],
+          ['date', 'dateTimeFormat'],
+          ['status', 'textFormat'],
+          ['amount', 'currencyFormat'],
+          ['fee', 'currencyFormat'],
+          ['note', 'textFormat'],
         ]),
       },
       {
         id: 'balances',
+        name: t('data.tables.balances'),
         description: 'Current account balance per currency.',
         data: data.balances,
-        fields: fields([
-          ['currency', 'Balance Currency', 'textFormat'],
-          ['total', 'Total Balance', 'currencyFormat'],
-          ['available', 'Available Balance', 'currencyFormat'],
-          ['withheld', 'Withheld Balance', 'currencyFormat'],
+        fields: fields(t, 'balances', [
+          ['currency', 'textFormat'],
+          ['total', 'currencyFormat'],
+          ['available', 'currencyFormat'],
+          ['withheld', 'currencyFormat'],
         ]),
       },
       {
         id: 'guardDecisions',
-        name: 'Guard Decisions',
+        name: t('data.tables.guardDecisions'),
         description:
           'The newest 5,000 PayPal tool calls the shop\'s AI agents made through the payment guard, and the decisions people made on held actions. ' +
           'Agent is support (refunds, dispute acceptances, cancellations, order reads) or billing (invoices). Verdict is allow, hold or block. ' +
@@ -282,49 +292,49 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
           'Money billed is the total of invoices the billing agent created; it is billed, not yet paid. Awaiting approval is 1 for held actions no person has decided yet. ' +
           'Allowed, Held and Blocked are 1 under the decision\'s verdict and 0 otherwise; sum them to count decisions by verdict. All guard money is in USD.',
         data: data.guardDecisions,
-        fields: fields([
-          ['id', 'Guard Entry', 'textFormat'],
-          ['at', 'Time', 'dateTimeFormat'],
-          ['day', 'Decision Date', 'dateFormat'],
-          ['tool', 'Tool', 'textFormat'],
-          ['verdict', 'Verdict', 'textFormat'],
-          ['decision', 'Decision', 'textFormat'],
-          ['outcome', 'Guard Outcome', 'textFormat'],
-          ['customer', 'Ticket Customer', 'textFormat'],
-          ['currency', 'Guard Currency', 'textFormat'],
-          ['requested', 'Requested Refund', 'usd'],
-          ['agent', 'Agent', 'textFormat'],
-          ['action', 'Action', 'textFormat'],
-          ['moved', 'Money Moved', 'usd'],
-          ['protected', 'Money Protected', 'usd'],
-          ['billed', 'Money Billed', 'usd'],
-          ['awaitingApproval', 'Awaiting Approval', 'integerFormat'],
-          ['allowed', 'Allowed', 'integerFormat'],
-          ['held', 'Held', 'integerFormat'],
-          ['blocked', 'Blocked', 'integerFormat'],
-          ['withheld', 'Personal Data Withheld', 'integerFormat'],
-          ['decidedBy', 'Decided By', 'textFormat'],
+        fields: fields(t, 'guardDecisions', [
+          ['id', 'textFormat'],
+          ['at', 'dateTimeFormat'],
+          ['day', 'dateFormat'],
+          ['tool', 'textFormat'],
+          ['verdict', 'textFormat'],
+          ['decision', 'textFormat'],
+          ['outcome', 'textFormat'],
+          ['customer', 'textFormat'],
+          ['currency', 'textFormat'],
+          ['requested', 'usd'],
+          ['agent', 'textFormat'],
+          ['action', 'textFormat'],
+          ['moved', 'usd'],
+          ['protected', 'usd'],
+          ['billed', 'usd'],
+          ['awaitingApproval', 'integerFormat'],
+          ['allowed', 'integerFormat'],
+          ['held', 'integerFormat'],
+          ['blocked', 'integerFormat'],
+          ['withheld', 'integerFormat'],
+          ['decidedBy', 'textFormat'],
         ]).concat({
           // The decision's day as text (2026-10-22), for charts with one bar per day: Studio draws a
           // date field on a time axis, which labels only some days; a text field is one labelled
           // category per day, and this form sorts in date order.
           id: 'dayText',
-          name: 'Day',
+          name: t('data.fields.guardDecisions.dayText'),
           format: 'textFormat',
           accessor: 'day',
         }),
       },
       {
         id: 'guardViolations',
-        name: 'Guard Violations',
+        name: t('data.tables.guardViolations'),
         description: 'Each rule a guard decision broke, one row per rule; a decision can break several. Block Reason is the rule code in words.',
         data: data.guardViolations,
-        fields: fields([
-          ['id', 'Violation ID', 'textFormat', true],
-          ['decisionId', 'Guard Entry ID', 'textFormat', true],
-          ['code', 'Violation Code', 'textFormat'],
-          ['reason', 'Block Reason', 'textFormat'],
-          ['message', 'Violation Detail', 'textFormat'],
+        fields: fields(t, 'guardViolations', [
+          ['id', 'textFormat', true],
+          ['decisionId', 'textFormat', true],
+          ['code', 'textFormat'],
+          ['reason', 'textFormat'],
+          ['message', 'textFormat'],
         ]),
       },
     ],
@@ -343,30 +353,30 @@ export function buildStudioData(data: DashboardData): AgDataSourcesDefinition {
     calendars: [
       {
         id: CALENDAR_ID,
-        label: 'Calendar',
+        label: t('data.calendar'),
         range: {
           from: { type: 'date', value: dates[0] ?? today },
           to: { type: 'date', value: dates.at(-1) ?? today },
         },
-        fragments: ['year', 'quarter', 'month', 'week', 'day', 'dayOfWeek'],
+        fragments: ['year', 'month', 'week', 'day', 'dayOfWeek'],
       },
     ],
     expressions: [
-      ratio('collectionRate', 'Collection rate', 'Paid / invoiced. Filter to one currency first.', 'invoices.paidAmount', 'invoices.issuedAmount'),
-      ratio('overdueShare', 'Overdue share', 'Share of outstanding receivables that is past due.', 'invoices.overdueAmount', 'invoices.outstanding'),
-      ratio('refundRate', 'Refund rate', 'Refunded / paid.', 'invoices.refundedAmount', 'invoices.paidAmount'),
-      total('allowedCalls', 'Passed', 'Calls the payment guard let through to PayPal.', 'guardDecisions.allowed'),
-      total('heldCalls', 'Held', 'Calls the payment guard held for a person.', 'guardDecisions.held'),
-      total('blockedCalls', 'Stopped', 'Calls the payment guard stopped before PayPal.', 'guardDecisions.blocked'),
-      total('moneyMoved', 'Moved out', 'Money allowed refunds and dispute acceptances took out of the account (USD).', 'guardDecisions.moved', 'usd'),
-      total('moneyBilled', 'Billed', 'Invoices the billing agent created (USD), not yet paid.', 'guardDecisions.billed', 'usd'),
-      total('moneyProtected', 'Protected', 'Money blocked refunds and dispute acceptances kept in the account (USD).', 'guardDecisions.protected', 'usd'),
-      total('moneyInTotal', 'Money in', 'Credits on the PayPal ledger.', 'transactions.moneyIn', 'currencyFormat'),
-      total('moneyOutTotal', 'Money out', 'Debits on the PayPal ledger, as positive amounts.', 'transactions.moneyOut', 'currencyFormat'),
-      total('salesTotal', 'Sales', 'Payments customers made to the shop.', 'transactions.sales', 'currencyFormat'),
-      total('outstandingTotal', 'Outstanding', 'What customers still owe on sent invoices.', 'invoices.outstanding', 'currencyFormat'),
-      total('overdueTotal', 'Overdue', 'The part of it past the due date.', 'invoices.overdueAmount', 'currencyFormat'),
-      ratio('blockRate', 'Block rate', 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
+      ratio('collectionRate', measure('collectionRate'), 'Paid / invoiced. Filter to one currency first.', 'invoices.paidAmount', 'invoices.issuedAmount'),
+      ratio('overdueShare', measure('overdueShare'), 'Share of outstanding receivables that is past due.', 'invoices.overdueAmount', 'invoices.outstanding'),
+      ratio('refundRate', measure('refundRate'), 'Refunded / paid.', 'invoices.refundedAmount', 'invoices.paidAmount'),
+      total('allowedCalls', measure('allowedCalls'), 'Calls the payment guard let through to PayPal.', 'guardDecisions.allowed'),
+      total('heldCalls', measure('heldCalls'), 'Calls the payment guard held for a person.', 'guardDecisions.held'),
+      total('blockedCalls', measure('blockedCalls'), 'Calls the payment guard stopped before PayPal.', 'guardDecisions.blocked'),
+      total('moneyMoved', measure('moneyMoved'), 'Money allowed refunds and dispute acceptances took out of the account (USD).', 'guardDecisions.moved', 'usd'),
+      total('moneyBilled', measure('moneyBilled'), 'Invoices the billing agent created (USD), not yet paid.', 'guardDecisions.billed', 'usd'),
+      total('moneyProtected', measure('moneyProtected'), 'Money blocked refunds and dispute acceptances kept in the account (USD).', 'guardDecisions.protected', 'usd'),
+      total('moneyInTotal', measure('moneyInTotal'), 'Credits on the PayPal ledger.', 'transactions.moneyIn', 'currencyFormat'),
+      total('moneyOutTotal', measure('moneyOutTotal'), 'Debits on the PayPal ledger, as positive amounts.', 'transactions.moneyOut', 'currencyFormat'),
+      total('salesTotal', measure('salesTotal'), 'Payments customers made to the shop.', 'transactions.sales', 'currencyFormat'),
+      total('outstandingTotal', measure('outstandingTotal'), 'What customers still owe on sent invoices.', 'invoices.outstanding', 'currencyFormat'),
+      total('overdueTotal', measure('overdueTotal'), 'The part of it past the due date.', 'invoices.overdueAmount', 'currencyFormat'),
+      ratio('blockRate', measure('blockRate'), 'Share of the AI agents\' calls the payment guard blocked.', 'guardDecisions.blocked', 'guardDecisions.id', 'countd'),
     ],
   };
 }
