@@ -227,11 +227,20 @@ const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) =>
 // What was saved; nothing when the file doesn't exist. A file that can't be read or parsed, or a
 // section edited into the wrong shape, is logged and ignored, so the server falls back to the
 // environment for it instead of failing.
-async function readStored(store: SettingsStore): Promise<Stored> {
+// `strict`: a store that can't be read (e.g. a dropped database connection) throws instead of
+// reading as empty, so a save never writes over the saved keys it couldn't see.
+async function readStored(store: SettingsStore, strict = false): Promise<Stored> {
   let parsed: unknown;
+  let json: string | undefined;
   try {
-    const json = await store.read();
-    if (json === undefined) return {};
+    json = await store.read();
+  } catch (error) {
+    if (strict) throw error;
+    console.error(`Ignoring ${store.where}: it could not be read`, error);
+    return {};
+  }
+  if (json === undefined) return {};
+  try {
     parsed = JSON.parse(json);
   } catch (error) {
     console.error(`Ignoring ${store.where}: it could not be read`, error);
@@ -470,7 +479,13 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
   if (sealing && !secret) {
     return { ok: false, errors: { form: `Keys cannot be stored: ${store.keyLabel} is unreadable or empty. Delete it and save again.` } };
   }
-  const previous = await readStored(store);
+  let previous: Stored;
+  try {
+    previous = await readStored(store, true);
+  } catch (error) {
+    console.error(`Settings not saved: ${store.where} could not be read`, error);
+    return { ok: false, errors: { form: 'The saved settings could not be read, so nothing was changed. Try again in a moment.' } };
+  }
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
   const keepPaypalSecret = !form.clearPaypalSecret && previous.paypal?.clientId === paypalClientId ? previous.paypal.secret : undefined;

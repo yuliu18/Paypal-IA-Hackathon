@@ -40,6 +40,18 @@ afterEach(() => db.close());
 const stored = async () => (await db.query<{ installation: string; data: string }>('SELECT installation, data FROM guard.settings')).rows;
 
 describe('settings on Postgres', () => {
+  it('refuses to save when the saved settings cannot be read, so a dropped connection never erases the saved keys', async () => {
+    const store = createPostgresSettingsStore(db);
+    expect(await saveSettings(form(), { store, env: ENV })).toEqual({ ok: true });
+    const before = await stored();
+    const flaky = { ...store, read: async () => Promise.reject(new Error('Connection terminated unexpectedly')) };
+    const result = await saveSettings(form({ name: 'Casa Mugs 2', apiKey: '', paypalSecret: '' }), { store: flaky, env: ENV });
+    expect(result.ok).toBe(false);
+    expect(await stored()).toEqual(before);
+    const settings = await loadSettings({ store, env: ENV });
+    expect([settings.business.name, settings.ai.apiKey]).toEqual(['Casa Mugs', 'sk-deepseek-abcd1234']);
+  });
+
   it('saves one row for the installation and reads it back, keys sealed', async () => {
     const store = createPostgresSettingsStore(db);
     expect(await saveSettings(form(), { store, env: ENV })).toEqual({ ok: true });
