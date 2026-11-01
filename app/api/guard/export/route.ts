@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   let entries;
   try {
     // One row more than fits tells whether the log was cut.
-    entries = auditLog().list(MAX_ROWS + 1);
+    entries = await auditLog().list(MAX_ROWS + 1);
   } catch (cause) {
     // The cause can name the database file, so it stays in the server log.
     console.error('Guard log export failed', cause);

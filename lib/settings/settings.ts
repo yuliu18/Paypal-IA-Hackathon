@@ -1,7 +1,8 @@
 // The shop's own configuration, edited on /settings: who the business is, its refund policy and
 // limits, which AI provider and models run the agent and the judge, its PayPal credentials and the
-// channels that announce held refunds (webhook, email through Resend or SMTP, Telegram). Saved in data/settings.json with
-// the keys (the webhook URL included) encrypted (./secret-box). The AI provider, its key, PayPal and
+// channels that announce held refunds (webhook, email through Resend or SMTP, Telegram). Saved in data/settings.json, or
+// in Postgres when DATABASE_URL is set (./postgres-store), with the keys (the webhook URL included)
+// encrypted (./secret-box). The AI provider, its key, PayPal and
 // the notification channels fall back to the environment, everything else to the demo defaults; the
 // models are chosen here only.
 // Server-side only: it returns the keys in plain text to the code that calls the providers.
@@ -13,6 +14,7 @@ import type { Limits } from '@/lib/guard/domain/policy';
 import { currencyFor } from './currencies.ts';
 import { normalizeBaseUrl, providerFor } from './providers.ts';
 import { openSecret, sealSecret } from './secret-box.ts';
+import type { SettingsStore } from './store.ts';
 
 // The refund policy the agent follows and the guard's intent judge checks calls against.
 export const DEFAULT_REFUND_POLICY = `Refund an order only when the customer who wrote the ticket says it arrived damaged, defective or never arrived.
@@ -27,7 +29,51 @@ const DEFAULT_LIMITS = { currency: 'USD', autoRefundUpTo: 100_00, approvalUpTo: 
 export const SETTINGS_FILE = 'data/settings.json';
 
 type Env = Record<string, string | undefined>;
-export type SettingsOptions = { file?: string; env?: Env };
+// `store` wins, then `file`, then SETTINGS_FILE (an operator's explicit choice); otherwise Postgres
+// when DATABASE_URL is set, else data/settings.json.
+export type SettingsOptions = { file?: string; env?: Env; store?: SettingsStore };
+
+async function storeFor({ env = process.env, file, store }: SettingsOptions): Promise<SettingsStore> {
+  if (store) return store;
+  if (!file && !env.SETTINGS_FILE && env.DATABASE_URL) {
+    // Loaded only when used, so the file setup never loads the database driver.
+    const [{ getDb }, { createPostgresSettingsStore }] = await Promise.all([import('../db/client.ts'), import('./postgres-store.ts')]);
+    return createPostgresSettingsStore(getDb(env as NodeJS.ProcessEnv)!);
+  }
+  return fileStore(file ?? env.SETTINGS_FILE ?? SETTINGS_FILE);
+}
+
+function fileStore(file: string): SettingsStore {
+  const keyFile = join(dirname(file), 'settings.key');
+  return {
+    where: file,
+    keyLabel: 'settings.key, next to the settings file,',
+    async read() {
+      try {
+        return await readFile(file, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+        throw error;
+      }
+    },
+    async write(json) {
+      await mkdir(dirname(file), { recursive: true });
+      // A temp name per save, so two saves at once never rename each other's file.
+      const partial = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
+      await writeFile(partial, json, { mode: 0o600 });
+      await rename(partial, file);
+    },
+    readKey: () => readKeyFile(keyFile),
+    async createKey() {
+      let pending = creating.get(keyFile);
+      if (!pending) {
+        pending = createKeyFile(keyFile).finally(() => creating.delete(keyFile));
+        creating.set(keyFile, pending);
+      }
+      await pending;
+    },
+  };
+}
 
 export type ShopSettings = {
   business: { name: string; contactEmails: string[]; refundPolicy: string };
@@ -115,23 +161,18 @@ const isLocked = (env: Env) => env.SETTINGS_LOCKED === 'true';
 const settingsSecret = (env: Env) => (env.SETTINGS_SECRET && env.SETTINGS_SECRET.length >= 16 ? env.SETTINGS_SECRET : undefined);
 
 // Without SETTINGS_SECRET, keys are encrypted with a random key kept in settings.key next to the
-// settings, readable only by the server account. It protects a copied settings.json, not a copied
-// data folder; SETTINGS_SECRET from a secrets manager protects both. Created on the first saved key.
-async function withSecret(env: Env, file: string, create: boolean): Promise<Env> {
+// settings, readable only by the server account (in Postgres: a row of its own). It protects a
+// copied settings.json, not a copied data folder; SETTINGS_SECRET from a secrets manager protects
+// both. Created on the first saved key.
+async function withSecret(env: Env, store: SettingsStore, create: boolean): Promise<Env> {
   if (settingsSecret(env)) return env;
-  const keyFile = join(dirname(file), 'settings.key');
-  const current = await readKeyFile(keyFile);
+  const current = await store.readKey();
   if (current === 'unreadable') return env;
   if (current) return { ...env, SETTINGS_SECRET: current };
   if (!create) return env;
   // Missing or empty: an empty file (left by a crash) never sealed a key, so it can be replaced.
-  let pending = creating.get(keyFile);
-  if (!pending) {
-    pending = createKeyFile(keyFile).finally(() => creating.delete(keyFile));
-    creating.set(keyFile, pending);
-  }
-  await pending;
-  const created = await readKeyFile(keyFile);
+  await store.createKey();
+  const created = await store.readKey();
   return created && created !== 'unreadable' ? { ...env, SETTINGS_SECRET: created } : env;
 }
 
@@ -186,12 +227,14 @@ const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) =>
 // What was saved; nothing when the file doesn't exist. A file that can't be read or parsed, or a
 // section edited into the wrong shape, is logged and ignored, so the server falls back to the
 // environment for it instead of failing.
-async function readStored(file: string): Promise<Stored> {
+async function readStored(store: SettingsStore): Promise<Stored> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await readFile(file, 'utf8'));
+    const json = await store.read();
+    if (json === undefined) return {};
+    parsed = JSON.parse(json);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`Ignoring ${file}: it could not be read`, error);
+    console.error(`Ignoring ${store.where}: it could not be read`, error);
     return {};
   }
   const stored: Record<string, unknown> = {};
@@ -199,7 +242,7 @@ async function readStored(file: string): Promise<Stored> {
     const section = (parsed as Record<string, unknown> | null)?.[name];
     if (section === undefined) continue;
     if (section && typeof section === 'object' && valid(section as Record<string, unknown>)) stored[name] = section;
-    else console.error(`Ignoring the "${name}" settings in ${file}: they are not in the expected shape`);
+    else console.error(`Ignoring the "${name}" settings in ${store.where}: they are not in the expected shape`);
   }
   return stored as Stored;
 }
@@ -282,18 +325,22 @@ function warnRetiredModelVariables(env: Env) {
   console.warn('AGENT_MODEL and JUDGE_MODEL are no longer read: choose the models on /settings (until then the provider default runs).');
 }
 
-export async function loadSettings({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<ShopSettings> {
+export async function loadSettings(options: SettingsOptions = {}): Promise<ShopSettings> {
+  const { env = process.env } = options;
   warnRetiredModelVariables(env);
-  return resolve(await readStored(file), await withSecret(env, file, false)).settings;
+  const store = await storeFor(options);
+  return resolve(await readStored(store), await withSecret(env, store, false)).settings;
 }
 
 // As the owner types it: "100.00", or "5000" in a currency without decimals.
 const decimal = (minor: number, currency: string) => (minor / 100).toFixed(currencyFor(currency)?.decimals ?? 2);
 
 // What the page shows: every value except the keys, which appear only as their last 4 characters.
-export async function settingsView({ env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SettingsView> {
-  const stored = await readStored(file);
-  const { settings, limits, keys } = resolve(stored, await withSecret(env, file, false));
+export async function settingsView(options: SettingsOptions = {}): Promise<SettingsView> {
+  const { env = process.env } = options;
+  const store = await storeFor(options);
+  const stored = await readStored(store);
+  const { settings, limits, keys } = resolve(stored, await withSecret(env, store, false));
   return {
     locked: isLocked(env),
     canStoreKeys: !isLocked(env),
@@ -345,7 +392,8 @@ const BOT_TOKEN = /^\d{1,20}:[\w-]{1,200}$/;
 // A host name or IP address: letters, digits, dots and dashes, nothing that could carry a path or port.
 const HOST = /^[a-z0-9.-]{1,253}$/i;
 
-export async function saveSettings(form: SettingsForm, { env = process.env, file = env.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}): Promise<SaveResult> {
+export async function saveSettings(form: SettingsForm, options: SettingsOptions = {}): Promise<SaveResult> {
+  const { env = process.env } = options;
   if (isLocked(env)) return { ok: false, errors: { form: 'Settings are read-only on this server (SETTINGS_LOCKED).' } };
   const errors: Extract<SaveResult, { ok: false }>['errors'] = {};
 
@@ -416,12 +464,13 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
   if (Object.keys(errors).length) return { ok: false, errors };
 
   const sealing = Boolean(apiKey || paypalSecret || webhookUrl || resendApiKey || telegramBotToken || smtpPassword);
-  const secret = sealing ? settingsSecret(await withSecret(env, file, true)) : undefined;
+  const store = await storeFor(options);
+  const secret = sealing ? settingsSecret(await withSecret(env, store, true)) : undefined;
   // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
   if (sealing && !secret) {
-    return { ok: false, errors: { form: 'Keys cannot be stored: settings.key, next to the settings file, is unreadable or empty. Delete it and save again.' } };
+    return { ok: false, errors: { form: `Keys cannot be stored: ${store.keyLabel} is unreadable or empty. Delete it and save again.` } };
   }
-  const previous = await readStored(file);
+  const previous = await readStored(store);
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
   const keepPaypalSecret = !form.clearPaypalSecret && previous.paypal?.clientId === paypalClientId ? previous.paypal.secret : undefined;
@@ -458,19 +507,16 @@ export async function saveSettings(form: SettingsForm, { env = process.env, file
     },
   };
 
-  await mkdir(dirname(file), { recursive: true });
-  // A temp name per save, so two saves at once never rename each other's file.
-  const partial = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  await writeFile(partial, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600 });
-  await rename(partial, file);
+  await store.write(`${JSON.stringify(stored, null, 2)}\n`);
   return { ok: true };
 }
 
 // The keys a "Test connection" press may use: the one typed, else a saved or environment key, but
 // only for the URL or client id it belongs to, so the form can't send a stored key elsewhere.
-export async function testCredentials(form: SettingsForm, { env: given = process.env, file = given.SETTINGS_FILE ?? SETTINGS_FILE }: SettingsOptions = {}) {
-  const env = await withSecret(given, file, false);
-  const stored = await readStored(file);
+export async function testCredentials(form: SettingsForm, options: SettingsOptions = {}) {
+  const store = await storeFor(options);
+  const env = await withSecret(options.env ?? process.env, store, false);
+  const stored = await readStored(store);
   const baseUrl = normalizeBaseUrl(form.baseUrl);
   const clientId = form.paypalClientId.trim();
   // Same choice as the agent makes (resolve): a saved key for this URL, even unreadable, wins over the environment's.

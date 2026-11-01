@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   // Live PayPal data: render per request, not at build time.
   await connection();
   // The guard's newest decisions, read fresh on every visit, sit beside the last PayPal snapshot.
-  const data = { ...(await latestDashboardData()), ...readGuardDashboardRows((limit) => auditLog().list(limit), GUARD_ROWS) };
+  const data = { ...(await latestDashboardData()), ...(await readGuardDashboardRows((limit) => auditLog().list(limit), GUARD_ROWS)) };
 
   // Only the model ids reach the client; the OpenAI key stays on the server (lib/ai.ts).
   return (

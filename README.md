@@ -34,6 +34,37 @@ Open [http://localhost:3000](http://localhost:3000). Next.js only loads the dott
 
 Other scripts: `npm run build` (production build), `npm run start` (serve the build), `npm run lint`.
 
+### Database (Postgres, optional locally)
+
+Without `DATABASE_URL` the guard keeps its black box in `data/guard-audit.db` (SQLite) and the settings in `data/settings.json`. With `DATABASE_URL` set (a Postgres connection string, e.g. Neon's pooled one) both live in Postgres instead, so they survive restarts on hosts without a persistent disk. The database holds two separate stores: schema `auth` for the owner's account and schema `guard` for the black box (`guard.audit_log`) and the settings (`guard.settings`, one row per installation). Neon Auth keeps its own users in schema `neon_auth`.
+
+- `npm run db:migrate` creates or updates the schemas; it is safe to run on every deploy, and the server also runs it before its first query. It uses `DATABASE_URL_UNPOOLED` (Neon's direct connection) when set.
+- `npm run db:probe` checks the Postgres stores against the real database inside a throwaway schema (`guard_probe_…`) that it drops at the end, so the real `guard` schema gets no test rows.
+- `npm run db:copy-sqlite` copies a local `data/guard-audit.db` into an empty Postgres black box, keeping every row's id, order and hash.
+
+Setting `SETTINGS_FILE` keeps the settings in that file even when `DATABASE_URL` is set.
+
+**On Render:** build command `npm ci && npm run build && npm run db:migrate`, start command `npm run start`. Set `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) in the service's environment, and `SETTINGS_SECRET` (16+ characters) so saved keys are encrypted with a key that is not stored in the same database.
+
+## Sign-in
+
+Every page and API route is protected ([`proxy.ts`](proxy.ts), [`lib/auth/gate.ts`](lib/auth/gate.ts)); static files are not. Which protection applies depends on the environment:
+
+| Mode | When | How you get in |
+|---|---|---|
+| Owner login | `NEON_AUTH_BASE_URL` is set | The installation's one owner signs in on `/login` with an email and password kept by [Neon Auth](https://neon.com/docs/auth/overview). Pages without the owner's session go to `/login`; API routes answer 401. **Sign out** is at the bottom of the side menu. |
+| Demo password | `NEON_AUTH_BASE_URL` is not set | HTTP Basic with `DEMO_PASSWORD`, any user name; 10 wrong passwords lock a client out for 15 minutes. Without `DEMO_PASSWORD` the app is open in development and refuses every request in production. For local development, tests and a public demo. |
+
+Owner login needs, besides `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (signs the session cookies; 32 characters or more, e.g. `openssl rand -base64 32`) and `DATABASE_URL` (the owner is looked up in Neon Auth's `neon_auth.user` table). If either is missing the app refuses every request with 503 instead of falling back to a weaker gate; if Neon Auth or the database can't be reached, requests count as signed out.
+
+Set it up once:
+
+1. Enable Neon Auth on the Neon project (`auth: true` in [`neon.ts`](neon.ts), then `neon deploy`, which writes `NEON_AUTH_BASE_URL` to `.env.local`), and add `NEON_AUTH_COOKIE_SECRET`. On the host, set the same variables and add the site's origin to Neon Auth's trusted domains: `neon neon-auth domain add https://your-app.onrender.com` (localhost is trusted by default).
+2. Open the app: with no owner yet, `/login` shows **Create the owner account** (email, and a password of at least 12 characters with a lowercase letter, an uppercase letter and a digit). That account is the owner; from then on `/login` only signs in, and the app refuses any second set-up.
+3. Close sign-up at Neon Auth too, so nobody can create accounts directly against its endpoint: `neon neon-auth config email-password update --disable-sign-up true`. The app already lets in only the owner (the oldest account), whatever other accounts exist; this keeps the user table clean.
+
+To start over (a forgotten password, a new owner), delete the owner with `neon neon-auth user delete <user-id>` and turn sign-up back on with `--disable-sign-up false`; the set-up form returns within 5 minutes (the owner is cached per server process).
+
 ## Settings
 
 `/settings` configures everything the agent and the guard use, with the environment variables as fallback, so a server with only `.env.local` works as before:
@@ -48,7 +79,7 @@ Other scripts: `npm run build` (production build), `npm run start` (serve the bu
 
 The AI catalog ([`lib/settings/catalog.ts`](lib/settings/catalog.ts)) comes from [models.dev](https://models.dev), the open provider and model database OpenCode and Pi use: every provider it serves through an OpenAI-compatible API, and for each only the models that can call tools, with context size and price. Verified presets ([`lib/settings/providers.ts`](lib/settings/providers.ts)) come first: Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio. Any other OpenAI-compatible URL works as **Custom**. The catalog is fetched once every 6 hours; if models.dev can't be reached, the presets still work and models can be typed.
 
-Settings are saved in `data/settings.json` (`SETTINGS_FILE` moves it). Keys (the Resend key, SMTP password and Telegram bot token included), and the webhook URL (it embeds a token), are encrypted with AES-256-GCM and the page only ever shows their last 4 characters. The encryption key is `SETTINGS_SECRET` when set (best kept in the host's secrets manager); otherwise a random key is generated in `data/settings.key`, readable only by the server account, which protects a copied `settings.json` but not a copied `data/` folder. A key is only sent to the URL or PayPal client ID it was saved or set for: changing the URL on the page never sends an existing key elsewhere. `SETTINGS_LOCKED=true` makes the page read-only and turns off the connection tests, for a public demo. On hosts with an ephemeral disk (Render's free plan), saved settings last until the next deploy; the environment variables are the durable configuration there.
+Settings are saved in `data/settings.json` (`SETTINGS_FILE` moves it), or in Postgres when `DATABASE_URL` is set (see [Database](#database-postgres-optional-locally)). Keys (the Resend key, SMTP password and Telegram bot token included), and the webhook URL (it embeds a token), are encrypted with AES-256-GCM and the page only ever shows their last 4 characters. The encryption key is `SETTINGS_SECRET` when set (best kept in the host's secrets manager); otherwise a random key is generated in `data/settings.key`, readable only by the server account (on Postgres: in `guard.settings_key`), which protects a copied `settings.json` but not a copied `data/` folder (or database). A key is only sent to the URL or PayPal client ID it was saved or set for: changing the URL on the page never sends an existing key elsewhere. `SETTINGS_LOCKED=true` makes the page read-only and turns off the connection tests, for a public demo. On hosts with an ephemeral disk (Render's free plan), saved settings last until the next deploy unless `DATABASE_URL` is set; the environment variables are the durable configuration there.
 
 ### AG Studio licence (optional)
 
@@ -237,14 +268,16 @@ The log holds text an attacker wrote: the ticket, and the arguments and PayPal a
 
 ### The black box
 
-Every decision is written to a SQLite file (`data/guard-audit.db`, or `GUARD_AUDIT_DB`) before the call runs, and its outcome is appended as a separate row afterwards, so no row is ever rewritten. Each row stores `sha256` of the previous row's hash and its own content. `/guard` checks the chain on every visit and shows either **Black box intact** with the head hash, or **Black box tampered** with the first bad row:
+Every decision is written to a SQLite file (`data/guard-audit.db`, or `GUARD_AUDIT_DB`), or to `guard.audit_log` in Postgres when `DATABASE_URL` is set, before the call runs, and its outcome is appended as a separate row afterwards, so no row is ever rewritten. Each row stores `sha256` of the previous row's hash and its own content. `/guard` checks the chain on every visit and shows either **Black box intact** with the head hash, or **Black box tampered** with the first bad row:
 
 - an edited row no longer matches its hash;
 - a deleted row breaks the link of the row after it, or leaves a gap in the row ids when it was the newest.
 
-What it can't see: someone with write access who rewrites the whole chain with fresh hashes, or also edits SQLite's id counter. To catch that, keep a copy of the head hash somewhere else and compare. New rows are checked on every visit; older ones are re-checked in full at least once a minute, so an edit to an already verified row can take up to a minute to show.
+Each decision also records the PayPal environment it ran in (`sandbox` or `live`), as part of the hashed content; rows written before that read as `sandbox`.
 
-Several processes can write to the same file: each append locks the database before reading the last hash, so the chain can't fork. A log written before the chain existed (table `audit`) is copied into the chain once, renumbered from 1, the first time the new version opens it; the old table is left as it was.
+What it can't see: someone with write access who rewrites the whole chain with fresh hashes, or also edits the id counter (SQLite's `sqlite_sequence`, Postgres's `guard.audit_head`). To catch that, keep a copy of the head hash somewhere else and compare. New rows are checked on every visit; older ones are re-checked in full at least once a minute, so an edit to an already verified row can take up to a minute to show.
+
+Several processes can write to the same file: each append locks the database before reading the last hash, so the chain can't fork. On Postgres each append locks the `guard.audit_head` row in its transaction, with the same effect across requests and server instances. A log written before the chain existed (table `audit`) is copied into the chain once, renumbered from 1, the first time the new version opens it; the old table is left as it was.
 
 The **AI operations** page, the dashboard's cover, shows the same log as what the AI agents did, each fact once. It opens with **Flow through the guard** (above); then four figures: money kept in the shop (the requested amount of blocked refunds, and the recorded amount of blocked dispute acceptances; a full refund with no stated amount isn't counted), money paid back to customers (refunds and dispute acceptances that went through), the held calls waiting for you, and the personal data fields withheld from the agents; then **Decisions per day** by verdict; and last **What the agents tried to do** (by action) beside **Why the guard stopped a call** (rules broken, as stops or holds). The other pages keep to what the cover doesn't show: **Agent activity** has calls by customer and every decision; **Revenue & cash** sales, balance, invoiced, money in and out per day, ledger activity by type and the ledger; **Receivables** what is owed by customer and by invoice date; **Catalogue** products, plans and prices.
 

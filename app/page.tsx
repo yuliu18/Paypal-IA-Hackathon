@@ -62,7 +62,7 @@ export default async function Overview() {
   const [{ business, limits, ai: chosen, paypal }, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
   const ai = await withDefaultModels(chosen, async () => catalog);
   const provider = catalog.providers.find((p) => p.id === ai.provider)?.label ?? t('rules.customProvider');
-  const rows = readGuardDashboardRows((limit) => auditLog().list(limit), COUNTED);
+  const rows = await readGuardDashboardRows((limit) => auditLog().list(limit), COUNTED);
   const tally = agentCalls(rows.guardDecisions);
   const shares = verdictShares(tally);
   const calls = checkpointCalls(rows, SHOWN);

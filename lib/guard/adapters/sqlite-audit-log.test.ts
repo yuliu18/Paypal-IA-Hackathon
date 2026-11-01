@@ -116,7 +116,7 @@ describe('sqlite audit log', () => {
   it('reads one entry by id, and tells whether a later entry resolves a held one', async () => {
     const held = entry({ outcome: 'held', moved: undefined, decision: { verdict: 'hold', violations: [{ code: 'APPROVAL_REQUIRED', message: 'over' }] } });
     const heldId = await log.record(held);
-    expect(await log.get(heldId)).toEqual({ ...held, id: heldId });
+    expect(await log.get(heldId)).toEqual({ ...held, id: heldId, environment: 'sandbox' });
     expect(await log.get('999')).toBeUndefined();
     expect(await log.isResolved(heldId)).toBe(false);
 
@@ -150,6 +150,16 @@ describe('sqlite audit log', () => {
     expect(await log.boundOrderCustomer('6C190127TN364715T')).toBeUndefined();
     await log.record(entry({ outcome: 'executed', detail: 'Order 5D190127TN364715T bound to the task customer' }));
     expect(await log.boundOrderCustomer('5D190127TN364715T')).toBeUndefined();
+  });
+});
+
+describe('the PayPal environment of each decision', () => {
+  it('records sandbox when the caller names none, and live when it says so', async () => {
+    const sandbox = await log.record(entry());
+    const live = await log.record(entry({ environment: 'live' }));
+    expect((await log.get(sandbox))?.environment).toBe('sandbox');
+    expect((await log.get(live))?.environment).toBe('live');
+    expect(log.list(2).map((e) => e.environment)).toEqual(['live', 'sandbox']);
   });
 });
 
@@ -231,6 +241,34 @@ describe('hash-chained black box', () => {
     const id = await file.record(entry({ detail: 'socket \ud800 closed' }));
     await file.update(id, { outcome: 'error', detail: 'bad \udfff' });
     expect(file.verifyChain()).toMatchObject({ intact: true, records: 2 });
+  });
+
+  it('reports a change to the environment a decision ran in', async () => {
+    const { first } = await sample();
+    tamper(`UPDATE audit_log SET environment = 'live' WHERE id = ${first}`);
+    expect(file.verifyChain()).toMatchObject({ intact: false, brokenAt: first });
+  });
+
+  it('opens a file written before the environment was recorded: its rows read as sandbox and the chain stays intact', async () => {
+    await sample();
+    // The file as the previous version left it: no environment column, the view without it.
+    tamper(`DROP VIEW audit_state; ALTER TABLE audit_log DROP COLUMN environment;
+      CREATE VIEW audit_state AS SELECT r.id, r.at, r.tool, r.args, r.task, r.decision, r.resolves, r.outcome, r.detail, r.moved_minor, r.moved_currency FROM audit_log r WHERE r.kind = 'record';`);
+    const db = new DatabaseSync(path);
+    // Rewrite the old rows' hashes as the previous version computed them (no environment).
+    const { hashOf } = await import('./audit-chain');
+    let prev = '0'.repeat(64);
+    for (const row of db.prepare('SELECT * FROM audit_log ORDER BY id').all() as unknown as (Parameters<typeof hashOf>[0] & { id: number })[]) {
+      const hash = hashOf({ ...row, prev_hash: prev, environment: null });
+      db.prepare('UPDATE audit_log SET prev_hash = ?, hash = ? WHERE id = ?').run(prev, hash, row.id);
+      prev = hash;
+    }
+    db.close();
+    const upgraded = createSqliteAuditLog(path);
+    expect(upgraded.list(10).map((e) => e.environment)).toEqual(['sandbox', 'sandbox']);
+    await upgraded.record(entry({ environment: 'live' }));
+    expect(upgraded.verifyChain()).toMatchObject({ intact: true, records: 4 });
+    expect(upgraded.list(1)[0].environment).toBe('live');
   });
 
   it('keeps the chain across reopening the file', async () => {

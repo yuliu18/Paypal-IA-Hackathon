@@ -50,6 +50,9 @@ export interface OrderBinder {
   bindToCustomer(orderId: string, customerEmail: string): Promise<void>;
 }
 
+// The PayPal environment a guard decision ran against: the sandbox (test money) or live (real money).
+export type PaymentEnvironment = 'sandbox' | 'live';
+
 export type AuditEntry = {
   at: string;
   tool: string;
@@ -64,6 +67,9 @@ export type AuditEntry = {
   detail?: string;
   // The held entry this one decides (a person's approval or rejection).
   resolves?: string;
+  // Recorded with every decision; 'sandbox' when not given. Entries logged before it was recorded
+  // read back as 'sandbox'.
+  environment?: PaymentEnvironment;
 };
 
 export type AuditRow = AuditEntry & { id: string };
@@ -86,6 +92,20 @@ export interface AuditLog {
   // The customer an executed create_order was bound to (its audit detail is boundOrderDetail), or
   // undefined when the guard created and bound no such order. The shop captures only those.
   boundOrderCustomer(orderId: string): Promise<string | undefined>;
+}
+
+export type ChainCheck =
+  | { intact: true; records: number; head: string | null }
+  | { intact: false; brokenAt: string; reason: string };
+
+// The audit log as the app's pages read it: the guard's AuditLog plus the newest entries and the
+// hash-chain check. Async because the Postgres store is.
+export interface BlackBox extends AuditLog {
+  // Newest first.
+  list(limit: number): Promise<AuditRow[]>;
+  // reuseFullCheckMs > 0 skips rows a full check already verified within that window, re-checking
+  // only rows added since and the last verified row; 0 always checks the whole chain.
+  verifyChain(reuseFullCheckMs?: number, now?: number): Promise<ChainCheck>;
 }
 
 // Tells a person that a held entry waits for their decision. The guard doesn't wait for it, and a

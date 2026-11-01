@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import { getTranslations } from 'next-intl/server';
-import type { ChainCheck } from '@/lib/guard/adapters/sqlite-audit-log';
+import type { ChainCheck } from '@/lib/guard/ports';
 import { parseInvoiceDraft } from '@/lib/guard/domain/invoice';
 import { parseOrderDraft } from '@/lib/guard/domain/order';
 import { format } from '@/lib/guard/domain/policy';
@@ -83,8 +83,7 @@ export default async function GuardLogPage() {
   await connection();
   const t = await getTranslations('guard');
   const log = auditLog();
-  const entries = log.list(500);
-  const chain = log.verifyChain(FULL_CHECK_MS);
+  const [entries, chain] = await Promise.all([log.list(500), log.verifyChain(FULL_CHECK_MS)]);
   const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
   const held: HeldCall[] = entries
     .filter((e) => e.outcome === 'held' && !decided.has(e.id))

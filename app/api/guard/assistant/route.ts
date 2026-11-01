@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const config = { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: TIMEOUT_MS };
     const answer = await askGuardAssistant({
       question,
-      entries: auditLog().list(ASSISTANT_MAX_ENTRIES),
+      entries: await auditLog().list(ASSISTANT_MAX_ENTRIES),
       now: new Date(),
       complete: (request) => requestCompletion(config, request),
     });
