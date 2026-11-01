@@ -3,7 +3,7 @@ import { firstSectionWithError, sectionFrom, SETTINGS_SECTIONS } from './section
 
 describe('settings sections', () => {
   it('lists the sections in the order the menu shows them', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Language', 'Business', 'Limits', 'AI model', 'PayPal app', 'Notifications']);
+    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Language', 'Business', 'Limits', 'AI model', 'PayPal app', 'Notifications', 'API keys']);
   });
 
   it('opens the first section, in menu order, that holds a field the save rejected', () => {
@@ -19,6 +19,11 @@ describe('settings sections', () => {
     expect(firstSectionWithError({})).toBeUndefined();
   });
 
+  it('puts the API keys last, after the notifications, holding no field of the settings form', () => {
+    expect(SETTINGS_SECTIONS.at(-1)).toMatchObject({ id: 'api-keys', fields: [] });
+    expect(SETTINGS_SECTIONS.at(-2)?.id).toBe('notifications');
+  });
+
   it('puts the language first, which holds no field of the settings form', () => {
     expect(SETTINGS_SECTIONS[0]).toMatchObject({ id: 'language', fields: [] });
   });
@@ -27,6 +32,7 @@ describe('settings sections', () => {
 describe('sectionFrom', () => {
   it("opens the section the address names, and the language when it names none or an unknown one", () => {
     expect(sectionFrom('limits')).toBe('limits');
+    expect(sectionFrom('api-keys')).toBe('api-keys');
     expect(sectionFrom(null)).toBe('language');
     expect(sectionFrom('nope')).toBe('language');
   });

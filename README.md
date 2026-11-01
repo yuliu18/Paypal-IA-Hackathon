@@ -67,6 +67,24 @@ Set it up once:
 
 To start over (a new owner), delete the owner with `neon neon-auth user delete <user-id>` and turn sign-up back on with `--disable-sign-up false`; the set-up form returns within 5 minutes (the owner is cached per server process).
 
+### API keys
+
+Your shop's own app (a checkout, a help-desk integration) calls the agents with a key instead of signing in. Keys need `DATABASE_URL`; without it the section explains that and no key is accepted.
+
+1. **Create:** Settings › **API keys**, give the key a name, **Create key**. The whole key (`pg_` and 43 more characters) is shown once: copy it into your app's secrets. Only its SHA-256 hash and last 4 characters are stored (`guard.api_keys`).
+2. **Call:** send it as a bearer token:
+
+   ```bash
+   curl -X POST https://your-app.onrender.com/api/support/tickets \
+     -H "Authorization: Bearer pg_your_key_here" \
+     -H "Content-Type: application/json" \
+     -d '{"customerEmail":"ana@example.com","message":"My mug arrived broken."}'
+   ```
+
+3. **Revoke:** **Revoke** next to the key in the list; calls with it get 401 at once. The list shows when each key was created and last used (updated at most once a minute).
+
+**Scope:** a key opens exactly three endpoints, `POST /api/support/tickets`, `POST /api/billing/tasks` and `POST /api/sales/chats`, with owner login or with the demo password. Nothing else accepts it: not the pages, not `/api/guard/*`, not `/api/auth/*`, not Server Actions. A wrong or revoked key gets `401 {"error":"Invalid or revoked API key."}`, never a redirect. The proxy tells the route a request came in with a key in the `x-pg-auth: api-key:<key id>` request header, after removing any copy the client sent.
+
 ## Settings
 
 `/settings` configures everything the agent and the guard use, with the environment variables as fallback, so a server with only `.env.local` works as before:
@@ -78,6 +96,7 @@ To start over (a new owner), delete the owner with `neon neon-auth user delete <
 | AI | Provider from the catalog, base URL, API key, agent and judge models; **Test connection** lists the provider's models |
 | PayPal | Sandbox client ID and secret; **Test connection** asks PayPal for a token |
 | Notifications | Where every refund held for a person is announced, each optional: a Slack or Discord webhook URL (or `GUARD_WEBHOOK_URL`); email to the contact emails through your own mail server over SMTP (or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) or through Resend, with its API key (or `RESEND_API_KEY`), from a sender address (or `NOTIFY_EMAIL_FROM`); a Telegram bot token and chat id (or `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) |
+| API keys | Keys your shop's own app calls the agent endpoints with ([API keys](#api-keys)); needs `DATABASE_URL` |
 
 The AI catalog ([`lib/settings/catalog.ts`](lib/settings/catalog.ts)) comes from [models.dev](https://models.dev), the open provider and model database OpenCode and Pi use: every provider it serves through an OpenAI-compatible API, and for each only the models that can call tools, with context size and price. Verified presets ([`lib/settings/providers.ts`](lib/settings/providers.ts)) come first: Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio. Any other OpenAI-compatible URL works as **Custom**. The catalog is fetched once every 6 hours; if models.dev can't be reached, the presets still work and models can be typed.
 

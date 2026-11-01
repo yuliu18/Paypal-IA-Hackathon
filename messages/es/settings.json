@@ -11,7 +11,8 @@
     "limits": "Límites",
     "ai": "Modelo de IA",
     "paypal": "App de PayPal",
-    "notifications": "Notificaciones"
+    "notifications": "Notificaciones",
+    "api-keys": "Claves de API"
   },
   "language": {
     "title": "Idioma",
@@ -153,5 +154,42 @@
     "scope": "Guarda todas las secciones, no solo esta.",
     "saved": "Guardado. El siguiente ticket usa estos ajustes.",
     "checkFields": "Revisa los campos marcados."
+  },
+  "apiKeys": {
+    "title": "Claves de API",
+    "detail": "La app de tu tienda llama a los agentes con una clave en lugar de iniciar sesión, en la cabecera Authorization.",
+    "needsDatabase": "Las claves de API se guardan en la base de datos: configura DATABASE_URL para crearlas.",
+    "unreadable": "No se pudieron leer las claves de la base de datos. Inténtalo más tarde.",
+    "name": "Nombre de la clave",
+    "namePlaceholder": "App de pago",
+    "create": "Crear clave",
+    "creating": "Creando…",
+    "created": "Tu nueva clave «{name}»",
+    "onceNote": "Cópiala ahora: no la volverás a ver. Solo se guardan sus 4 últimos caracteres.",
+    "copy": "Copiar",
+    "copied": "Copiada",
+    "example": "Llama al agente de soporte con una clave",
+    "scope": "Una clave solo sirve en los tres endpoints de los agentes: POST /api/support/tickets, /api/billing/tasks y /api/sales/chats. Nada más la acepta.",
+    "listTitle": "Tus claves",
+    "empty": "Aún no hay claves.",
+    "columns": {
+      "name": "Nombre",
+      "key": "Clave",
+      "created": "Creada",
+      "lastUsed": "Último uso",
+      "status": "Estado"
+    },
+    "never": "Nunca",
+    "active": "Activa",
+    "revokedAt": "Revocada {at}",
+    "revoke": "Revocar",
+    "revokeConfirm": "¿Revocar la clave «{name}»? Las apps que la usan dejan de funcionar al instante.",
+    "errors": {
+      "invalid-name": "Ponle a la clave un nombre de 1 a 60 caracteres.",
+      "not-found": "Esa clave ya está revocada.",
+      "unavailable": "Las claves de API se guardan en la base de datos: configura DATABASE_URL para crearlas.",
+      "locked": "Los ajustes son de solo lectura en este servidor (SETTINGS_LOCKED).",
+      "failed": "No ha funcionado. Inténtalo de nuevo; los detalles están en el log del servidor."
+    }
   }
 }

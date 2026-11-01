@@ -2,7 +2,7 @@ import type { SettingsForm } from '@/lib/settings/settings';
 
 // The settings page's sections, one shown at a time, and the form fields each one holds, so a
 // rejected save can open the section of the field it names. The language is saved on its own, at
-// once, in this browser (./language-actions), so it holds no field of the form.
+// once, in this browser (./language-actions), so it holds no field of the form; nor do the API keys.
 export const SETTINGS_SECTIONS = [
   { id: 'language', label: 'Language', fields: [] },
   { id: 'business', label: 'Business', fields: ['name', 'contactEmails', 'refundPolicy'] },
@@ -14,6 +14,8 @@ export const SETTINGS_SECTIONS = [
     label: 'Notifications',
     fields: ['webhookUrl', 'resendApiKey', 'emailFrom', 'telegramBotToken', 'telegramChatId', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPassword'],
   },
+  // Keys are created and revoked on their own, at once (./api-key-actions), outside the form.
+  { id: 'api-keys', label: 'API keys', fields: [] },
 ] as const satisfies readonly { id: string; label: string; fields: readonly (keyof SettingsForm)[] }[];
 
 export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]['id'];

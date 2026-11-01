@@ -14,6 +14,20 @@ export function isPublicRequest({ method, pathname, serverAction = false }: { me
   return false;
 }
 
+// The only requests an API key opens (lib/apikeys): the business's own app posting to the agents.
+// Paths match exactly; a Server Action never counts, whatever path it is posted to.
+export const API_KEY_ROUTES = ['/api/support/tickets', '/api/billing/tasks', '/api/sales/chats'];
+
+export function acceptsApiKey({ method, pathname, serverAction = false }: { method: string; pathname: string; serverAction?: boolean }): boolean {
+  return !serverAction && method === 'POST' && API_KEY_ROUTES.includes(pathname);
+}
+
+// The key in `Authorization: Bearer <key>`, or undefined when the header holds anything else.
+export function bearerToken(authorization: string | null): string | undefined {
+  const match = /^Bearer[ ]+(\S+)[ ]*$/i.exec(authorization ?? '');
+  return match?.[1];
+}
+
 // One owner per installation: only their session opens the app. While nobody has signed up yet,
 // everyone is sent to the login page, which then offers to create the owner account.
 export function neonAccess({ userId, ownerId }: { userId: string | undefined; ownerId: string | null }): 'allow' | 'sign-in' {

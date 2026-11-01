@@ -13,6 +13,7 @@ import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './se
 import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
+import { ApiKeysSection, type ApiKeysView } from './api-keys-section';
 
 type Check = { ok: boolean; message: string } | null;
 // The page's text, from messages/<locale>/settings.json.
@@ -121,7 +122,17 @@ function CheckResult({ check }: { check: Check }) {
 
 // The shop owner's settings: business, refund limits, AI provider, PayPal and the held-refund
 // channels (webhook, email, Telegram). Keys and the webhook URL are write-only: the page only ever receives their last 4 characters.
-export function SettingsEditor({ view, providers, initialModels }: { view: SettingsView; providers: CatalogProvider[]; initialModels: CatalogModel[] }) {
+export function SettingsEditor({
+  view,
+  providers,
+  initialModels,
+  apiKeys,
+}: {
+  view: SettingsView;
+  providers: CatalogProvider[];
+  initialModels: CatalogModel[];
+  apiKeys: ApiKeysView;
+}) {
   const t = useTranslations('settings');
   const formRef = useRef<HTMLFormElement>(null);
   const [state, save, saving] = useActionState(saveSettingsAction, null);
@@ -446,8 +457,8 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
             </Channel>
           </Section>
 
-          {/* The language saves on its own, so the form's button stays out of its section. */}
-          <div hidden={open === 'language'} className="flex flex-wrap items-center gap-4">
+          {/* The language and the API keys save on their own, so the form's button stays out of their sections. */}
+          <div hidden={open === 'language' || open === 'api-keys'} className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={saving} className={primaryButton}>
               {saving && <Spinner />}
               {saving ? t('save.saving') : t('save.button')}
@@ -460,6 +471,10 @@ export function SettingsEditor({ view, providers, initialModels }: { view: Setti
         </fieldset>
         </div>
       </form>
+      {/* Outside the settings form: a form can't hold another. */}
+      <div className="max-w-4xl">
+        <ApiKeysSection hidden={open !== 'api-keys'} view={apiKeys} locked={view.locked} />
+      </div>
     </main>
   );
 }

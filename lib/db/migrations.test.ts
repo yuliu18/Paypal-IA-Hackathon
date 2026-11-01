@@ -22,7 +22,7 @@ describe('database migrations', () => {
     const authTables = await db.query(`SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth'`);
     expect(authTables.rows).toEqual([]);
     const guardTables = (await db.query<{ table_name: string }>(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'guard' ORDER BY table_name`)).rows.map((r) => r.table_name);
-    expect(guardTables).toEqual(['audit_head', 'audit_log', 'audit_state', 'schema_migrations', 'settings', 'settings_key']);
+    expect(guardTables).toEqual(['api_keys', 'audit_head', 'audit_log', 'audit_state', 'schema_migrations', 'settings', 'settings_key']);
   });
 
   it('applies nothing the second time', async () => {

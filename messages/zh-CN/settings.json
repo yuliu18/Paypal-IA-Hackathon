@@ -11,7 +11,8 @@
     "limits": "限额",
     "ai": "AI 模型",
     "paypal": "PayPal 应用",
-    "notifications": "通知"
+    "notifications": "通知",
+    "api-keys": "API 密钥"
   },
   "language": {
     "title": "语言",
@@ -153,5 +154,42 @@
     "scope": "保存所有分区，而不只是当前分区。",
     "saved": "已保存。下一个工单将使用这些设置。",
     "checkFields": "请检查标出的字段。"
+  },
+  "apiKeys": {
+    "title": "API 密钥",
+    "detail": "你店铺自己的应用用密钥调用智能体，无需登录，密钥放在 Authorization 请求头中。",
+    "needsDatabase": "API 密钥保存在数据库中：设置 DATABASE_URL 后才能创建。",
+    "unreadable": "无法从数据库读取密钥，请稍后再试。",
+    "name": "密钥名称",
+    "namePlaceholder": "结账应用",
+    "create": "创建密钥",
+    "creating": "正在创建…",
+    "created": "你的新密钥“{name}”",
+    "onceNote": "请立即复制：之后将无法再次查看。只保留最后 4 个字符。",
+    "copy": "复制",
+    "copied": "已复制",
+    "example": "用密钥调用客服智能体",
+    "scope": "密钥只在三个智能体接口上有效：POST /api/support/tickets、/api/billing/tasks 和 /api/sales/chats。其他地方都不接受。",
+    "listTitle": "你的密钥",
+    "empty": "还没有密钥。",
+    "columns": {
+      "name": "名称",
+      "key": "密钥",
+      "created": "创建时间",
+      "lastUsed": "上次使用",
+      "status": "状态"
+    },
+    "never": "从未",
+    "active": "有效",
+    "revokedAt": "已于 {at} 撤销",
+    "revoke": "撤销",
+    "revokeConfirm": "撤销密钥“{name}”？使用它的应用会立即停止工作。",
+    "errors": {
+      "invalid-name": "请为密钥取一个 1 到 60 个字符的名称。",
+      "not-found": "该密钥已被撤销。",
+      "unavailable": "API 密钥保存在数据库中：设置 DATABASE_URL 后才能创建。",
+      "locked": "此服务器上的设置为只读（SETTINGS_LOCKED）。",
+      "failed": "操作失败，请重试；详情见服务器日志。"
+    }
   }
 }

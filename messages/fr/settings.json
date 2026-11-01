@@ -11,7 +11,8 @@
     "limits": "Limites",
     "ai": "Modèle d'IA",
     "paypal": "App PayPal",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "api-keys": "Clés API"
   },
   "language": {
     "title": "Langue",
@@ -153,5 +154,42 @@
     "scope": "Enregistre toutes les sections, pas seulement celle-ci.",
     "saved": "Enregistré. Le prochain ticket utilise ces paramètres.",
     "checkFields": "Vérifiez les champs signalés."
+  },
+  "apiKeys": {
+    "title": "Clés API",
+    "detail": "L’application de votre boutique appelle les agents avec une clé au lieu de se connecter, dans l’en-tête Authorization.",
+    "needsDatabase": "Les clés API sont conservées dans la base de données : définissez DATABASE_URL pour en créer.",
+    "unreadable": "Impossible de lire les clés dans la base de données. Réessayez plus tard.",
+    "name": "Nom de la clé",
+    "namePlaceholder": "Appli de paiement",
+    "create": "Créer une clé",
+    "creating": "Création…",
+    "created": "Votre nouvelle clé « {name} »",
+    "onceNote": "Copiez-la maintenant : vous ne la reverrez plus. Seuls ses 4 derniers caractères sont conservés.",
+    "copy": "Copier",
+    "copied": "Copiée",
+    "example": "Appeler l’agent de support avec une clé",
+    "scope": "Une clé ne fonctionne que sur les trois points d’accès des agents : POST /api/support/tickets, /api/billing/tasks et /api/sales/chats. Rien d’autre ne l’accepte.",
+    "listTitle": "Vos clés",
+    "empty": "Aucune clé pour l’instant.",
+    "columns": {
+      "name": "Nom",
+      "key": "Clé",
+      "created": "Créée",
+      "lastUsed": "Dernière utilisation",
+      "status": "État"
+    },
+    "never": "Jamais",
+    "active": "Active",
+    "revokedAt": "Révoquée {at}",
+    "revoke": "Révoquer",
+    "revokeConfirm": "Révoquer la clé « {name} » ? Les applications qui l’utilisent cessent aussitôt de fonctionner.",
+    "errors": {
+      "invalid-name": "Donnez à la clé un nom de 1 à 60 caractères.",
+      "not-found": "Cette clé est déjà révoquée.",
+      "unavailable": "Les clés API sont conservées dans la base de données : définissez DATABASE_URL pour en créer.",
+      "locked": "Les paramètres sont en lecture seule sur ce serveur (SETTINGS_LOCKED).",
+      "failed": "Cela n’a pas fonctionné. Réessayez ; les détails sont dans le journal du serveur."
+    }
   }
 }

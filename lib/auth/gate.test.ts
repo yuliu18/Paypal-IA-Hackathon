@@ -12,10 +12,19 @@ const deps = (overrides: Partial<GateDeps> = {}): GateDeps => ({
   demo: () => new NextResponse('demo', { status: 401 }),
   session: async () => ({ userId: undefined, cookies: [] }),
   ownerId: async () => 'owner-1',
+  apiKey: async () => null,
   ...overrides,
 });
 
 const passedThrough = (response: Response) => response.headers.get('x-middleware-next') === '1';
+// What the route will see in x-pg-auth: the value the proxy forwards, or null when it removed it.
+const forwardedAuth = (response: Response) => {
+  const list = response.headers.get('x-middleware-override-headers');
+  // Without the override list Next forwards the client's headers untouched.
+  expect(list).not.toBeNull();
+  const overridden = list!.split(',');
+  return overridden.includes('x-pg-auth') ? response.headers.get('x-middleware-request-x-pg-auth') : null;
+};
 
 describe('gate without Neon Auth (demo password)', () => {
   it('leaves every request, the login page included, to the demo password unchanged', async () => {
@@ -117,5 +126,108 @@ describe('gate with Neon Auth', () => {
   it('refuses a Server Action posted to the login page without a session', async () => {
     const response = await gate(request('/login', { method: 'POST', headers: { 'next-action': 'abc123' } }), deps());
     expect(passedThrough(response)).toBe(false);
+  });
+});
+
+describe('gate with an API key', () => {
+  const KEY = `pg_${'k'.repeat(43)}`;
+  const AGENT_ROUTES = ['/api/support/tickets', '/api/billing/tasks', '/api/sales/chats'];
+  const bearer = (key = KEY, extra: Record<string, string> = {}) => ({ method: 'POST', headers: { authorization: `Bearer ${key}`, ...extra } });
+  const apiKey = vi.fn(async (key: string) => (key === KEY ? { keyId: 'key-1' } : null));
+  const demo = { kind: 'demo' } as const;
+
+  it('lets a valid key POST to the three agent routes, with owner login or the demo password, and tells the route', async () => {
+    for (const mode of [neon, demo]) {
+      for (const path of AGENT_ROUTES) {
+        const session = vi.fn();
+        const demoGate = vi.fn();
+        const response = await gate(request(path, bearer()), deps({ mode, apiKey, session, demo: demoGate }));
+        expect(passedThrough(response)).toBe(true);
+        expect(forwardedAuth(response)).toBe('api-key:key-1');
+        expect(session).not.toHaveBeenCalled();
+        expect(demoGate).not.toHaveBeenCalled();
+      }
+    }
+  });
+
+  it('refuses a wrong or revoked key on an agent route with 401 JSON, never a redirect, even with a session', async () => {
+    const owner = async () => ({ userId: 'owner-1', cookies: [] });
+    for (const mode of [neon, demo]) {
+      const response = await gate(request('/api/support/tickets', bearer(`pg_${'x'.repeat(43)}`)), deps({ mode, apiKey, session: owner }));
+      expect(response.status).toBe(401);
+      expect(response.headers.get('location')).toBeNull();
+      expect(await response.json()).toEqual({ error: 'Invalid or revoked API key.' });
+    }
+  });
+
+  it('fails closed when the key cannot be checked', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const broken = async () => {
+      throw new Error('unreachable');
+    };
+    expect((await gate(request('/api/billing/tasks', bearer()), deps({ apiKey: broken }))).status).toBe(401);
+    log.mockRestore();
+  });
+
+  it('accepts a key nowhere else: other routes, other methods, paths below, pages, sign-in, Server Actions', async () => {
+    apiKey.mockClear();
+    const elsewhere: [string, { method: string; headers: Record<string, string> }][] = [
+      ['/api/guard/export', bearer()],
+      ['/api/guard/approve', bearer()],
+      ['/api/support/tickets/x', bearer()],
+      ['/api/sales/paypal-return', bearer()],
+      ['/settings', bearer()],
+      ['/', { ...bearer(), method: 'GET' }],
+      ['/api/support/tickets', { ...bearer(), method: 'GET' }],
+      ['/api/billing/tasks', { ...bearer(), method: 'PUT' }],
+      ['/api/sales/chats', bearer(KEY, { 'next-action': 'abc123' })],
+    ];
+    for (const [path, init] of elsewhere) {
+      const response = await gate(request(path, init), deps({ apiKey }));
+      expect(passedThrough(response)).toBe(false);
+      expect(response.status === 401 || response.status === 307).toBe(true);
+    }
+    const demoGate = vi.fn(() => new NextResponse('Authentication required.', { status: 401 }));
+    expect((await gate(request('/api/guard/export', bearer()), deps({ mode: demo, apiKey, demo: demoGate }))).status).toBe(401);
+    expect(demoGate).toHaveBeenCalledTimes(1);
+    expect(apiKey).not.toHaveBeenCalled();
+  });
+
+  it('never forwards a key-authenticated mark to the public sign-in endpoints', async () => {
+    const response = await gate(request('/api/auth/sign-in', bearer()), deps({ apiKey }));
+    expect(passedThrough(response)).toBe(true);
+    expect(forwardedAuth(response)).toBeNull();
+  });
+
+  it('keeps the half-configured refusal for key requests too', async () => {
+    const response = await gate(request('/api/support/tickets', bearer()), deps({ mode: { kind: 'misconfigured', missing: ['DATABASE_URL'] }, apiKey }));
+    expect(response.status).toBe(503);
+  });
+
+  it('removes an x-pg-auth header the client sent, whoever lets the request through', async () => {
+    const forged = { 'x-pg-auth': 'api-key:forged' };
+    const owner = async () => ({ userId: 'owner-1', cookies: [] });
+    const allowDemo = () => NextResponse.next();
+    const cases: [string, Parameters<typeof request>[1], Partial<GateDeps>][] = [
+      ['/api/support/tickets', { method: 'POST', headers: forged }, { session: owner }],
+      ['/api/support/tickets', { method: 'POST', headers: forged }, { mode: demo, demo: allowDemo }],
+      ['/settings', { headers: forged }, { session: owner }],
+      ['/login', { headers: forged }, {}],
+      ['/api/auth/sign-in', { method: 'POST', headers: forged }, {}],
+    ];
+    for (const [path, init, overrides] of cases) {
+      const response = await gate(request(path, init), deps(overrides));
+      expect(passedThrough(response)).toBe(true);
+      expect(forwardedAuth(response)).toBeNull();
+    }
+    const withKey = await gate(request('/api/support/tickets', bearer(KEY, forged)), deps({ apiKey }));
+    expect(forwardedAuth(withKey)).toBe('api-key:key-1');
+  });
+
+  it('still passes the refreshed session cookies on along with the cleaned headers', async () => {
+    const session = async () => ({ userId: 'owner-1', cookies: [{ name: 'c', value: 'v', options: { path: '/' } }] });
+    const response = await gate(request('/settings', { headers: { 'x-pg-auth': 'x' } }), deps({ session }));
+    expect(response.headers.get('set-cookie')).toContain('c=v');
+    expect(forwardedAuth(response)).toBeNull();
   });
 });

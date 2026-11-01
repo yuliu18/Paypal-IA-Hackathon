@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { apiKeys } from '@/lib/apikeys/keys';
 import { authMode } from '@/lib/auth/config';
 import { gate } from '@/lib/auth/gate';
 import { owner } from '@/lib/auth/owner';
@@ -31,7 +32,8 @@ function demoGate(request: NextRequest) {
 }
 
 // With Neon Auth (NEON_AUTH_BASE_URL set), only the owner's session opens a page or API route
-// (lib/auth/gate.ts); without it, the demo password. Static assets don't pass through here.
+// (lib/auth/gate.ts); without it, the demo password. In both, the agent routes also take an API key
+// (lib/apikeys, needs DATABASE_URL). Static assets don't pass through here.
 export function proxy(request: NextRequest) {
   const mode = authMode();
   return gate(request, {
@@ -39,6 +41,7 @@ export function proxy(request: NextRequest) {
     demo: demoGate,
     session: (req) => (mode.kind === 'neon' ? readSession(req, mode) : Promise.resolve({ userId: undefined, cookies: [] })),
     ownerId: () => owner.ownerId(),
+    apiKey: async (key) => (await apiKeys()).verify(key),
   });
 }
 

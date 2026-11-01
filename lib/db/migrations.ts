@@ -74,6 +74,23 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 2,
+    name: 'api keys',
+    statements: (s) => [
+      // Keys the business's own app calls the agent API with (lib/apikeys): only the SHA-256 hash
+      // of each key is kept, with its last 4 characters to tell keys apart.
+      `CREATE TABLE IF NOT EXISTS ${s}.api_keys (
+        id UUID PRIMARY KEY,
+        name TEXT NOT NULL,
+        hash TEXT NOT NULL UNIQUE,
+        last4 TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        last_used_at TIMESTAMPTZ,
+        revoked_at TIMESTAMPTZ
+      )`,
+    ],
+  },
 ];
 
 export type MigrateOptions = { guardSchema?: string; authSchema?: string | null };

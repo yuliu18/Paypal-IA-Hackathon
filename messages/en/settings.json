@@ -11,7 +11,8 @@
     "limits": "Limits",
     "ai": "AI model",
     "paypal": "PayPal app",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "api-keys": "API keys"
   },
   "language": {
     "title": "Language",
@@ -153,5 +154,42 @@
     "scope": "Saves every section, not only this one.",
     "saved": "Saved. The next ticket uses these settings.",
     "checkFields": "Check the highlighted fields."
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "detail": "Your shop's own app calls the agents with a key instead of signing in, in the Authorization header.",
+    "needsDatabase": "API keys are kept in the database: set DATABASE_URL to create them.",
+    "unreadable": "The keys could not be read from the database. Try again later.",
+    "name": "Key name",
+    "namePlaceholder": "Checkout app",
+    "create": "Create key",
+    "creating": "Creating…",
+    "created": "Your new key “{name}”",
+    "onceNote": "Copy it now: you won't see it again. Only its last 4 characters are kept.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "example": "Call the support agent with a key",
+    "scope": "A key works only on the three agent endpoints: POST /api/support/tickets, /api/billing/tasks and /api/sales/chats. Nothing else accepts it.",
+    "listTitle": "Your keys",
+    "empty": "No keys yet.",
+    "columns": {
+      "name": "Name",
+      "key": "Key",
+      "created": "Created",
+      "lastUsed": "Last used",
+      "status": "Status"
+    },
+    "never": "Never",
+    "active": "Active",
+    "revokedAt": "Revoked {at}",
+    "revoke": "Revoke",
+    "revokeConfirm": "Revoke the key “{name}”? Apps using it stop working at once.",
+    "errors": {
+      "invalid-name": "Give the key a name of 1 to 60 characters.",
+      "not-found": "That key is already revoked.",
+      "unavailable": "API keys are kept in the database: set DATABASE_URL to create them.",
+      "locked": "Settings are read-only on this server (SETTINGS_LOCKED).",
+      "failed": "That didn't work. Try again; the details are in the server log."
+    }
   }
 }
