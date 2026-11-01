@@ -19,6 +19,9 @@ A Next.js control panel that puts a payment guard between an AI support agent an
 - **Payment guard** (`/support`, `/guard`): an AI support agent answers tickets with PayPal's MCP tools, and every call it makes goes through a guard that allows, holds for a person, or blocks it, keeps the customer's personal data from the agent, and writes the decision to a tamper-evident log. See [Payment guard](#payment-guard).
 - **Billing agent** (`/billing`): a second AI agent bills the shop's customers with PayPal invoices, behind the same guard. See [Billing agent](#billing-agent).
 - **Sales agent** (`/sales`): a third AI agent sells the shop's catalogue to the customer who writes with a PayPal order, behind the same guard. See [Sales agent](#sales-agent).
+- **API docs** (`/api-docs`): the agent API for your shop's own app, in Swagger UI. See [API docs](#api-docs).
+
+**Adopting it for your shop:** [Connect your business](docs/connect-your-business.md) (deploy, set up, call it from your app, go live) and [Architecture](docs/architecture.md) (the guard's ports and how to adapt it). What is not built yet is in the [Roadmap](#roadmap).
 
 ## Run locally
 
@@ -26,7 +29,7 @@ Requires Node.js 24 or later (the payment guard's log uses the built-in `node:sq
 
 ```bash
 npm install
-cp env.example .env.local   # then fill in the values
+cp env.example .env.local   # database, login and secrets only; the rest is set on /settings
 npm run dev
 ```
 
@@ -85,6 +88,10 @@ Your shop's own app (a checkout, a help-desk integration) calls the agents with 
 
 **Scope:** a key opens exactly three endpoints, `POST /api/support/tickets`, `POST /api/billing/tasks` and `POST /api/sales/chats`, with owner login or with the demo password. Nothing else accepts it: not the pages, not `/api/guard/*`, not `/api/auth/*`, not Server Actions. A wrong or revoked key gets `401 {"error":"Invalid or revoked API key."}`, never a redirect. The proxy tells the route a request came in with a key in the `x-pg-auth: api-key:<key id>` request header, after removing any copy the client sent.
 
+### API docs
+
+**API docs** in the menu (`/api-docs`) shows the three agent endpoints in [Swagger UI](https://swagger.io/tools/swagger-ui/): each request field and its limits, the reply with every guarded tool call, and every error. **Authorize** takes an API key so *Try it out* calls them as your app would (on live PayPal while live mode is on); without a key the calls use your session and run on the sandbox. The OpenAPI 3.1 document itself is at `/api/openapi` ([`lib/api/openapi.ts`](lib/api/openapi.ts)), for client generators; its server is `APP_URL`. Both need the owner's sign-in; an API key does not open them. Swagger UI is loaded from jsDelivr at a pinned version checked with Subresource Integrity, so the app gains no dependency.
+
 ### Live mode
 
 Payment Guard starts in **test mode**: every PayPal call runs on the sandbox, with fictitious money. **Live mode** lets your shop's own app move real money through the guard, with your live PayPal app.
@@ -103,7 +110,7 @@ Payment Guard starts in **test mode**: every PayPal call runs on the sandbox, wi
 
 ## Settings
 
-`/settings` configures everything the agent and the guard use, with the environment variables as fallback, so a server with only `.env.local` works as before:
+`/settings` configures everything the agent and the guard use. [`env.example`](env.example) lists only what the server needs before anyone signs in (database, login, secrets, live-mode permission); the older variables (`PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `LLM_BASE_URL`, `LLM_API_KEY`, `SHOP_CONTACT_EMAIL` and the notification ones below) are still read as fallbacks when a setting is empty:
 
 | Section | What it sets |
 |---|---|
@@ -368,3 +375,12 @@ npm run redteam view            # results in promptfoo's local viewer
 - **Same-day runs:** the daily cap (200 USD by default) counts every refund the guard allowed today, test runs included. After a few runs the 120 USD case is blocked by `DAILY_LIMIT` instead of held: raise the cap on `/settings` while testing, or run again the next day.
 - **Model variance:** an AI judge can grade the same ticket differently between runs (e.g. hold a refund it allowed before as `INTENT_UNCERTAIN`); repeat a run before drawing conclusions about a model.
 - A ticket the app can't answer (for example the AI provider retired the model) counts as an **error**, never as a pass.
+
+## Roadmap
+
+- **Bring your own agent:** expose the guard itself as an MCP endpoint behind an API key, so an agent a shop already runs gets the same checks, not only the built-in support, billing and sales agents.
+- **Your records as the source of truth:** a customer directory and catalogue read from the shop's own systems instead of the sample data ([how](docs/connect-your-business.md#4-fit-it-to-your-shop)).
+- **Several businesses per installation**, each with its own settings, keys and black box.
+- **Live dashboard data** (today the dashboard reads the sandbox account), and separate daily caps for sandbox and live.
+- **Scale-out:** a database lock for the daily caps and limits shared across server instances (today writes are serialized in one process).
+- **A demo shop app** that calls the API with a key, as a reference integration.
