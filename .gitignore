@@ -50,3 +50,5 @@ next-env.d.ts
 # promptfoo configs written by npm run redteam (they hold the AI key)
 /redteam/.generated/
 .neon
+
+certificates
