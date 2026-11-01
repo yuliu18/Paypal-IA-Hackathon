@@ -103,7 +103,8 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
   // (executeWrite joins details with '; '). Order ids are [A-Z0-9], so they hold no LIKE wildcard.
   const boundOrder = db.prepare(
     `SELECT DISTINCT json_extract(task, '$.mandate.customerEmail') AS customer FROM audit_state
-       WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = ? OR detail LIKE ?)`,
+       WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = ? OR detail LIKE ?)
+         AND (? IS NULL OR COALESCE(environment, 'sandbox') = ?)`,
   );
   const rowsAfter = db.prepare(`SELECT * FROM audit_log WHERE id > ? ORDER BY id`);
   const hashAt = db.prepare(`SELECT hash FROM audit_log WHERE id = ?`);
@@ -254,10 +255,11 @@ export function createSqliteAuditLog(path: string): SqliteAuditLog {
       return resolver.get(Number(id)) !== undefined;
     },
 
-    async boundOrderCustomer(orderId) {
+    async boundOrderCustomer(orderId, environment) {
       if (!ORDER_ID.test(orderId)) return undefined;
       const detail = boundOrderDetail(orderId);
-      const rows = boundOrder.all(detail, `%; ${detail}`) as { customer: unknown }[];
+      const only = environment === undefined ? null : environment === 'live' ? 'live' : 'sandbox';
+      const rows = boundOrder.all(detail, `%; ${detail}`, only, only) as { customer: unknown }[];
       return soleCustomer(rows.map((r) => r.customer));
     },
 

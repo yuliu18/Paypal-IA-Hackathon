@@ -87,12 +87,18 @@
     "connectedAgent": "Conectado con el modelo del agente."
   },
   "paypal": {
-    "detail": "Los agentes llegan a PayPal mediante una app REST que creas en el PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials). Pega aquí su client ID y su secret de sandbox. El dinero del sandbox es ficticio.",
+    "detail": "Los agentes llegan a PayPal mediante apps REST que creas en el PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials): una app de sandbox para probar y, cuando estés listo, una app live para dinero real.",
     "clientId": "Client ID",
     "secret": "Secret",
     "removeSecret": "Borrar el secret guardado",
     "connected": "Conectado al sandbox de PayPal.",
-    "needCredentials": "Introduce primero el client ID y el secret."
+    "needCredentials": "Introduce primero el client ID y el secret.",
+    "sandboxTitle": "App de sandbox (dinero de prueba)",
+    "sandboxDetail": "Pega aquí su client ID y su secret de sandbox. El dinero del sandbox es ficticio. Las páginas de prueba, la evaluación y los datos de ejemplo usan siempre esta app.",
+    "liveTitle": "App live (dinero real)",
+    "liveDetail": "El client ID y el secret de la pestaña Live de Apps & Credentials. Solo se usa en modo real, y solo para las llamadas de la app de tu tienda con una clave API. Guardar otra app live desactiva el modo real.",
+    "liveNoEnv": "Aún no hay secret. El secret live solo se guarda aquí; nunca se lee del entorno del servidor.",
+    "connectedLive": "Conectado a PayPal live."
   },
   "notifications": {
     "detail": "Cuando el guard retiene una llamada para una persona, avisa a cada canal activo. El mensaje indica el importe, el email del cliente enmascarado y las reglas, nunca el texto del ticket.",
@@ -190,6 +196,52 @@
       "unavailable": "Las claves de API se guardan en la base de datos: configura DATABASE_URL para crearlas.",
       "locked": "Los ajustes son de solo lectura en este servidor (SETTINGS_LOCKED).",
       "failed": "No ha funcionado. Inténtalo de nuevo; los detalles están en el log del servidor."
+    }
+  },
+  "liveMode": {
+    "title": "Modo",
+    "detail": "El modo de prueba hace todas las llamadas en el sandbox de PayPal. El modo real permite que las llamadas de la app de tu tienda muevan dinero real con tu app live.",
+    "test": "Prueba",
+    "live": "Real",
+    "badge": {
+      "test": "Modo de prueba",
+      "live": "Modo real"
+    },
+    "current": {
+      "test": "Modo de prueba: todas las llamadas van al sandbox de PayPal, con dinero ficticio.",
+      "live": "Modo real: las llamadas de la app de tu tienda con una clave API usan tu app live de PayPal y mueven dinero real. Las páginas de prueba y la evaluación siguen en el sandbox."
+    },
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba porque {reason}. Todas las llamadas usan el sandbox.",
+    "reasons": {
+      "server": "no permite el modo real (ALLOW_LIVE_MODE no es true)",
+      "app": "falta el client ID o el secret de la app live, o no se puede leer"
+    },
+    "disabled": {
+      "server": "Este servidor no permite el modo real",
+      "app": "Guarda primero el client ID y el secret de la app live.",
+      "locked": "La configuración es de solo lectura en este servidor (SETTINGS_LOCKED)."
+    },
+    "howBack": "Para volver, pulsa Prueba: el cambio es inmediato.",
+    "dashboardNote": "El panel siempre lee la cuenta de sandbox; los datos live en el panel están en la hoja de ruta.",
+    "dialog": {
+      "title": "¿Activar el modo real?",
+      "warning": "El modo real mueve dinero real.",
+      "money": "Los reembolsos, cancelaciones, aceptaciones de disputas, facturas y pedidos que el guard deje pasar se ejecutan en tu cuenta live de PayPal, con dinero real.",
+      "scope": "Solo lo usan las llamadas de la app de tu tienda con una clave API. Las páginas de prueba (Support, Billing, Sales) y la evaluación siguen en el sandbox.",
+      "check": "Antes de cambiar, el guard pide un token a PayPal live con las credenciales de tu app live.",
+      "back": "Para volver, pulsa Prueba en esta sección: el cambio es inmediato.",
+      "confirmLabel": "Escribe {word} para confirmar",
+      "confirm": "Activar el modo real",
+      "cancel": "Cancelar",
+      "checking": "Comprobando con PayPal…"
+    },
+    "errors": {
+      "locked": "La configuración es de solo lectura en este servidor (SETTINGS_LOCKED).",
+      "server": "Este servidor no permite el modo real",
+      "app": "Guarda primero el client ID y el secret de la app live.",
+      "confirmation": "Escribe exactamente {word} para confirmar.",
+      "check": "PayPal live no aceptó la app live, así que sigue el modo de prueba: {detail}",
+      "unreadable": "No se pudo leer la configuración guardada, así que no se cambió nada. Inténtalo de nuevo en un momento."
     }
   }
 }

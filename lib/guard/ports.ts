@@ -91,7 +91,9 @@ export interface AuditLog {
   isResolved(id: string): Promise<boolean>;
   // The customer an executed create_order was bound to (its audit detail is boundOrderDetail), or
   // undefined when the guard created and bound no such order. The shop captures only those.
-  boundOrderCustomer(orderId: string): Promise<string | undefined>;
+  // `environment`: only an order created in that PayPal environment counts (entries logged before
+  // the environment was recorded count as sandbox); any environment when not given.
+  boundOrderCustomer(orderId: string, environment?: PaymentEnvironment): Promise<string | undefined>;
 }
 
 export type ChainCheck =

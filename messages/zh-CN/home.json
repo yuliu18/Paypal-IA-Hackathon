@@ -89,6 +89,12 @@
     "paypal": "PayPal",
     "sandbox": "沙盒，虚拟资金",
     "noCredentials": "尚无应用凭据",
-    "change": "修改规则"
+    "change": "修改规则",
+    "live": "真实：你店铺应用使用真实资金"
+  },
+  "liveMode": {
+    "on": "真实模式已开启：你店铺应用的调用会转移真实资金。",
+    "failClosed": "真实模式已开启，但此服务器以测试模式运行：所有调用都使用沙盒。",
+    "settings": "模式设置"
   }
 }

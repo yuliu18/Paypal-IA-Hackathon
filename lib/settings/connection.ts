@@ -1,8 +1,8 @@
 // The settings page's "Test connection" buttons: list an AI provider's models with its key, and
-// ask PayPal sandbox for a token. Errors never repeat the key. Server-side only.
+// ask PayPal (the sandbox, or live PayPal for the live app) for a token. Errors never repeat the key. Server-side only.
 
 import { clientHeaders } from '@/lib/llm/openai-compatible';
-import { PAYPAL_API } from '@/lib/paypal';
+import { payPalApi, type PaymentEnvironment } from '@/lib/paypal';
 import { normalizeBaseUrl } from './providers';
 
 export type ModelList = { ok: true; models: string[] } | { ok: false; error: string };
@@ -47,17 +47,23 @@ export async function listModels(
   }
 }
 
-export async function testPayPal({ clientId, secret }: { clientId: string; secret: string }, fetchImpl: typeof fetch = fetch): Promise<ConnectionCheck> {
+// `environment`: 'live' asks live PayPal (api-m.paypal.com); anything else, the sandbox.
+export async function testPayPal(
+  { clientId, secret }: { clientId: string; secret: string },
+  fetchImpl: typeof fetch = fetch,
+  environment: PaymentEnvironment = 'sandbox',
+): Promise<ConnectionCheck> {
+  const name = environment === 'live' ? 'Live PayPal' : 'PayPal sandbox';
   try {
-    const res = await fetchImpl(`${PAYPAL_API}/v1/oauth2/token`, {
+    const res = await fetchImpl(`${payPalApi(environment)}/v1/oauth2/token`, {
       method: 'POST',
       headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'grant_type=client_credentials',
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    return res.ok ? { ok: true } : { ok: false, error: `PayPal sandbox refused these credentials (${res.status}).` };
+    return res.ok ? { ok: true } : { ok: false, error: `${name} refused these credentials (${res.status}).` };
   } catch (error) {
-    return { ok: false, error: `Could not reach PayPal sandbox (${error instanceof Error ? error.message : 'no answer'})` };
+    return { ok: false, error: `Could not reach ${name} (${error instanceof Error ? error.message : 'no answer'})` };
   }
 }

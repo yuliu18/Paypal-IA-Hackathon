@@ -34,7 +34,8 @@
     "reasons": "Motivos",
     "args": "Argumentos",
     "detail": "Detalle",
-    "decides": "Decide la entrada retenida"
+    "decides": "Decide la entrada retenida",
+    "environment": "Entorno"
   },
   "grid": {
     "search": "Buscar en todas las columnas…",
@@ -73,7 +74,8 @@
       "intentJudgeUnavailable": "Juez de IA no disponible"
     },
     "invalidRequest": "Solicitud de decisión no válida",
-    "failed": "No se pudo procesar la decisión; no se registró nada."
+    "failed": "No se pudo procesar la decisión; no se registró nada.",
+    "live": "Real · dinero real"
   },
   "assistant": {
     "title": "Pregunta por estas decisiones",
@@ -90,5 +92,14 @@
     "ask": "Preguntar",
     "failed": "El asistente del guard falló.",
     "unreachable": "No se pudo contactar con el asistente del guard."
+  },
+  "environment": {
+    "sandbox": "Sandbox",
+    "live": "Real"
+  },
+  "liveMode": {
+    "on": "El modo real está activado: las llamadas de la app de tu tienda mueven dinero real.",
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba: todas las llamadas usan el sandbox.",
+    "settings": "Ajustes del modo"
   }
 }

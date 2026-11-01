@@ -7,6 +7,9 @@ import { parseOrderDraft } from '@/lib/guard/domain/order';
 import { format } from '@/lib/guard/domain/policy';
 import { maskEmail, maskPersonalData } from '@/lib/guard/domain/redact';
 import { auditLog } from '@/lib/guard/runtime';
+import { liveModeStatus } from '@/lib/settings/live-mode';
+import { loadSettings } from '@/lib/settings/settings';
+import { LiveIndicator } from '../../_overview/live-indicator';
 import { EndpointPage } from '../endpoint-page';
 import { GuardAssistant } from './guard-assistant';
 import { HeldQueue, type HeldCall } from './held-queue';
@@ -83,7 +86,9 @@ export default async function GuardLogPage() {
   await connection();
   const t = await getTranslations('guard');
   const log = auditLog();
-  const [entries, chain] = await Promise.all([log.list(500), log.verifyChain(FULL_CHECK_MS)]);
+  const [entries, chain, settings] = await Promise.all([log.list(500), log.verifyChain(FULL_CHECK_MS), loadSettings()]);
+  const live = liveModeStatus(settings);
+  const environmentOf = (e: { environment?: string }) => (e.environment === 'live' ? ('live' as const) : ('sandbox' as const));
   const decided = new Set(entries.flatMap((e) => (e.resolves ? [e.resolves] : [])));
   const held: HeldCall[] = entries
     .filter((e) => e.outcome === 'held' && !decided.has(e.id))
@@ -92,6 +97,7 @@ export default async function GuardLogPage() {
         id: e.id,
         at: e.at,
         customer: maskEmail(e.task.mandate.customerEmail),
+        environment: environmentOf(e),
         codes: e.decision.violations.map((v) => v.code),
         // One sentence per reason.
         reasons: maskPersonalData(e.decision.violations.map((v) => (/[.!?]$/.test(v.message) ? v.message : `${v.message}.`)).join(' ')),
@@ -152,10 +158,13 @@ export default async function GuardLogPage() {
         args: maskPersonalData(JSON.stringify(e.args)),
         detail: e.detail && maskPersonalData(e.detail),
         decides: e.resolves ? `#${e.resolves}` : null,
+        environment: t(`environment.${environmentOf(e)}`),
       }))}
       columns={[
         { field: 'id', headerName: t('columns.id') },
         { field: 'at', headerName: t('columns.at'), cellDataType: 'dateTimeString', sort: 'desc' },
+        // Next to the time, so a live (real money) decision stands out without scrolling.
+        { field: 'environment', headerName: t('columns.environment') },
         { field: 'tool', headerName: t('columns.tool') },
         { field: 'outcome', headerName: t('columns.outcome') },
         { field: 'verdict', headerName: t('columns.verdict') },
@@ -167,6 +176,8 @@ export default async function GuardLogPage() {
         { field: 'decides', headerName: t('columns.decides') },
       ]}
     >
+      {live.active && <LiveIndicator state="on" text={t('liveMode.on')} settingsLabel={t('liveMode.settings')} />}
+      {live.mode === 'live' && !live.active && <LiveIndicator state="failClosed" text={t('liveMode.failClosed')} settingsLabel={t('liveMode.settings')} />}
       {!chain.intact && <ChainStatus check={chain} />}
       <Tally entries={entries.length} passed={count('executed')} waiting={held.length} stopped={count('blocked')} />
       <div className="mt-8 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">

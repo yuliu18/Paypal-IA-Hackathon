@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import type { KeyStatus, SettingsForm, SettingsView } from '@/lib/settings/settings';
 import type { CatalogModel, CatalogProvider } from '@/lib/settings/catalog';
 import { CURRENCIES } from '@/lib/settings/currencies';
-import { catalogModelsAction, saveSettingsAction, testAiAction, testPayPalAction } from './actions';
+import { catalogModelsAction, saveSettingsAction, testAiAction, testLivePayPalAction, testPayPalAction } from './actions';
 import { Picker, type PickerOption } from './picker';
 import { latestOnly } from './picker-logic';
 import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './sections';
@@ -14,6 +14,8 @@ import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
 import { ApiKeysSection, type ApiKeysView } from './api-keys-section';
+import { LiveModeSection } from './live-mode-section';
+import type { LiveModeStatus } from '@/lib/settings/live-mode';
 
 type Check = { ok: boolean; message: string } | null;
 // The page's text, from messages/<locale>/settings.json.
@@ -127,11 +129,13 @@ export function SettingsEditor({
   providers,
   initialModels,
   apiKeys,
+  liveMode,
 }: {
   view: SettingsView;
   providers: CatalogProvider[];
   initialModels: CatalogModel[];
   apiKeys: ApiKeysView;
+  liveMode: LiveModeStatus;
 }) {
   const t = useTranslations('settings');
   const formRef = useRef<HTMLFormElement>(null);
@@ -148,6 +152,7 @@ export function SettingsEditor({
   const [liveModels, setLiveModels] = useState<string[]>([]);
   const [aiCheck, setAiCheck] = useState<Check>(null);
   const [payPalCheck, setPayPalCheck] = useState<Check>(null);
+  const [livePayPalCheck, setLivePayPalCheck] = useState<Check>(null);
   const [testing, startTesting] = useTransition();
   const errors: Partial<Record<keyof SettingsForm | 'form', string>> = state && !state.ok ? state.errors : {};
   const defaults = view.form;
@@ -208,6 +213,13 @@ export function SettingsEditor({
     startTesting(async () => {
       const result = await testPayPalAction(new FormData(formRef.current!));
       setPayPalCheck(result.ok ? { ok: true, message: t('paypal.connected') } : { ok: false, message: result.error });
+    });
+  }
+
+  function testLivePayPalConnection() {
+    startTesting(async () => {
+      const result = await testLivePayPalAction(new FormData(formRef.current!));
+      setLivePayPalCheck(result.ok ? { ok: true, message: t('paypal.connectedLive') } : { ok: false, message: result.error });
     });
   }
 
@@ -310,6 +322,10 @@ export function SettingsEditor({
           </Section>
 
           <Section id="paypal" open={open} title={t('sections.paypal')} detail={t('paypal.detail')}>
+            <div className="sm:col-span-2">
+              <h3 className="font-semibold">{t('paypal.sandboxTitle')}</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{t('paypal.sandboxDetail')}</p>
+            </div>
             <Field label={t('paypal.clientId')} error={errors.paypalClientId}>
               <input name="paypalClientId" defaultValue={defaults.paypalClientId} autoComplete="off" className={input} />
             </Field>
@@ -326,6 +342,28 @@ export function SettingsEditor({
                 {t('testConnection')}
               </button>
               <CheckResult check={payPalCheck} />
+            </div>
+
+            <div className="border-t border-pp-gridline pt-5 sm:col-span-2">
+              <h3 className="font-semibold">{t('paypal.liveTitle')}</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{t('paypal.liveDetail')}</p>
+            </div>
+            <Field label={t('paypal.clientId')} error={errors.paypalLiveClientId}>
+              <input name="paypalLiveClientId" defaultValue={defaults.paypalLiveClientId} autoComplete="off" className={input} />
+            </Field>
+            <Field label={t('paypal.secret')} error={errors.paypalLiveSecret} hint={view.paypalLive.secret.source === 'none' ? t('paypal.liveNoEnv') : keyHint(t, view.paypalLive.secret, '')}>
+              <input name="paypalLiveSecret" type="password" autoComplete="off" disabled={!view.canStoreKeys} placeholder={view.paypalLive.secret.hint} className={input} />
+            </Field>
+            {view.paypalLive.secret.source === 'saved' && (
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" name="clearPaypalLiveSecret" /> {t('paypal.removeSecret')}
+              </label>
+            )}
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <button type="button" onClick={testLivePayPalConnection} disabled={testing} className={button}>
+                {t('testConnection')}
+              </button>
+              <CheckResult check={livePayPalCheck} />
             </div>
           </Section>
 
@@ -474,6 +512,7 @@ export function SettingsEditor({
       {/* Outside the settings form: a form can't hold another. */}
       <div className="max-w-4xl">
         <ApiKeysSection hidden={open !== 'api-keys'} view={apiKeys} locked={view.locked} />
+        <LiveModeSection hidden={open !== 'paypal'} status={liveMode} locked={view.locked} />
       </div>
     </main>
   );

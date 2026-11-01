@@ -143,12 +143,14 @@ export function createPostgresAuditLog(db: Db, { schema = 'guard' }: { schema?: 
 
     // An executed create_order whose detail records the binding, alone or after a late-answer note
     // (executeWrite joins details with '; '). Order ids are [A-Z0-9], so they hold no LIKE wildcard.
-    async boundOrderCustomer(orderId) {
+    async boundOrderCustomer(orderId, environment) {
       if (!ORDER_ID.test(orderId)) return undefined;
       const detail = boundOrderDetail(orderId);
+      const only = environment === undefined ? null : environment === 'live' ? 'live' : 'sandbox';
       const { rows } = await db.query<{ task: string }>(
-        `SELECT task FROM ${s}.audit_state WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = $1 OR detail LIKE $2)`,
-        [detail, `%; ${detail}`],
+        `SELECT task FROM ${s}.audit_state WHERE tool = 'create_order' AND outcome = 'executed' AND (detail = $1 OR detail LIKE $2)
+           AND ($3::text IS NULL OR COALESCE(environment, 'sandbox') = $3::text)`,
+        [detail, `%; ${detail}`, only],
       );
       return soleCustomer(rows.map((row) => JSON.parse(row.task)?.mandate?.customerEmail));
     },

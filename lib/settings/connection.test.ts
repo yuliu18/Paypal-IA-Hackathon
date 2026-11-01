@@ -109,6 +109,12 @@ describe('testPayPal', () => {
       error: 'PayPal sandbox refused these credentials (401).',
     });
   });
+
+  it('asks live PayPal for a token only when the live app is tested', async () => {
+    const { calls, fetchImpl } = fakeFetch(() => Response.json({ error: 'invalid_client' }, { status: 401 }));
+    expect(await testPayPal({ clientId: 'live-id', secret: 'bad' }, fetchImpl, 'live')).toEqual({ ok: false, error: 'Live PayPal refused these credentials (401).' });
+    expect(calls[0].url).toBe('https://api-m.paypal.com/v1/oauth2/token');
+  });
 });
 
 describe('testCredentials', () => {

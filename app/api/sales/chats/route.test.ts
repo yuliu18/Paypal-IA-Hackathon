@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const handleSalesChat = vi.fn();
 vi.mock('@/lib/agent/handle-sales-chat', () => ({ handleSalesChat: (...args: unknown[]) => handleSalesChat(...args) }));
+// The shop's mode for the live-mode cases; test mode with no live app unless a case says otherwise.
+let settings: Record<string, unknown> = { mode: 'test', paypalLive: { clientId: '', secret: '' } };
+vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => settings }));
 
 const { POST } = await import('./route');
 
@@ -26,7 +29,7 @@ describe('POST /api/sales/chats', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reply: 'Pay here', steps: [] });
-    expect(handleSalesChat).toHaveBeenCalledWith(chat, 'vulnerable', { shopOrigin: shopOrigin() });
+    expect(handleSalesChat).toHaveBeenCalledWith(chat, 'vulnerable', { shopOrigin: shopOrigin(), environment: 'sandbox' });
     expect(shopOrigin()).not.toBe('https://shop.example');
   });
 
@@ -67,5 +70,55 @@ describe('POST /api/sales/chats', () => {
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
     expect((await res.json()).error.message).toMatch(/^Too many sales chats from this address\. Try again in \d+ seconds\.$/);
     expect(handleSalesChat).toHaveBeenCalledTimes(20);
+  });
+});
+
+describe('the PayPal environment of api/sales/chats', () => {
+  const LIVE = { mode: 'live', paypalLive: { clientId: 'live-id', secret: 'live-secret' } };
+  const send = (agent: string, headers: Record<string, string> = {}, client = '10.9.0.1') =>
+    POST(new Request('http://test/api/sales/chats', { method: 'POST', body: JSON.stringify({ ...{ customerEmail: 'ana@example.com', message: 'Two mug sets.' }, agent }), headers: { 'x-forwarded-for': client, ...headers } }));
+  const apiKey = { 'x-pg-auth': 'api-key:key-1' };
+
+  afterEach(() => {
+    handleSalesChat.mockReset();
+    settings = { mode: 'test', paypalLive: { clientId: '', secret: '' } };
+    vi.unstubAllEnvs();
+  });
+
+  it('runs an API-key request on live PayPal when live mode is really on', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    handleSalesChat.mockResolvedValue({ reply: 'Done', steps: [] });
+    expect((await send('careful', apiKey, '10.9.0.2')).status).toBe(200);
+    expect(handleSalesChat.mock.calls[0]).toEqual([{ customerEmail: 'ana@example.com', message: 'Two mug sets.' }, 'careful', { shopOrigin: shopOrigin(), environment: 'live' }]);
+  });
+
+  it('keeps the owner\'s own requests (the test pages) on the sandbox in live mode', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    handleSalesChat.mockResolvedValue({ reply: 'Done', steps: [] });
+    await send('careful', {}, '10.9.0.3');
+    expect(handleSalesChat.mock.calls[0][2]).toMatchObject({ environment: 'sandbox' });
+  });
+
+  it.each([
+    ['the server does not allow live mode', undefined, LIVE],
+    ['the live app is missing', 'true', { mode: 'live', paypalLive: { clientId: 'live-id', secret: '' } }],
+    ['the owner left test mode on', 'true', { ...LIVE, mode: 'test' }],
+  ])('fails closed to the sandbox for an API-key request when %s', async (_why, allow, saved) => {
+    if (allow) vi.stubEnv('ALLOW_LIVE_MODE', allow);
+    settings = saved;
+    handleSalesChat.mockResolvedValue({ reply: 'Done', steps: [] });
+    await send('careful', apiKey, '10.9.0.4');
+    expect(handleSalesChat.mock.calls[0][2]).toMatchObject({ environment: 'sandbox' });
+  });
+
+  it('never runs the vulnerable agent with real money', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    settings = LIVE;
+    const res = await send('vulnerable', apiKey, '10.9.0.5');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: { message: 'agent "vulnerable" runs only on the PayPal sandbox, never in live mode.' } });
+    expect(handleSalesChat).not.toHaveBeenCalled();
   });
 });

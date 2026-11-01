@@ -1,12 +1,24 @@
 // PayPal REST client: every call this demo makes to PayPal goes through here. It covers
 // catalog products, billing plans, invoicing, Transaction Search, balances and the order and
 // capture lookups the payment guard needs and the sandbox card charges the demo seed makes, with plain fetch and no SDK. Server-side only: it reads the client secret from the shop's settings or the environment.
+// Every call runs on the sandbox unless its caller passes the environment 'live' explicitly, and
+// a live call needs live mode really on (./settings/live-mode.ts) or it is refused before
+// reaching PayPal. There is no process-wide environment, so a live request can't leak into a
+// sandbox one.
 
+import type { PaymentEnvironment } from './guard/ports.ts';
+import { liveModeStatus } from './settings/live-mode.ts';
 import { loadSettings } from './settings/settings.ts';
 
-export const PAYPAL_API = 'https://api-m.sandbox.paypal.com';
-const BASE_URL = PAYPAL_API;
+export type { PaymentEnvironment };
+
+export const PAYPAL_APIS = { sandbox: 'https://api-m.sandbox.paypal.com', live: 'https://api-m.paypal.com' } as const;
+// The sandbox: the demo's sample data and every caller that names no environment.
+export const PAYPAL_API = PAYPAL_APIS.sandbox;
 const MAX_ATTEMPTS = 4;
+
+// The live API only for exactly 'live'; anything else is the sandbox.
+export const payPalApi = (environment: PaymentEnvironment = 'sandbox') => (environment === 'live' ? PAYPAL_APIS.live : PAYPAL_APIS.sandbox);
 
 export class PayPalApiError extends Error {
   constructor(
@@ -19,17 +31,29 @@ export class PayPalApiError extends Error {
   }
 }
 
-// The token is kept for the credentials it was minted with, so saving new ones on /settings
-// takes effect on the next call.
-let cachedToken: { value: string; expiresAt: number; credentials: string } | undefined;
+// One token per environment, kept for the credentials it was minted with, so saving new ones on
+// /settings takes effect on the next call.
+const cachedTokens = new Map<PaymentEnvironment, { value: string; expiresAt: number; credentials: string }>();
 
-export async function accessToken(): Promise<string> {
-  const { clientId: id, secret } = (await loadSettings()).paypal;
+// The sandbox app, or the live app when live mode is really on now (re-checked on every call).
+async function credentialsFor(environment: PaymentEnvironment): Promise<string> {
+  const settings = await loadSettings();
+  if (environment === 'live') {
+    if (!liveModeStatus(settings).active) throw new Error('Live mode is off: this call was refused before reaching PayPal');
+    return `${settings.paypalLive.clientId}:${settings.paypalLive.secret}`;
+  }
+  const { clientId: id, secret } = settings.paypal;
   if (!id || !secret) throw new Error('Set the PayPal client ID and secret on /settings, or PAYPAL_CLIENT_ID and PAYPAL_SECRET in .env.local');
-  const credentials = `${id}:${secret}`;
+  return `${id}:${secret}`;
+}
+
+export async function accessToken(environment: PaymentEnvironment = 'sandbox'): Promise<string> {
+  const env: PaymentEnvironment = environment === 'live' ? 'live' : 'sandbox';
+  const credentials = await credentialsFor(env);
+  const cachedToken = cachedTokens.get(env);
   if (cachedToken && cachedToken.credentials === credentials && Date.now() < cachedToken.expiresAt) return cachedToken.value;
 
-  const res = await fetch(`${BASE_URL}/v1/oauth2/token`, {
+  const res = await fetch(`${payPalApi(env)}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${Buffer.from(credentials).toString('base64')}`,
@@ -42,21 +66,21 @@ export async function accessToken(): Promise<string> {
 
   const { access_token, expires_in } = (await res.json()) as { access_token: string; expires_in: number };
   // Refresh a minute early so an in-flight request never carries an expired token.
-  cachedToken = { value: access_token, expiresAt: Date.now() + (expires_in - 60) * 1000, credentials };
+  cachedTokens.set(env, { value: access_token, expiresAt: Date.now() + (expires_in - 60) * 1000, credentials });
   return access_token;
 }
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, environment: PaymentEnvironment = 'sandbox'): Promise<T> {
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers: { Authorization: `Bearer ${await accessToken()}` },
+    const res = await fetch(`${payPalApi(environment)}${path}`, {
+      headers: { Authorization: `Bearer ${await accessToken(environment)}` },
       cache: 'no-store',
     });
     if (res.ok) return (await res.json()) as T;
 
     // A revoked or expired token: drop it and mint a new one once.
     if (res.status === 401 && attempt === 1) {
-      cachedToken = undefined;
+      cachedTokens.delete(environment === 'live' ? 'live' : 'sandbox');
       continue;
     }
     if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
@@ -249,12 +273,12 @@ export type Order = {
   }[];
 };
 
-export function getCapture(id: string): Promise<Capture> {
-  return get<Capture>(`/v2/payments/captures/${encodeURIComponent(id)}`);
+export function getCapture(id: string, environment: PaymentEnvironment = 'sandbox'): Promise<Capture> {
+  return get<Capture>(`/v2/payments/captures/${encodeURIComponent(id)}`, environment);
 }
 
-export function getOrder(id: string): Promise<Order> {
-  return get<Order>(`/v2/checkout/orders/${encodeURIComponent(id)}`);
+export function getOrder(id: string, environment: PaymentEnvironment = 'sandbox'): Promise<Order> {
+  return get<Order>(`/v2/checkout/orders/${encodeURIComponent(id)}`, environment);
 }
 
 // --- Sandbox charges (demo seed) ------------------------------------------------
@@ -269,7 +293,8 @@ export type Charge = { orderId: string; captureId: string; status: string };
 // server would. Not retried: a repeated POST could charge twice.
 export async function chargeCard({ amount, customerEmail, description }: { amount: Money; customerEmail: string; description: string }): Promise<Charge> {
   const path = '/v2/checkout/orders';
-  const res = await fetch(`${BASE_URL}${path}`, {
+  // Always the sandbox: the test card exists only there.
+  const res = await fetch(`${PAYPAL_APIS.sandbox}${path}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${await accessToken()}`,

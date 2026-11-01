@@ -1,7 +1,7 @@
 // DisputeLookup backed by the PayPal REST API: a dispute gives its status, the disputed amount
 // and the shop's capture it is about. One bounded GET, no retries: the guard fails closed on any error.
 
-import { accessToken, PAYPAL_API } from '@/lib/paypal';
+import { accessToken, payPalApi, type PaymentEnvironment } from '@/lib/paypal';
 import { toMinor } from './paypal-capture-lookup';
 import type { DisputeFacts } from '../domain/dispute';
 import type { DisputeLookup } from '../ports';
@@ -25,14 +25,16 @@ export function toDisputeFacts(body: unknown): DisputeFacts {
 }
 
 export function createPayPalDisputeLookup({
-  fetch = globalThis.fetch,
-  token = accessToken,
+  environment = 'sandbox',
+  // Looked up at call time, so the shared default never holds on to a fetch replaced later.
+  fetch = (input, init) => globalThis.fetch(input, init),
+  token = () => accessToken(environment),
   timeoutMs = 10_000,
-}: { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): DisputeLookup {
+}: { environment?: PaymentEnvironment; fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): DisputeLookup {
   return {
     async getDispute(disputeId) {
       const path = `/v1/customer/disputes/${encodeURIComponent(disputeId)}`;
-      const res = await fetch(`${PAYPAL_API}${path}`, {
+      const res = await fetch(`${payPalApi(environment)}${path}`, {
         headers: { Authorization: `Bearer ${await token()}` },
         cache: 'no-store',
         signal: AbortSignal.timeout(timeoutMs),

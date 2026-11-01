@@ -1,5 +1,5 @@
 // The guard's audit log as a downloadable file (CSV or JSON): one row per decision, saying who
-// decided it and what happened. Emails and cards are masked, as on the guard log page.
+// decided it, what happened and in which PayPal environment (sandbox or live). Emails and cards are masked, as on the guard log page.
 
 import { maskEmail, maskPersonalData } from './domain/redact';
 import type { AuditRow } from './ports';
@@ -24,10 +24,12 @@ export type AuditExportRow = {
   // The held entry a person's decision resolves.
   decides: string;
   detail: string;
+  // The PayPal environment the decision ran in; entries logged before it was recorded ran in the sandbox.
+  environment: 'sandbox' | 'live';
 };
 
 export const AUDIT_EXPORT_COLUMNS: (keyof AuditExportRow)[] = [
-  'id', 'at', 'tool', 'outcome', 'verdict', 'decidedBy', 'customer', 'moved', 'currency', 'codes', 'reasons', 'decides', 'detail',
+  'id', 'at', 'tool', 'outcome', 'verdict', 'decidedBy', 'customer', 'moved', 'currency', 'codes', 'reasons', 'decides', 'detail', 'environment',
 ];
 
 function decidedBy(entry: AuditRow): AuditExportRow['decidedBy'] {
@@ -54,6 +56,7 @@ export function auditExportRows(entries: AuditRow[]): AuditExportRow[] {
     reasons: maskPersonalData(e.decision.violations.map((v) => v.message).join('; ')),
     decides: e.resolves ?? '',
     detail: e.detail ? maskPersonalData(e.detail) : '',
+    environment: e.environment === 'live' ? 'live' : 'sandbox',
   }));
 }
 

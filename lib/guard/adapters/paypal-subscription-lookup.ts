@@ -1,7 +1,7 @@
 // SubscriptionLookup backed by the PayPal REST API: a subscription gives its status and the
 // subscriber it belongs to. One bounded GET, no retries: the guard fails closed on any error.
 
-import { accessToken, PAYPAL_API } from '@/lib/paypal';
+import { accessToken, payPalApi, type PaymentEnvironment } from '@/lib/paypal';
 import type { SubscriptionFacts } from '../domain/cancellation';
 import type { SubscriptionLookup } from '../ports';
 
@@ -16,14 +16,16 @@ export function toSubscriptionFacts(body: unknown): SubscriptionFacts {
 }
 
 export function createPayPalSubscriptionLookup({
-  fetch = globalThis.fetch,
-  token = accessToken,
+  environment = 'sandbox',
+  // Looked up at call time, so the shared default never holds on to a fetch replaced later.
+  fetch = (input, init) => globalThis.fetch(input, init),
+  token = () => accessToken(environment),
   timeoutMs = 10_000,
-}: { fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): SubscriptionLookup {
+}: { environment?: PaymentEnvironment; fetch?: typeof globalThis.fetch; token?: () => Promise<string>; timeoutMs?: number } = {}): SubscriptionLookup {
   return {
     async getSubscription(subscriptionId) {
       const path = `/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`;
-      const res = await fetch(`${PAYPAL_API}${path}`, {
+      const res = await fetch(`${payPalApi(environment)}${path}`, {
         headers: { Authorization: `Bearer ${await token()}` },
         cache: 'no-store',
         signal: AbortSignal.timeout(timeoutMs),

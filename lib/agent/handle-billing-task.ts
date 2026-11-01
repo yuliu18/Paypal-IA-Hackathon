@@ -3,9 +3,10 @@
 // of it, and the billing agent only ever talks to the guard. Server-side only.
 
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
-import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
-import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
+import { payPalAdapters } from '@/lib/guard/adapters/paypal-environment';
 import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
+import { inEnvironment } from '@/lib/guard/environment-audit';
+import type { PaymentEnvironment } from '@/lib/paypal';
 import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { DEFAULT_INVOICE_LIMITS } from '@/lib/guard/domain/invoice';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
@@ -40,14 +41,16 @@ export type BillingResult = { reply: string; steps: AgentStep[]; redacted: Redac
 
 // `liftDailyCap`: for the /evaluate page's billing tasks only (lib/evaluation withoutDailyCap): the
 // invoice daily cap is lifted, every other invoice limit applies.
+// `environment`: the PayPal environment the request runs in (lib/settings/live-mode.ts); the sandbox by default.
 export async function handleBillingTask(
   received: BillingTask,
   mode: AgentMode = 'careful',
-  { liftDailyCap = false }: { liftDailyCap?: boolean } = {},
+  { liftDailyCap = false, environment = 'sandbox' }: { liftDailyCap?: boolean; environment?: PaymentEnvironment } = {},
 ): Promise<BillingResult> {
   const shop = await loadSettings();
   const llm = await llmConfig(shop.ai);
-  const paypal = await payPalToolkit(BILLING_ACTIONS);
+  const paypal = await payPalToolkit(BILLING_ACTIONS, environment);
+  const { captures, invoices } = payPalAdapters(environment);
   // Agent, judge and black box all get the task without card numbers.
   const { ticket: task, removed: taskRemoved } = privateTicket(received);
 
@@ -56,10 +59,10 @@ export async function handleBillingTask(
       upstream,
       task: { mandate: { customerEmail: task.customerEmail }, instructions: BILLING_POLICY, untrustedInput: task.message },
       judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
-      captures: payPalCaptureLookup,
-      invoices: payPalInvoiceLookup,
+      captures,
+      invoices,
       customers: seedCustomerDirectory,
-      audit: auditLog(),
+      audit: inEnvironment(auditLog(), environment),
       limits: shop.limits,
       ...(liftDailyCap && { invoiceLimits: withoutDailyCap(DEFAULT_INVOICE_LIMITS) }),
       notifier: heldNotifier(shop),

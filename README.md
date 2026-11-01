@@ -85,6 +85,22 @@ Your shop's own app (a checkout, a help-desk integration) calls the agents with 
 
 **Scope:** a key opens exactly three endpoints, `POST /api/support/tickets`, `POST /api/billing/tasks` and `POST /api/sales/chats`, with owner login or with the demo password. Nothing else accepts it: not the pages, not `/api/guard/*`, not `/api/auth/*`, not Server Actions. A wrong or revoked key gets `401 {"error":"Invalid or revoked API key."}`, never a redirect. The proxy tells the route a request came in with a key in the `x-pg-auth: api-key:<key id>` request header, after removing any copy the client sent.
 
+### Live mode
+
+Payment Guard starts in **test mode**: every PayPal call runs on the sandbox, with fictitious money. **Live mode** lets your shop's own app move real money through the guard, with your live PayPal app.
+
+**Requirements**, all checked again on every request (otherwise everything runs on the sandbox, and Settings, the overview and the guard log say why):
+
+1. The server allows it: `ALLOW_LIVE_MODE=true` in its environment. The public demo leaves it unset, so nobody can turn live mode on there.
+2. The live app is saved: Settings › **PayPal app** › **Live app (real money)**, the client ID and secret from the Live tab of Apps & Credentials in the PayPal Developer Dashboard. It is encrypted like the other keys and never read from the environment.
+3. The owner turns it on: Settings › PayPal app › **Mode** › **Live**. A dialog explains what it does and asks you to type `LIVE`; the server then asks live PayPal (`api-m.paypal.com`) for a token with the live app's credentials, and only if PayPal accepts them does live mode turn on. Saving another live app (client ID or secret) turns it off again, so a new app is always checked first. A read-only server (`SETTINGS_LOCKED=true`) can't turn it on.
+
+**What goes live:** only requests to the three agent endpoints that come in with an [API key](#api-keys) (your shop's app): their toolkit, the guard's lookups, the order approval links, and the shop's capture when the buyer comes back from a live order. A held live call is approved on live PayPal, and only while live mode is on (it can always be rejected). Every guard decision records its environment, shown in the guard log's **Environment** column and in its CSV/JSON download, and the overview and the guard log show a **Live mode** notice while it is on. The vulnerable agent never runs live (`400`).
+
+**What never goes live:** the test pages (Support, Billing, Sales) and the evaluation, which use the owner's session, the sample data buttons and `npm run seed`, and the dashboard, which always reads the sandbox account (live dashboard data is on the roadmap). The guard's daily limits count sandbox and live decisions together.
+
+**Switching back:** Settings › PayPal app › Mode › **Test**. It takes effect at once, needs no confirmation and works even on a read-only server. Unsetting `ALLOW_LIVE_MODE`, or removing the live app's secret, also puts every request back on the sandbox at once.
+
 ## Settings
 
 `/settings` configures everything the agent and the guard use, with the environment variables as fallback, so a server with only `.env.local` works as before:
@@ -94,7 +110,7 @@ Your shop's own app (a checkout, a help-desk integration) calls the agents with 
 | Business | Name, contact emails replies may include, and the refund policy the agent follows and the judge checks against |
 | Limits | Currency, refunds that run on their own, refunds a person approves (above: blocked), daily cap |
 | AI | Provider from the catalog, base URL, API key, agent and judge models; **Test connection** lists the provider's models |
-| PayPal | Sandbox client ID and secret; **Test connection** asks PayPal for a token |
+| PayPal | Two apps: the sandbox app (client ID and secret, test money) and the live app (real money, saved here only); **Test connection** asks the sandbox, or live PayPal for the live app, for a token. The **Mode** switch, Test or Live ([Live mode](#live-mode)) |
 | Notifications | Where every refund held for a person is announced, each optional: a Slack or Discord webhook URL (or `GUARD_WEBHOOK_URL`); email to the contact emails through your own mail server over SMTP (or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) or through Resend, with its API key (or `RESEND_API_KEY`), from a sender address (or `NOTIFY_EMAIL_FROM`); a Telegram bot token and chat id (or `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) |
 | API keys | Keys your shop's own app calls the agent endpoints with ([API keys](#api-keys)); needs `DATABASE_URL` |
 

@@ -34,7 +34,8 @@
     "reasons": "Motifs",
     "args": "Arguments",
     "detail": "Détail",
-    "decides": "Décide l’entrée retenue"
+    "decides": "Décide l’entrée retenue",
+    "environment": "Environnement"
   },
   "grid": {
     "search": "Rechercher dans toutes les colonnes…",
@@ -73,7 +74,8 @@
       "intentJudgeUnavailable": "Juge IA indisponible"
     },
     "invalidRequest": "Demande de décision non valide",
-    "failed": "La décision n’a pas pu être traitée ; rien n’a été enregistré."
+    "failed": "La décision n’a pas pu être traitée ; rien n’a été enregistré.",
+    "live": "Réel · argent réel"
   },
   "assistant": {
     "title": "Questions sur ces décisions",
@@ -90,5 +92,14 @@
     "ask": "Demander",
     "failed": "L’assistant du guard a échoué.",
     "unreachable": "Impossible de joindre l’assistant du guard."
+  },
+  "environment": {
+    "sandbox": "Sandbox",
+    "live": "Réel"
+  },
+  "liveMode": {
+    "on": "Le mode réel est activé : les appels de l'app de votre boutique déplacent de l'argent réel.",
+    "failClosed": "Le mode réel est activé, mais ce serveur fonctionne en mode test : chaque appel utilise le sandbox.",
+    "settings": "Réglages du mode"
   }
 }

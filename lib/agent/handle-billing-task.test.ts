@@ -3,7 +3,7 @@ import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup'
 import { payPalInvoiceLookup } from '@/lib/guard/adapters/paypal-invoice-lookup';
 import { seedCustomerDirectory } from '@/lib/guard/adapters/seed-customer-directory';
 
-const payPalToolkit = vi.fn(async (actions: unknown) => ({ toolkit: actions }));
+const payPalToolkit = vi.fn(async (actions: unknown, environment?: unknown) => ({ toolkit: actions, environment }));
 const createPaymentGuard = vi.fn((deps: unknown) => ({ guard: deps }));
 const runBillingAgent = vi.fn();
 const shop = {
@@ -15,7 +15,7 @@ const shop = {
 
 vi.mock('./handle-ticket', () => ({
   llmConfig: async () => ({ baseUrl: 'https://llm.test', apiKey: 'k', agentModel: 'agent-m', judgeModel: 'judge-m', headers: {} }),
-  payPalToolkit: (actions: unknown) => payPalToolkit(actions),
+  payPalToolkit: (actions: unknown, environment?: unknown) => payPalToolkit(actions, environment),
   heldNotifier: () => 'NOTIFIER',
 }));
 vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => shop }));
@@ -46,7 +46,7 @@ describe('handleBillingTask', () => {
 
     expect(BILLING_ACTIONS).toEqual({ invoices: { create: true, get: true, send: true, sendReminder: true } });
     expect(payPalToolkit).toHaveBeenCalledTimes(1);
-    expect(payPalToolkit).toHaveBeenCalledWith(BILLING_ACTIONS);
+    expect(payPalToolkit).toHaveBeenCalledWith(BILLING_ACTIONS, 'sandbox');
   });
 
   it('puts the guard in front of the toolkit with the task customer as mandate and the invoice lookups', async () => {
@@ -61,7 +61,7 @@ describe('handleBillingTask', () => {
       captures: payPalCaptureLookup,
       invoices: payPalInvoiceLookup,
       customers: seedCustomerDirectory,
-      audit: 'AUDIT',
+      audit: expect.objectContaining({ environment: 'sandbox', log: 'AUDIT' }),
       limits: shop.limits,
       notifier: 'NOTIFIER',
     });
@@ -102,5 +102,15 @@ describe('handleBillingTask', () => {
     expect(result.reply).not.toContain('thief@outside.example');
     expect(result.steps).toEqual([{ tool: 'create_invoice', args: {}, isError: false, result: '{}' }]);
     expect(result.redacted).toEqual({ ticket: 1, reply: 1 });
+  });
+
+  it('runs a live request on live PayPal: the toolkit, the lookups and every logged decision', async () => {
+    runBillingAgent.mockResolvedValue({ reply: 'Done', steps: [] });
+
+    await handleBillingTask(task, 'careful', { environment: 'live' });
+
+    expect(payPalToolkit).toHaveBeenCalledWith(BILLING_ACTIONS, 'live');
+    expect(guardDeps().audit).toMatchObject({ environment: 'live' });
+    expect(guardDeps().captures).not.toBe(payPalCaptureLookup);
   });
 });

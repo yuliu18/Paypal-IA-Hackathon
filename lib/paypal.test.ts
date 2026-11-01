@@ -2,8 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { accessToken, chargeCard } from './paypal';
-import { saveSettings } from './settings/settings';
+import { accessToken, chargeCard, getCapture, payPalApi } from './paypal';
+import { saveSettings, setPaymentMode } from './settings/settings';
 
 describe('chargeCard', () => {
   afterEach(() => {
@@ -86,5 +86,92 @@ describe('accessToken', () => {
     await saveSettings({ ...form, paypalClientId: 'other-id', paypalSecret: 'other-secret' }, { file, env });
     expect(await accessToken()).toBe('t2');
     expect(basics).toEqual(['shop-id:shop-secret', 'other-id:other-secret']);
+  });
+});
+
+describe('the PayPal environment', () => {
+  let dir: string;
+  let file: string;
+  const env = { SETTINGS_SECRET: 'a-long-settings-secret-for-tests' };
+  const form = {
+    name: 'Shop', contactEmails: '', refundPolicy: 'Refund damaged orders of the ticket customer.', currency: 'USD',
+    autoRefundUpTo: '100', approvalUpTo: '250', dailyCap: '200', provider: 'custom', baseUrl: 'https://llm.example/v1',
+    agentModel: 'm', judgeModel: '', apiKey: '', paypalClientId: 'sandbox-id', paypalSecret: 'sandbox-secret',
+    paypalLiveClientId: 'live-id', paypalLiveSecret: 'live-secret',
+  };
+  type Seen = { url: string; basic?: string; bearer?: string };
+  let seen: Seen[];
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'paypal-env-'));
+    file = join(dir, 'settings.json');
+    for (const [name, value] of Object.entries({ ...env, SETTINGS_FILE: file })) vi.stubEnv(name, value);
+    await saveSettings(form, { file, env });
+    seen = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      const auth = new Headers(init.headers).get('authorization') ?? '';
+      if (auth.startsWith('Basic ')) {
+        const basic = Buffer.from(auth.slice('Basic '.length), 'base64').toString();
+        seen.push({ url, basic });
+        return Response.json({ access_token: `token-for-${basic.split(':')[0]}`, expires_in: 3600 });
+      }
+      seen.push({ url, bearer: auth.slice('Bearer '.length) });
+      return Response.json({ id: 'CAP-1', status: 'COMPLETED', amount: { value: '1.00', currency_code: 'USD' } });
+    });
+  });
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('names the live API only for exactly "live"', () => {
+    expect(payPalApi('sandbox')).toBe('https://api-m.sandbox.paypal.com');
+    expect(payPalApi('live')).toBe('https://api-m.paypal.com');
+    expect(payPalApi('LIVE' as never)).toBe('https://api-m.sandbox.paypal.com');
+    expect(payPalApi(undefined as never)).toBe('https://api-m.sandbox.paypal.com');
+  });
+
+  it('runs on the sandbox app and URL by default, even in live mode', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    await setPaymentMode('live', { file, env });
+    await getCapture('CAP-1');
+    expect(seen).toEqual([
+      { url: 'https://api-m.sandbox.paypal.com/v1/oauth2/token', basic: 'sandbox-id:sandbox-secret' },
+      { url: 'https://api-m.sandbox.paypal.com/v2/payments/captures/CAP-1', bearer: 'token-for-sandbox-id' },
+    ]);
+  });
+
+  it('runs on the live app and URL only when asked for live and live mode is on', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    await setPaymentMode('live', { file, env });
+    await getCapture('CAP-1', 'live');
+    await getCapture('CAP-2', 'sandbox');
+    // The sandbox token may still be cached from an earlier test; the live one never is reused for the sandbox.
+    expect(seen.filter((s) => s.basic !== 'sandbox-id:sandbox-secret')).toEqual([
+      { url: 'https://api-m.paypal.com/v1/oauth2/token', basic: 'live-id:live-secret' },
+      { url: 'https://api-m.paypal.com/v2/payments/captures/CAP-1', bearer: 'token-for-live-id' },
+      { url: 'https://api-m.sandbox.paypal.com/v2/payments/captures/CAP-2', bearer: 'token-for-sandbox-id' },
+    ]);
+    expect(seen.every((s) => s.url.startsWith('https://api-m.sandbox.paypal.com') === (s.basic ?? s.bearer ?? '').includes('sandbox-id'))).toBe(true);
+  });
+
+  it.each([
+    ['the server does not allow it', undefined, 'live'],
+    ['the owner left test mode on', 'true', 'test'],
+  ] as const)('refuses a live token, calling nothing, when %s', async (_why, allow, mode) => {
+    if (allow) vi.stubEnv('ALLOW_LIVE_MODE', allow);
+    await setPaymentMode(mode, { file, env });
+    await expect(accessToken('live')).rejects.toThrow('Live mode is off');
+    expect(seen).toEqual([]);
+  });
+
+  it('refuses a live token, calling nothing, when the live app is gone', async () => {
+    vi.stubEnv('ALLOW_LIVE_MODE', 'true');
+    await setPaymentMode('live', { file, env });
+    await saveSettings({ ...form, paypalLiveSecret: '', clearPaypalLiveSecret: true }, { file, env });
+    await setPaymentMode('live', { file, env });
+    await expect(accessToken('live')).rejects.toThrow('Live mode is off');
+    expect(seen).toEqual([]);
   });
 });

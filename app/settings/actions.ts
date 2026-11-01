@@ -4,7 +4,7 @@ import { refresh } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { loadCatalog, withDefaultModels, type CatalogModel } from '@/lib/settings/catalog';
 import { listModels, testPayPal, type ConnectionCheck, type ModelList } from '@/lib/settings/connection';
-import { saveSettings, testCredentials, type SaveResult, type SettingsForm } from '@/lib/settings/settings';
+import { saveSettings, testCredentials, testLiveCredentials, type SaveResult, type SettingsForm } from '@/lib/settings/settings';
 
 export type SaveState = SaveResult | null;
 
@@ -28,6 +28,9 @@ function settingsForm(form: FormData): SettingsForm {
     paypalClientId: text(form, 'paypalClientId'),
     paypalSecret: text(form, 'paypalSecret'),
     clearPaypalSecret: form.get('clearPaypalSecret') === 'on',
+    paypalLiveClientId: text(form, 'paypalLiveClientId'),
+    paypalLiveSecret: text(form, 'paypalLiveSecret'),
+    clearPaypalLiveSecret: form.get('clearPaypalLiveSecret') === 'on',
     webhookUrl: text(form, 'webhookUrl'),
     clearWebhookUrl: form.get('clearWebhookUrl') === 'on',
     resendApiKey: text(form, 'resendApiKey'),
@@ -68,6 +71,14 @@ export async function testPayPalAction(form: FormData): Promise<ConnectionCheck>
   const { paypal } = await testCredentials(settingsForm(form));
   if (!paypal.clientId || !paypal.secret) return { ok: false, error: (await getTranslations('settings'))('paypal.needCredentials') };
   return testPayPal(paypal);
+}
+
+// The live app's credentials against live PayPal (api-m.paypal.com): one token request, nothing else.
+export async function testLivePayPalAction(form: FormData): Promise<ConnectionCheck> {
+  if (locked()) return { ok: false, error: await lockedError() };
+  const live = await testLiveCredentials(settingsForm(form));
+  if (!live.clientId || !live.secret) return { ok: false, error: (await getTranslations('settings'))('paypal.needCredentials') };
+  return testPayPal(live, fetch, 'live');
 }
 
 // One provider's models from the catalog, loaded when the owner picks the provider.

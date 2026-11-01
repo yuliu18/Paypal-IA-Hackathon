@@ -79,7 +79,13 @@ export type ShopSettings = {
   business: { name: string; contactEmails: string[]; refundPolicy: string };
   limits: Limits;
   ai: { provider: string; baseUrl: string; apiKey: string; agentModel: string; judgeModel: string };
+  // The sandbox app (test money): the agents' test pages, the evaluation and the sample data.
   paypal: { clientId: string; secret: string };
+  // The live app (real money), used only in live mode and only for API-key requests
+  // (./live-mode.ts). Saved on /settings only, never read from the environment.
+  paypalLive: { clientId: string; secret: string };
+  // What the owner chose on /settings; ./live-mode.ts decides whether live mode is really on.
+  mode: 'test' | 'live';
   // Each channel left empty is skipped; all empty: held refunds wait on /guard without telling
   // anyone. Email goes to business.contactEmails, through SMTP when it is fully set, else Resend.
   notifications: {
@@ -108,6 +114,10 @@ export type SettingsForm = {
   paypalClientId: string;
   paypalSecret: string;
   clearPaypalSecret?: boolean;
+  // The live app. Optional: a form without them keeps the saved live app.
+  paypalLiveClientId?: string;
+  paypalLiveSecret?: string;
+  clearPaypalLiveSecret?: boolean;
   // Optional: forms from before the webhook existed keep the saved one, as a blank field does.
   webhookUrl?: string;
   clearWebhookUrl?: boolean;
@@ -136,6 +146,8 @@ export type SettingsView = {
   form: SettingsForm;
   ai: { apiKey: KeyStatus };
   paypal: { secret: KeyStatus };
+  paypalLive: { secret: KeyStatus };
+  mode: 'test' | 'live';
   notifications: { webhookUrl: KeyStatus; resendApiKey: KeyStatus; telegramBotToken: KeyStatus; smtpPassword: KeyStatus };
 };
 
@@ -144,6 +156,9 @@ type Stored = {
   limits?: typeof DEFAULT_LIMITS;
   ai?: { provider: string; baseUrl: string; agentModel: string; judgeModel: string; apiKey?: string };
   paypal?: { clientId: string; secret?: string };
+  paypalLive?: { clientId: string; secret?: string };
+  // Saved on its own (setPaymentMode), never by the settings form.
+  paypalMode?: { mode: 'test' | 'live' };
   notifications?: {
     webhookUrl?: string;
     resendApiKey?: string;
@@ -219,6 +234,8 @@ const SECTION_SHAPES: Record<keyof Stored, (section: Record<string, unknown>) =>
   limits: (l) => isText(l.currency) && isMinor(l.autoRefundUpTo) && isMinor(l.approvalUpTo) && isMinor(l.dailyCap),
   ai: (a) => isText(a.provider) && isText(a.baseUrl) && isText(a.agentModel) && isText(a.judgeModel) && (a.apiKey === undefined || isText(a.apiKey)),
   paypal: (p) => isText(p.clientId) && (p.secret === undefined || isText(p.secret)),
+  paypalLive: (p) => isText(p.clientId) && (p.secret === undefined || isText(p.secret)),
+  paypalMode: (m) => m.mode === 'test' || m.mode === 'live',
   notifications: (n) =>
     ['webhookUrl', 'resendApiKey', 'emailFrom', 'telegramBotToken', 'telegramChatId', 'smtpHost', 'smtpUser', 'smtpPassword'].every((name) => n[name] === undefined || isText(n[name])) &&
     (n.smtpPort === undefined || isPort(n.smtpPort)),
@@ -282,6 +299,9 @@ function resolve(stored: Stored, env: Env) {
 
   const clientId = stored.paypal?.clientId || env.PAYPAL_CLIENT_ID || '';
   const payPalSecret = savedKey(stored.paypal?.clientId ? stored.paypal.secret : undefined, env) ?? envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID);
+  // No environment fallback: real money moves only with credentials the owner saved here.
+  const liveClientId = stored.paypalLive?.clientId ?? '';
+  const liveSecret = savedKey(liveClientId ? stored.paypalLive?.secret : undefined, env) ?? envKey(undefined, false);
 
   // Its token is the only secret in a webhook URL, and it goes nowhere but that URL.
   const webhookUrl = savedKey(stored.notifications?.webhookUrl, env) ?? envKey(env.GUARD_WEBHOOK_URL, true);
@@ -313,6 +333,8 @@ function resolve(stored: Stored, env: Env) {
       judgeModel: stored.ai?.judgeModel || agentModel,
     },
     paypal: { clientId, secret: payPalSecret.value },
+    paypalLive: { clientId: liveClientId, secret: liveSecret.value },
+    mode: stored.paypalMode?.mode === 'live' ? 'live' : 'test',
     notifications: {
       webhookUrl: webhookUrl.value,
       email: { resendApiKey: resendApiKey.value, from: stored.notifications?.emailFrom || env.NOTIFY_EMAIL_FROM || '' },
@@ -320,7 +342,7 @@ function resolve(stored: Stored, env: Env) {
       telegram: { botToken: botToken.value, chatId: stored.notifications?.telegramChatId || env.TELEGRAM_CHAT_ID || '' },
     },
   };
-  const keys = { ai: aiKey.status, paypal: payPalSecret.status, webhook: webhookUrl.status, resend: resendApiKey.status, telegram: botToken.status, smtp: smtpPassword.status };
+  const keys = { ai: aiKey.status, paypal: payPalSecret.status, paypalLive: liveSecret.status, webhook: webhookUrl.status, resend: resendApiKey.status, telegram: botToken.status, smtp: smtpPassword.status };
   return { settings, limits, keys };
 }
 
@@ -368,6 +390,8 @@ export async function settingsView(options: SettingsOptions = {}): Promise<Setti
       apiKey: '',
       paypalClientId: settings.paypal.clientId,
       paypalSecret: '',
+      paypalLiveClientId: settings.paypalLive.clientId,
+      paypalLiveSecret: '',
       webhookUrl: '',
       resendApiKey: '',
       emailFrom: settings.notifications.email.from,
@@ -380,6 +404,8 @@ export async function settingsView(options: SettingsOptions = {}): Promise<Setti
     },
     ai: { apiKey: keys.ai },
     paypal: { secret: keys.paypal },
+    paypalLive: { secret: keys.paypalLive },
+    mode: settings.mode,
     notifications: { webhookUrl: keys.webhook, resendApiKey: keys.resend, telegramBotToken: keys.telegram, smtpPassword: keys.smtp },
   };
 }
@@ -448,6 +474,11 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
   if (/[\s\p{Cc}]/u.test(apiKey)) errors.apiKey = badKey;
   if (paypalSecret && !paypalClientId) errors.paypalClientId = 'Enter the client ID that goes with this secret.';
   if (/[\s\p{Cc}]/u.test(paypalSecret)) errors.paypalSecret = badKey;
+  const paypalLiveClientId = form.paypalLiveClientId?.trim();
+  if (paypalLiveClientId && !/^[\w-]{1,200}$/.test(paypalLiveClientId)) errors.paypalLiveClientId = 'Paste the client ID from developer.paypal.com.';
+  const paypalLiveSecret = (form.paypalLiveSecret ?? '').trim();
+  if (paypalLiveSecret && !paypalLiveClientId) errors.paypalLiveClientId = 'Enter the client ID that goes with this secret.';
+  if (/[\s\p{Cc}]/u.test(paypalLiveSecret)) errors.paypalLiveSecret = badKey;
   const webhookUrl = (form.webhookUrl ?? '').trim();
   if (webhookUrl && (!/^https:\/\/[^\s/]+/i.test(webhookUrl) || /[\s\p{Cc}]/u.test(webhookUrl) || !URL.canParse(webhookUrl))) {
     errors.webhookUrl = 'Enter the https:// webhook URL from Slack or Discord.';
@@ -472,7 +503,7 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
   if (smtpPassword && (!smtpHost || !smtpUser) && !errors.smtpHost) errors.smtpHost = 'Enter the server and login this password is for.';
   if (Object.keys(errors).length) return { ok: false, errors };
 
-  const sealing = Boolean(apiKey || paypalSecret || webhookUrl || resendApiKey || telegramBotToken || smtpPassword);
+  const sealing = Boolean(apiKey || paypalSecret || paypalLiveSecret || webhookUrl || resendApiKey || telegramBotToken || smtpPassword);
   const store = await storeFor(options);
   const secret = sealing ? settingsSecret(await withSecret(env, store, true)) : undefined;
   // An empty or unreadable settings.key (e.g. left by a crash) can't encrypt anything.
@@ -489,6 +520,13 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
   // A saved key stays only with the endpoint or client id it was saved for.
   const keepApiKey = !form.clearApiKey && previous.ai?.baseUrl === baseUrl ? previous.ai.apiKey : undefined;
   const keepPaypalSecret = !form.clearPaypalSecret && previous.paypal?.clientId === paypalClientId ? previous.paypal.secret : undefined;
+  // A form without the live fields keeps the live app; its secret stays only with its client id.
+  const nextLiveClientId = paypalLiveClientId ?? previous.paypalLive?.clientId ?? '';
+  const keepLiveSecret = !form.clearPaypalLiveSecret && previous.paypalLive?.clientId === nextLiveClientId ? previous.paypalLive?.secret : undefined;
+  const nextLiveSecret = paypalLiveSecret ? sealSecret(paypalLiveSecret, secret!) : keepLiveSecret;
+  // Another live app (client id or secret) was never checked against PayPal: live mode turns off
+  // until the owner turns it on again, which checks it.
+  const sameLiveApp = nextLiveClientId === (previous.paypalLive?.clientId ?? '') && nextLiveSecret === previous.paypalLive?.secret;
   const keepWebhookUrl = form.clearWebhookUrl ? undefined : previous.notifications?.webhookUrl;
   const keepResendApiKey = form.clearResendApiKey ? undefined : previous.notifications?.resendApiKey;
   const keepBotToken = form.clearTelegramBotToken ? undefined : previous.notifications?.telegramBotToken;
@@ -508,6 +546,8 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
       apiKey: apiKey ? sealSecret(apiKey, secret!) : keepApiKey,
     },
     paypal: { clientId: paypalClientId, secret: paypalSecret ? sealSecret(paypalSecret, secret!) : keepPaypalSecret },
+    paypalLive: { clientId: nextLiveClientId, secret: nextLiveSecret },
+    paypalMode: { mode: sameLiveApp && previous.paypalMode?.mode === 'live' ? 'live' : 'test' },
     notifications: {
       webhookUrl: webhookUrl ? sealSecret(webhookUrl, secret!) : keepWebhookUrl,
       resendApiKey: resendApiKey ? sealSecret(resendApiKey, secret!) : keepResendApiKey,
@@ -526,6 +566,29 @@ export async function saveSettings(form: SettingsForm, options: SettingsOptions 
   return { ok: true };
 }
 
+// Test or live mode, saved on its own, at once, apart from the settings form. Only the rules in
+// ./live-switch.ts may turn live mode on. A read-only server (SETTINGS_LOCKED) never turns it on,
+// but turning it off is always allowed.
+export async function setPaymentMode(mode: 'test' | 'live', options: SettingsOptions = {}): Promise<{ ok: true } | { ok: false; error: 'locked' | 'unreadable' }> {
+  const { env = process.env } = options;
+  if (mode === 'live' && isLocked(env)) return { ok: false, error: 'locked' };
+  const store = await storeFor(options);
+  // Everything else is written back exactly as it was read; a store that can't be read or parsed
+  // is left alone (and reads as test mode anyway).
+  let previous: Record<string, unknown>;
+  try {
+    const json = await store.read();
+    const parsed: unknown = json === undefined ? {} : JSON.parse(json);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not a JSON object');
+    previous = parsed as Record<string, unknown>;
+  } catch (error) {
+    console.error(`Mode not saved: ${store.where} could not be read`, error);
+    return { ok: false, error: 'unreadable' };
+  }
+  await store.write(`${JSON.stringify({ ...previous, paypalMode: { mode } }, null, 2)}\n`);
+  return { ok: true };
+}
+
 // The keys a "Test connection" press may use: the one typed, else a saved or environment key, but
 // only for the URL or client id it belongs to, so the form can't send a stored key elsewhere.
 export async function testCredentials(form: SettingsForm, options: SettingsOptions = {}) {
@@ -541,3 +604,15 @@ export async function testCredentials(form: SettingsForm, options: SettingsOptio
   const secret = form.paypalSecret.trim() || (savedSecret ?? envKey(env.PAYPAL_SECRET, clientId === env.PAYPAL_CLIENT_ID)).value;
   return { ai: { baseUrl, apiKey }, paypal: { clientId, secret } };
 }
+
+// The live app a "Test connection" press may use: the secret typed, else the saved one, but only
+// for the client id it was saved with. Never an environment key.
+export async function testLiveCredentials(form: Pick<SettingsForm, 'paypalLiveClientId' | 'paypalLiveSecret'>, options: SettingsOptions = {}) {
+  const store = await storeFor(options);
+  const env = await withSecret(options.env ?? process.env, store, false);
+  const stored = await readStored(store);
+  const clientId = (form.paypalLiveClientId ?? '').trim();
+  const saved = clientId && stored.paypalLive?.clientId === clientId ? savedKey(stored.paypalLive.secret, env) : undefined;
+  return { clientId, secret: (form.paypalLiveSecret ?? '').trim() || (saved?.value ?? '') };
+}
+

@@ -4,8 +4,9 @@
 // guard. Server-side only.
 
 import { createLlmIntentJudge, openAiCompatibleChat } from '@/lib/guard/adapters/llm-intent-judge';
-import { payPalCaptureLookup } from '@/lib/guard/adapters/paypal-capture-lookup';
-import { payPalOrderBinder } from '@/lib/guard/adapters/paypal-order-binder';
+import { payPalAdapters } from '@/lib/guard/adapters/paypal-environment';
+import { inEnvironment } from '@/lib/guard/environment-audit';
+import type { PaymentEnvironment } from '@/lib/paypal';
 import { withoutDailyCap } from '@/lib/evaluation/evaluation';
 import { privateReply, privateTicket } from '@/lib/guard/domain/redact';
 import { createPaymentGuard } from '@/lib/guard/guard';
@@ -43,14 +44,18 @@ export type SalesResult = { reply: string; steps: AgentStep[]; redacted: Redacti
 // `shopOrigin`: the shop's origin for the order's return links (lib/shop/checkout.ts shopOrigin).
 // `liftDailyCap`: for the /evaluate page only (lib/evaluation withoutDailyCap); orders never count
 // toward it, but the agent's other calls run under the same limits as the other agents'.
+// `environment`: the PayPal environment the request runs in (lib/settings/live-mode.ts); the
+// sandbox by default. The order's approval link comes from the toolkit, so it is a live checkout
+// link only in a live request.
 export async function handleSalesChat(
   received: SalesChat,
   mode: AgentMode = 'careful',
-  { liftDailyCap = false, shopOrigin = defaultShopOrigin() }: { liftDailyCap?: boolean; shopOrigin?: string } = {},
+  { liftDailyCap = false, shopOrigin = defaultShopOrigin(), environment = 'sandbox' }: { liftDailyCap?: boolean; shopOrigin?: string; environment?: PaymentEnvironment } = {},
 ): Promise<SalesResult> {
   const shop = await loadSettings();
   const llm = await llmConfig(shop.ai);
-  const paypal = await payPalToolkit(SALES_ACTIONS);
+  const paypal = await payPalToolkit(SALES_ACTIONS, environment);
+  const { captures, binder } = payPalAdapters(environment);
   // Agent, judge and black box all get the message without card numbers.
   const { ticket: task, removed: taskRemoved } = privateTicket(received);
 
@@ -59,9 +64,9 @@ export async function handleSalesChat(
       upstream,
       task: { mandate: { customerEmail: task.customerEmail }, instructions: SALES_POLICY, untrustedInput: task.message },
       judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
-      captures: payPalCaptureLookup,
-      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder: payPalOrderBinder },
-      audit: auditLog(),
+      captures,
+      orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder },
+      audit: inEnvironment(auditLog(), environment),
       limits: liftDailyCap ? withoutDailyCap(shop.limits) : shop.limits,
       notifier: heldNotifier(shop),
     });

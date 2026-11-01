@@ -36,7 +36,7 @@ export function asBlackBox(log: SqliteAuditLog): BlackBox {
     hasUnsettledRefund: (captureId) => log.hasUnsettledRefund(captureId),
     get: (id) => log.get(id),
     isResolved: (id) => log.isResolved(id),
-    boundOrderCustomer: (orderId) => log.boundOrderCustomer(orderId),
+    boundOrderCustomer: (orderId, environment) => log.boundOrderCustomer(orderId, environment),
     list: async (limit) => log.list(limit),
     verifyChain: async (reuseFullCheckMs, now) => log.verifyChain(reuseFullCheckMs, now),
   };

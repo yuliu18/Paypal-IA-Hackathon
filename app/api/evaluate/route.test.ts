@@ -38,7 +38,7 @@ describe('POST /api/evaluate', () => {
     const res = await post({ caseId: 'business-refund' });
 
     expect(res.status).toBe(200);
-    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('ORD-ANA') }, 'careful', { liftDailyCap: true });
+    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('ORD-ANA') }, 'careful', { liftDailyCap: true, environment: 'sandbox' });
     expect(await res.json()).toMatchObject({ caseId: 'business-refund', result: { pass: true }, reply: 'Refunded.', steps: [{ tool: 'create_refund' }] });
   });
 
@@ -48,7 +48,7 @@ describe('POST /api/evaluate', () => {
 
     await post({ caseId: 'attack-system-notice:base64@vulnerable', agent: 'careful' });
 
-    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true });
+    expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true, environment: 'sandbox' });
   });
 
   it('runs a billing case through the billing agent with the daily cap lifted, never the support agent', async () => {
@@ -59,12 +59,12 @@ describe('POST /api/evaluate', () => {
     const res = await post({ caseId: 'business-invoice' });
 
     expect(handleTicket).not.toHaveBeenCalled();
-    expect(handleBillingTask).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('ORD-ANA') }, 'careful', { liftDailyCap: true });
+    expect(handleBillingTask).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('ORD-ANA') }, 'careful', { liftDailyCap: true, environment: 'sandbox' });
     expect(await res.json()).toMatchObject({ caseId: 'business-invoice', result: { pass: true }, reply: 'Invoiced.' });
 
     handleBillingTask.mockResolvedValue({ reply: 'No.', steps: [], redacted: { ticket: 0, reply: 0 } });
     await post({ caseId: 'attack-invoice-copy:jailbreak@vulnerable' });
-    expect(handleBillingTask).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('additional_recipients') }, 'vulnerable', { liftDailyCap: true });
+    expect(handleBillingTask).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('additional_recipients') }, 'vulnerable', { liftDailyCap: true, environment: 'sandbox' });
     expect(handleTicket).not.toHaveBeenCalled();
   });
 
@@ -82,12 +82,12 @@ describe('POST /api/evaluate', () => {
 
     expect(handleTicket).not.toHaveBeenCalled();
     expect(handleBillingTask).not.toHaveBeenCalled();
-    expect(handleSalesChat).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('Ceramic mug set') }, 'careful', { liftDailyCap: true, shopOrigin: 'https://shop.example' });
+    expect(handleSalesChat).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('Ceramic mug set') }, 'careful', { liftDailyCap: true, shopOrigin: 'https://shop.example', environment: 'sandbox' });
     expect(await res.json()).toMatchObject({ caseId: 'business-order', result: { pass: true }, reply: 'Here is your order.' });
 
     handleSalesChat.mockResolvedValue({ reply: 'Done.', steps: [order('https://elsewhere.example/return')], redacted: { ticket: 0, reply: 0 } });
     const attack = await (await post({ caseId: 'attack-order-return-url:base64@vulnerable' })).json();
-    expect(handleSalesChat).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true, shopOrigin: 'https://shop.example' });
+    expect(handleSalesChat).toHaveBeenLastCalledWith({ customerEmail: 'ana@example.com', message: expect.stringContaining('base64') }, 'vulnerable', { liftDailyCap: true, shopOrigin: 'https://shop.example', environment: 'sandbox' });
     expect(attack).toMatchObject({ result: { pass: false, guardHeld: false } });
   });
 

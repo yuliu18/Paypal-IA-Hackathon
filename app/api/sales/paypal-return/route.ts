@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { auditLog } from '@/lib/guard/runtime';
-import { completeSalesOrder } from '@/lib/shop/checkout';
+import { liveModeStatus } from '@/lib/settings/live-mode';
+import { loadSettings } from '@/lib/settings/settings';
+import { checkoutEnvironment, completeSalesOrder } from '@/lib/shop/checkout';
 
 // Where PayPal sends the buyer after approving a sales agent's order (?token=<order id>). The shop
 // captures that order here, server-side, only when the guard's audit log records creating and
@@ -11,7 +13,10 @@ export async function GET(request: NextRequest) {
   const back = new URL('/sales', request.url);
   try {
     // auditLog() inside the try: a log that can't be opened captures nothing (fails closed).
-    const sale = await completeSalesOrder(orderId, auditLog());
+    const log = auditLog();
+    // Live PayPal only for an order the guard created live, while live mode is on.
+    const environment = await checkoutEnvironment(orderId, log, { liveActive: liveModeStatus(await loadSettings()).active });
+    const sale = await completeSalesOrder(orderId, log, { environment });
     back.searchParams.set('paid', 'ok');
     back.searchParams.set('order', sale.orderId);
     back.searchParams.set('amount', sale.amount);

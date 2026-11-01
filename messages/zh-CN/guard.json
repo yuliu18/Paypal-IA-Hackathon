@@ -34,7 +34,8 @@
     "reasons": "原因",
     "args": "参数",
     "detail": "详情",
-    "decides": "处理的暂扣记录"
+    "decides": "处理的暂扣记录",
+    "environment": "环境"
   },
   "grid": {
     "search": "搜索所有列…",
@@ -73,7 +74,8 @@
       "intentJudgeUnavailable": "AI 评判不可用"
     },
     "invalidRequest": "无效的决定请求",
-    "failed": "无法处理该决定；未记录任何内容。"
+    "failed": "无法处理该决定；未记录任何内容。",
+    "live": "真实 · 真实资金"
   },
   "assistant": {
     "title": "询问这些决定",
@@ -90,5 +92,14 @@
     "ask": "提问",
     "failed": "守卫助手出错了。",
     "unreachable": "无法连接守卫助手。"
+  },
+  "environment": {
+    "sandbox": "沙盒",
+    "live": "真实"
+  },
+  "liveMode": {
+    "on": "真实模式已开启：你店铺应用的调用会转移真实资金。",
+    "failClosed": "真实模式已开启，但此服务器以测试模式运行：所有调用都使用沙盒。",
+    "settings": "模式设置"
   }
 }

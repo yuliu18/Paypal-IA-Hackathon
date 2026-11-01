@@ -125,6 +125,23 @@ describe('sqlite audit log', () => {
     expect((await log.get(approvalId))?.resolves).toBe(heldId);
   });
 
+  it('names the bound customer only for the environment the order was created in', async () => {
+    const created = (detail: string, environment?: 'sandbox' | 'live') =>
+      entry({ tool: 'create_order', args: { currencyCode: 'USD' }, moved: undefined, outcome: 'executed', detail, ...(environment && { environment }) });
+    await log.record(created('Order 1L190127TN364715T bound to the task customer', 'live'));
+    await log.record(created('Order 2S190127TN364715T bound to the task customer', 'sandbox'));
+    await log.record(created('Order 3U190127TN364715T bound to the task customer'));
+    expect(await log.boundOrderCustomer('1L190127TN364715T', 'live')).toBe('ana@example.com');
+    expect(await log.boundOrderCustomer('1L190127TN364715T', 'sandbox')).toBeUndefined();
+    expect(await log.boundOrderCustomer('2S190127TN364715T', 'live')).toBeUndefined();
+    expect(await log.boundOrderCustomer('2S190127TN364715T', 'sandbox')).toBe('ana@example.com');
+    // Recorded without an environment: the sandbox.
+    expect(await log.boundOrderCustomer('3U190127TN364715T', 'live')).toBeUndefined();
+    expect(await log.boundOrderCustomer('3U190127TN364715T', 'sandbox')).toBe('ana@example.com');
+    // No environment asked: any.
+    expect(await log.boundOrderCustomer('1L190127TN364715T')).toBe('ana@example.com');
+  });
+
   it('names the customer the guard bound a created order to, and nobody for any other order', async () => {
     const ORDER = '5O190127TN364715T';
     const created = (overrides: Partial<AuditEntry> = {}) => entry({ tool: 'create_order', args: { currencyCode: 'USD' }, moved: undefined, outcome: 'pending', ...overrides });

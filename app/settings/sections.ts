@@ -8,7 +8,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'business', label: 'Business', fields: ['name', 'contactEmails', 'refundPolicy'] },
   { id: 'limits', label: 'Limits', fields: ['currency', 'autoRefundUpTo', 'approvalUpTo', 'dailyCap'] },
   { id: 'ai', label: 'AI model', fields: ['provider', 'baseUrl', 'agentModel', 'judgeModel', 'apiKey'] },
-  { id: 'paypal', label: 'PayPal app', fields: ['paypalClientId', 'paypalSecret'] },
+  { id: 'paypal', label: 'PayPal app', fields: ['paypalClientId', 'paypalSecret', 'paypalLiveClientId', 'paypalLiveSecret'] },
   {
     id: 'notifications',
     label: 'Notifications',

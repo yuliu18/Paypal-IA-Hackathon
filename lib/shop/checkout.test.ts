@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkoutUrls, completeSalesOrder, shopOrigin } from './checkout';
+import { checkoutEnvironment, checkoutUrls, completeSalesOrder, shopOrigin } from './checkout';
 
 type Sent = { method: string; path: string; body?: unknown };
 
@@ -109,5 +109,55 @@ describe('completeSalesOrder', () => {
       await expect(completeSalesOrder(id, records, { fetch, token })).rejects.toThrow(/not a PayPal order id/);
     }
     expect(sent).toEqual([]);
+  });
+});
+
+describe('the PayPal environment of a checkout', () => {
+  function recordingPayPal() {
+    const hosts: string[] = [];
+    const fetch = (async (url: string, init: RequestInit = {}) => {
+      hosts.push(new URL(url).host);
+      return (init.method ?? 'GET') === 'GET' ? Response.json(order('APPROVED', 'ana@example.com').json) : Response.json(captured().json, { status: 201 });
+    }) as typeof globalThis.fetch;
+    return { fetch, hosts };
+  }
+  // Bound for ana in one environment only.
+  const boundIn = (environment: 'sandbox' | 'live') => {
+    const asked: unknown[] = [];
+    return {
+      asked,
+      records: {
+        boundOrderCustomer: async (id: string, env?: 'sandbox' | 'live') => (asked.push(env), id === ORDER && env === environment ? 'ana@example.com' : undefined),
+      },
+    };
+  };
+
+  it('captures on the sandbox by default, checking the order was created there', async () => {
+    const paypal = recordingPayPal();
+    const { records, asked } = boundIn('sandbox');
+    await completeSalesOrder(ORDER, records, { fetch: paypal.fetch, token });
+    expect(asked).toEqual(['sandbox']);
+    expect(paypal.hosts).toEqual(['api-m.sandbox.paypal.com', 'api-m.sandbox.paypal.com']);
+  });
+
+  it('captures a live order on live PayPal', async () => {
+    const paypal = recordingPayPal();
+    const { records, asked } = boundIn('live');
+    await completeSalesOrder(ORDER, records, { fetch: paypal.fetch, token, environment: 'live' });
+    expect(asked).toEqual(['live']);
+    expect(paypal.hosts).toEqual(['api-m.paypal.com', 'api-m.paypal.com']);
+  });
+
+  it('captures nothing when the order was created in the other environment', async () => {
+    const paypal = recordingPayPal();
+    await expect(completeSalesOrder(ORDER, boundIn('sandbox').records, { fetch: paypal.fetch, token, environment: 'live' })).rejects.toThrow('not an order the payment guard created');
+    await expect(completeSalesOrder(ORDER, boundIn('live').records, { fetch: paypal.fetch, token })).rejects.toThrow('not an order the payment guard created');
+    expect(paypal.hosts).toEqual([]);
+  });
+
+  it('is live only for an order the guard created live, while live mode is on', async () => {
+    expect(await checkoutEnvironment(ORDER, boundIn('live').records, { liveActive: true })).toBe('live');
+    expect(await checkoutEnvironment(ORDER, boundIn('live').records, { liveActive: false })).toBe('sandbox');
+    expect(await checkoutEnvironment(ORDER, boundIn('sandbox').records, { liveActive: true })).toBe('sandbox');
   });
 });

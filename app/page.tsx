@@ -6,8 +6,10 @@ import type { Money } from '@/lib/guard/domain/policy';
 import { readGuardDashboardRows } from '@/lib/guard/dashboard-rows';
 import { auditLog } from '@/lib/guard/runtime';
 import { loadCatalog, withDefaultModels } from '@/lib/settings/catalog';
+import { liveModeStatus } from '@/lib/settings/live-mode';
 import { loadSettings } from '@/lib/settings/settings';
 import { checkpointCalls, timeAgo } from './_overview/checkpoint';
+import { LiveIndicator } from './_overview/live-indicator';
 import { agentCalls, heroSentence, verdictShares } from './_overview/tally';
 import { VerdictStamp } from './ui/verdict-stamp';
 
@@ -59,7 +61,9 @@ const button = 'inline-flex items-center rounded-md px-4 py-2.5 text-sm font-sem
 export default async function Overview() {
   await connection();
   const [t, tallyT, timeT] = await Promise.all([getTranslations('home'), getTranslations('home.tally'), getTranslations('home.checkpoint.timeAgo')]);
-  const [{ business, limits, ai: chosen, paypal }, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
+  const [settings, catalog] = await Promise.all([loadSettings(), loadCatalog()]);
+  const { business, limits, ai: chosen, paypal } = settings;
+  const live = liveModeStatus(settings);
   const ai = await withDefaultModels(chosen, async () => catalog);
   const provider = catalog.providers.find((p) => p.id === ai.provider)?.label ?? t('rules.customProvider');
   const rows = await readGuardDashboardRows((limit) => auditLog().list(limit), COUNTED);
@@ -70,6 +74,16 @@ export default async function Overview() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-10 font-paypal text-pp-ink md:px-10 md:py-14">
+      {live.active && (
+        <div className="-mt-6 mb-8">
+          <LiveIndicator state="on" text={t('liveMode.on')} settingsLabel={t('liveMode.settings')} />
+        </div>
+      )}
+      {live.mode === 'live' && !live.active && (
+        <div className="-mt-6 mb-8">
+          <LiveIndicator state="failClosed" text={t('liveMode.failClosed')} settingsLabel={t('liveMode.settings')} />
+        </div>
+      )}
       <section className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-14">
         <div>
           <h1 className="text-[40px] font-semibold leading-[1.05] tracking-[-0.02em] md:text-[52px]">
@@ -208,7 +222,13 @@ export default async function Overview() {
             <div className="flex justify-between gap-6 py-2.5">
               <dt className="text-pp-muted">{t('rules.paypal')}</dt>
               <dd className="text-right font-semibold">
-                {paypal.clientId && paypal.secret ? t('rules.sandbox') : <span className="text-pp-warning">{t('rules.noCredentials')}</span>}
+                {live.active ? (
+                  <span className="text-pp-danger">{t('rules.live')}</span>
+                ) : paypal.clientId && paypal.secret ? (
+                  t('rules.sandbox')
+                ) : (
+                  <span className="text-pp-warning">{t('rules.noCredentials')}</span>
+                )}
               </dd>
             </div>
           </dl>

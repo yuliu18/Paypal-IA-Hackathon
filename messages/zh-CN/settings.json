@@ -87,12 +87,18 @@
     "connectedAgent": "已使用智能体模型连接。"
   },
   "paypal": {
-    "detail": "智能体通过你在 PayPal Developer Dashboard（developer.paypal.com，Apps & Credentials）中创建的 REST 应用访问 PayPal。在此粘贴其沙盒 client ID 和 secret。沙盒中的资金是虚拟的。",
+    "detail": "智能体通过你在 PayPal Developer Dashboard（developer.paypal.com，Apps & Credentials）中创建的 REST 应用访问 PayPal：一个用于测试的沙盒应用，以及准备就绪后用于真实资金的 live 应用。",
     "clientId": "Client ID",
     "secret": "Secret",
     "removeSecret": "删除已保存的 secret",
     "connected": "已连接到 PayPal 沙盒。",
-    "needCredentials": "请先输入 client ID 和 secret。"
+    "needCredentials": "请先输入 client ID 和 secret。",
+    "sandboxTitle": "沙盒应用（测试资金）",
+    "sandboxDetail": "在此粘贴其沙盒 client ID 和 secret。沙盒中的资金是虚拟的。测试页面、评估和示例数据始终使用此应用。",
+    "liveTitle": "Live 应用（真实资金）",
+    "liveDetail": "来自 Apps & Credentials 中 Live 标签页的 client ID 和 secret。仅在真实模式下、且仅供你店铺应用携带 API 密钥的调用使用。保存另一个 live 应用会关闭真实模式。",
+    "liveNoEnv": "尚无 secret。live secret 只保存在这里，从不从服务器环境变量读取。",
+    "connectedLive": "已连接到 PayPal live。"
   },
   "notifications": {
     "detail": "当守卫将某个调用暂扣待人工处理时，会通知所有已开启的渠道。消息包含金额、脱敏后的客户邮箱和触发的规则，绝不包含工单内容。",
@@ -190,6 +196,52 @@
       "unavailable": "API 密钥保存在数据库中：设置 DATABASE_URL 后才能创建。",
       "locked": "此服务器上的设置为只读（SETTINGS_LOCKED）。",
       "failed": "操作失败，请重试；详情见服务器日志。"
+    }
+  },
+  "liveMode": {
+    "title": "模式",
+    "detail": "测试模式下所有调用都在 PayPal 沙盒中运行。真实模式允许你店铺应用的调用通过 live 应用转移真实资金。",
+    "test": "测试",
+    "live": "真实",
+    "badge": {
+      "test": "测试模式",
+      "live": "真实模式"
+    },
+    "current": {
+      "test": "测试模式：所有调用都在 PayPal 沙盒中运行，使用虚拟资金。",
+      "live": "真实模式：你店铺应用携带 API 密钥的调用使用你的 PayPal live 应用并转移真实资金。测试页面和评估仍使用沙盒。"
+    },
+    "failClosed": "真实模式已开启，但此服务器以测试模式运行，因为{reason}。所有调用都使用沙盒。",
+    "reasons": {
+      "server": "它不允许真实模式（ALLOW_LIVE_MODE 不是 true）",
+      "app": "live 应用的 client ID 或 secret 缺失或无法读取"
+    },
+    "disabled": {
+      "server": "此服务器不允许真实模式",
+      "app": "请先保存 live 应用的 client ID 和 secret。",
+      "locked": "此服务器上的设置为只读（SETTINGS_LOCKED）。"
+    },
+    "howBack": "要切换回来，点击“测试”：立即生效。",
+    "dashboardNote": "仪表板始终读取沙盒账户；仪表板的 live 数据已列入路线图。",
+    "dialog": {
+      "title": "开启真实模式？",
+      "warning": "真实模式会转移真实资金。",
+      "money": "守卫放行的退款、取消、争议接受、发票和订单将在你的 PayPal live 账户中以真实资金执行。",
+      "scope": "只有你店铺应用携带 API 密钥的调用会使用它。测试页面（Support、Billing、Sales）和评估仍使用沙盒。",
+      "check": "切换前，守卫会用你 live 应用的凭据向 PayPal live 请求令牌。",
+      "back": "要切换回来，在本节点击“测试”：立即生效。",
+      "confirmLabel": "输入 {word} 以确认",
+      "confirm": "开启真实模式",
+      "cancel": "取消",
+      "checking": "正在向 PayPal 核实…"
+    },
+    "errors": {
+      "locked": "此服务器上的设置为只读（SETTINGS_LOCKED）。",
+      "server": "此服务器不允许真实模式",
+      "app": "请先保存 live 应用的 client ID 和 secret。",
+      "confirmation": "请准确输入 {word} 以确认。",
+      "check": "PayPal live 未接受该 live 应用，因此仍保持测试模式：{detail}",
+      "unreadable": "无法读取已保存的设置，因此未做任何更改。请稍后重试。"
     }
   }
 }

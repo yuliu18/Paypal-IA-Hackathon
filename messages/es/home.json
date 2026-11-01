@@ -89,6 +89,12 @@
     "paypal": "PayPal",
     "sandbox": "Sandbox, dinero ficticio",
     "noCredentials": "Aún no hay credenciales de la app",
-    "change": "Cambiar las reglas"
+    "change": "Cambiar las reglas",
+    "live": "Real: dinero real para la app de tu tienda"
+  },
+  "liveMode": {
+    "on": "El modo real está activado: las llamadas de la app de tu tienda mueven dinero real.",
+    "failClosed": "El modo real está activado, pero este servidor funciona en modo de prueba: todas las llamadas usan el sandbox.",
+    "settings": "Ajustes del modo"
   }
 }

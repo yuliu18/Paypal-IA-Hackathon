@@ -3,7 +3,8 @@ import { connection } from 'next/server';
 import { getTranslations } from 'next-intl/server';
 import { apiKeys } from '@/lib/apikeys/keys';
 import { loadCatalog } from '@/lib/settings/catalog';
-import { settingsView } from '@/lib/settings/settings';
+import { liveModeStatus } from '@/lib/settings/live-mode';
+import { loadSettings, settingsView } from '@/lib/settings/settings';
 import type { ApiKeysView } from './api-keys-section';
 import { SettingsEditor } from './settings-editor';
 
@@ -25,6 +26,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SettingsPage() {
   await connection();
-  const [view, catalog, keys] = await Promise.all([settingsView(), loadCatalog(), apiKeysView()]);
-  return <SettingsEditor view={view} providers={catalog.providers} initialModels={catalog.models.get(view.form.provider) ?? []} apiKeys={keys} />;
+  const [view, catalog, keys, settings] = await Promise.all([settingsView(), loadCatalog(), apiKeysView(), loadSettings()]);
+  return (
+    <SettingsEditor
+      view={view}
+      providers={catalog.providers}
+      initialModels={catalog.models.get(view.form.provider) ?? []}
+      apiKeys={keys}
+      // Re-checked on every visit, like every request: what is really in force, and why not when it isn't.
+      liveMode={liveModeStatus(settings)}
+    />
+  );
 }

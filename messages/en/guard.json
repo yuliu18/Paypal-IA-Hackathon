@@ -34,7 +34,8 @@
     "reasons": "Reasons",
     "args": "Arguments",
     "detail": "Detail",
-    "decides": "Decides held entry"
+    "decides": "Decides held entry",
+    "environment": "Environment"
   },
   "grid": {
     "search": "Search all columns…",
@@ -73,7 +74,8 @@
       "intentJudgeUnavailable": "AI judge unavailable"
     },
     "invalidRequest": "Invalid decision request",
-    "failed": "The decision could not be processed; nothing was recorded."
+    "failed": "The decision could not be processed; nothing was recorded.",
+    "live": "Live · real money"
   },
   "assistant": {
     "title": "Ask about these decisions",
@@ -90,5 +92,14 @@
     "ask": "Ask",
     "failed": "The guard assistant failed.",
     "unreachable": "The guard assistant could not be reached."
+  },
+  "environment": {
+    "sandbox": "Sandbox",
+    "live": "Live"
+  },
+  "liveMode": {
+    "on": "Live mode is on: calls from your shop's app move real money.",
+    "failClosed": "Live mode is turned on, but this server runs in test mode: every call uses the sandbox.",
+    "settings": "Mode settings"
   }
 }

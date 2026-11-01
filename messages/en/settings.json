@@ -87,12 +87,18 @@
     "connectedAgent": "Connected with the agent model."
   },
   "paypal": {
-    "detail": "The agents reach PayPal through a REST app you create in the PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials). Paste its sandbox client ID and secret here. Money in the sandbox is fictitious.",
+    "detail": "The agents reach PayPal through REST apps you create in the PayPal Developer Dashboard (developer.paypal.com, Apps & Credentials): a sandbox app to test with and, when you are ready, a live app for real money.",
     "clientId": "Client ID",
     "secret": "Secret",
     "removeSecret": "Remove the saved secret",
     "connected": "Connected to PayPal sandbox.",
-    "needCredentials": "Enter the client ID and secret first."
+    "needCredentials": "Enter the client ID and secret first.",
+    "sandboxTitle": "Sandbox app (test money)",
+    "sandboxDetail": "Paste its sandbox client ID and secret here. Money in the sandbox is fictitious. The test pages, the evaluation and the sample data always use this app.",
+    "liveTitle": "Live app (real money)",
+    "liveDetail": "The client ID and secret from the Live tab of Apps & Credentials. Used only in live mode, and only by calls from your shop's app with an API key. Saving another live app turns live mode off.",
+    "liveNoEnv": "No secret yet. The live secret is only ever saved here, never read from the server environment.",
+    "connectedLive": "Connected to live PayPal."
   },
   "notifications": {
     "detail": "When the guard holds a call for a person, it tells every channel that is on. The message names the amount, the masked customer email and the rules, never the ticket's text.",
@@ -190,6 +196,52 @@
       "unavailable": "API keys are kept in the database: set DATABASE_URL to create them.",
       "locked": "Settings are read-only on this server (SETTINGS_LOCKED).",
       "failed": "That didn't work. Try again; the details are in the server log."
+    }
+  },
+  "liveMode": {
+    "title": "Mode",
+    "detail": "Test mode runs every call on the PayPal sandbox. Live mode lets calls from your shop's app move real money with your live app.",
+    "test": "Test",
+    "live": "Live",
+    "badge": {
+      "test": "Test mode",
+      "live": "Live mode"
+    },
+    "current": {
+      "test": "Test mode: every call runs on the PayPal sandbox, with fictitious money.",
+      "live": "Live mode: calls from your shop's app with an API key use your live PayPal app and move real money. The test pages and the evaluation stay on the sandbox."
+    },
+    "failClosed": "Live mode is turned on, but this server runs in test mode because {reason}. Every call uses the sandbox.",
+    "reasons": {
+      "server": "it doesn't allow live mode (ALLOW_LIVE_MODE is not true)",
+      "app": "the live app's client ID or secret is missing or can't be read"
+    },
+    "disabled": {
+      "server": "This server doesn't allow live mode",
+      "app": "Save the live app's client ID and secret first.",
+      "locked": "Settings are read-only on this server (SETTINGS_LOCKED)."
+    },
+    "howBack": "To switch back, press Test: it takes effect at once.",
+    "dashboardNote": "The dashboard always reads the sandbox account; live dashboard data is on the roadmap.",
+    "dialog": {
+      "title": "Turn on live mode?",
+      "warning": "Live mode moves real money.",
+      "money": "Refunds, cancellations, dispute acceptances, invoices and orders the guard lets through run on your live PayPal account, with real money.",
+      "scope": "Only calls from your shop's app with an API key use it. The test pages (Support, Billing, Sales) and the evaluation stay on the sandbox.",
+      "check": "Before switching, the guard asks live PayPal for a token with your live app's credentials.",
+      "back": "To switch back, press Test in this section: it takes effect at once.",
+      "confirmLabel": "Type {word} to confirm",
+      "confirm": "Turn on live mode",
+      "cancel": "Cancel",
+      "checking": "Checking with PayPal…"
+    },
+    "errors": {
+      "locked": "Settings are read-only on this server (SETTINGS_LOCKED).",
+      "server": "This server doesn't allow live mode",
+      "app": "Save the live app's client ID and secret first.",
+      "confirmation": "Type {word} exactly to confirm.",
+      "check": "Live PayPal didn't accept the live app, so test mode stays on: {detail}",
+      "unreadable": "The saved settings could not be read, so nothing was changed. Try again in a moment."
     }
   }
 }

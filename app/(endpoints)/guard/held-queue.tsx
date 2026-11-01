@@ -8,7 +8,8 @@ import { useTranslations } from 'next-intl';
 import { Spinner } from '../../ui/desk';
 import { decideHeldAction } from './actions';
 
-export type HeldCall = { id: string; at: string; customer: string; codes: string[]; reasons: string } & (
+// `environment`: a live hold runs on live PayPal, with real money, once approved.
+export type HeldCall = { id: string; at: string; customer: string; codes: string[]; reasons: string; environment?: 'sandbox' | 'live' } & (
   | { kind: 'refund'; amount: string; captureId: string }
   | { kind: 'cancellation'; subscriptionId: string }
   | { kind: 'dispute'; disputeId: string }
@@ -91,6 +92,9 @@ function HeldItem({ held, action, pending }: { held: HeldCall; action: (form: Fo
             {atUtc(held.at)}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            {held.environment === 'live' && (
+              <span className="rounded-[3px] border border-pp-danger/40 bg-pp-danger-tint px-2 py-0.5 text-xs font-semibold text-pp-danger">{t('live')}</span>
+            )}
             {[...new Set(held.codes)].map((code) => (
               <span key={code} className="rounded-[3px] border border-pp-warning/40 bg-pp-warning-tint px-2 py-0.5 text-xs font-semibold text-pp-warning">
                 {WHY[code] ? t(`reasons.${WHY[code]}`) : code}

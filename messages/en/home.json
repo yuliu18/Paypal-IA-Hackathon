@@ -89,6 +89,12 @@
     "paypal": "PayPal",
     "sandbox": "Sandbox, fictitious money",
     "noCredentials": "No app credentials yet",
-    "change": "Change the rules"
+    "change": "Change the rules",
+    "live": "Live: real money for your shop's app"
+  },
+  "liveMode": {
+    "on": "Live mode is on: calls from your shop's app move real money.",
+    "failClosed": "Live mode is turned on, but this server runs in test mode: every call uses the sandbox.",
+    "settings": "Mode settings"
   }
 }
