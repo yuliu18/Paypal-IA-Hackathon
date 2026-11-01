@@ -47,6 +47,16 @@ Without `DATABASE_URL` the guard keeps its black box in `data/guard-audit.db` (S
 
 Setting `SETTINGS_FILE` keeps the settings in that file even when `DATABASE_URL` is set.
 
+**Any Postgres works**, not only Neon: the app speaks plain Postgres through [`pg`](https://node-postgres.com) and was checked with `npm run db:probe` against a non-Neon server. Pick one:
+
+| Where | `DATABASE_URL` |
+|---|---|
+| Nothing (local) | unset: SQLite file and `data/settings.json` |
+| Docker (local) | `docker compose up -d` with the repo's [`docker-compose.yml`](docker-compose.yml), then `postgres://guard:guard@localhost:5432/payment_guard` |
+| Neon, Supabase, RDS, Render Postgres, your own server | that provider's connection string (`sslmode=require` is upgraded to full certificate checks) |
+
+Only the **owner login** ties you to Neon: Neon Auth keeps its users in the Neon database (schema `neon_auth`), and the app finds the owner there, so with owner login `DATABASE_URL` must be that Neon database (see [Sign-in](#sign-in)). With any other Postgres, or none, the app is protected by `DEMO_PASSWORD` instead. [`neon.ts`](neon.ts) is only read by the `neon` CLI.
+
 **On Render:** build command `npm ci && npm run build && npm run db:migrate`, start command `npm run start`. Set `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) in the service's environment, and `SETTINGS_SECRET` (16+ characters) so saved keys are encrypted with a key that is not stored in the same database.
 
 ## Sign-in

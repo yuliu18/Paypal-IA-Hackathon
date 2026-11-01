@@ -4,7 +4,8 @@ From a fresh clone to your shop's own app calling the guarded agents, first on t
 
 ## 1. Deploy it
 
-1. **Database and login.** Create a free [Neon](https://neon.com) project with Postgres and Neon Auth (`neon init`, then `neon deploy`; [`neon.ts`](../neon.ts) already asks for both). It writes `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and `NEON_AUTH_BASE_URL` to `.env.local`.
+1. **Database.** Any Postgres: your own server, a hosted one, or locally `docker compose up -d` ([`docker-compose.yml`](../docker-compose.yml)). Put its connection string in `DATABASE_URL`. Without one, the app keeps its data in local files (development only).
+   **Login.** The owner account uses Neon Auth: create a free [Neon](https://neon.com) project with Auth (`neon init`, then `neon deploy`; [`neon.ts`](../neon.ts) asks for it), which writes `NEON_AUTH_BASE_URL` and that project's `DATABASE_URL`: Neon Auth keeps the owner's account in the same database, so with owner login the data lives in Neon too. With another Postgres, set `DEMO_PASSWORD` instead: one shared password protects the whole app.
 2. **Environment.** `cp env.example .env.local` and fill in what is left: `NEON_AUTH_COOKIE_SECRET` (`openssl rand -base64 32`), `SETTINGS_SECRET` (16+ random characters), `APP_URL`. Nothing else goes in the environment; the rest is set in the app.
 3. **Host.** On Render (or any Node 24 host): build `npm ci && npm run build && npm run db:migrate`, start `npm run start`, and the same variables in the service's environment. Then trust the site at Neon Auth: `neon neon-auth domain add https://your-app.onrender.com`.
 4. **Owner.** Open the site: `/login` offers **Create the owner account** once. Then close sign-up: `neon neon-auth config email-password update --disable-sign-up true`.

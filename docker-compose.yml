@@ -1,0 +1,24 @@
+# A local Postgres for Payment Guard, as an alternative to Neon or any hosted Postgres.
+#   docker compose up -d
+#   DATABASE_URL=postgres://guard:guard@localhost:5432/payment_guard   (in .env.local)
+#   npm run db:migrate
+# Data persists in the named volume until `docker compose down -v`. Local development only:
+# change the password before exposing it anywhere.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: guard
+      POSTGRES_PASSWORD: guard
+      POSTGRES_DB: payment_guard
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - payment-guard-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guard -d payment_guard"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  payment-guard-db:
