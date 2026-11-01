@@ -8,7 +8,9 @@ import type { AuditLog, PaymentEnvironment } from '@/lib/guard/ports';
 import { appBase, demoClient, type DemoDeps } from '@/lib/demo-paypal-client';
 
 export const SALES_RETURN_PATH = '/api/sales/paypal-return';
-export const SALES_CANCEL_PATH = '/sales?order=cancelled';
+// Where the buyer lands, paid or not: a public page (app/checkout), since buyers never sign in.
+export const CHECKOUT_RESULT_PATH = '/checkout';
+export const SALES_CANCEL_PATH = `${CHECKOUT_RESULT_PATH}?order=cancelled`;
 
 // The shop's origin, the only place the guard lets an order send the buyer back to: APP_URL, else
 // the local dev server, as the sample payments' return links (lib/demo-paypal-client.ts appBase).

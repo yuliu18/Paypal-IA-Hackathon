@@ -11,7 +11,7 @@ describe('isPublicRequest', () => {
   });
 
   it('keeps every other page and API route behind the session', () => {
-    for (const pathname of ['/', '/guard', '/settings', '/sales', '/api/guard/export', '/api/sales/paypal-return', '/login-other', '/api/auth', '/api/auth/get-session', '/auth/sign-in']) {
+    for (const pathname of ['/', '/guard', '/settings', '/sales', '/api/guard/export', '/login-other', '/api/auth', '/api/auth/get-session', '/auth/sign-in']) {
       expect(isPublicRequest({ method: 'GET', pathname })).toBe(false);
       expect(isPublicRequest({ method: 'POST', pathname })).toBe(false);
     }
@@ -51,6 +51,21 @@ describe('isPublicRequest for password recovery', () => {
   it('refuses a Server Action call on them', () => {
     expect(isPublicRequest({ method: 'GET', pathname: '/login/forgot', serverAction: true })).toBe(false);
     expect(isPublicRequest({ method: 'POST', pathname: '/api/auth/reset', serverAction: true })).toBe(false);
+  });
+});
+
+describe('isPublicRequest for a buyer back from PayPal', () => {
+  it('opens the checkout capture and its result page to buyers, who never sign in (read only)', () => {
+    for (const pathname of ['/api/sales/paypal-return', '/checkout']) {
+      expect(isPublicRequest({ method: 'GET', pathname })).toBe(true);
+      expect(isPublicRequest({ method: 'POST', pathname })).toBe(false);
+    }
+  });
+
+  it('opens nothing else around them, and not the sample dispute payment return', () => {
+    for (const pathname of ['/api/sales/paypal-return/x', '/api/sales/chats', '/checkout/x', '/api/support/paypal-return', '/sales']) {
+      expect(isPublicRequest({ method: 'GET', pathname })).toBe(false);
+    }
   });
 });
 

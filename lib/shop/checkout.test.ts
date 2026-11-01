@@ -49,10 +49,10 @@ describe('shopOrigin', () => {
 });
 
 describe('checkoutUrls', () => {
-  it('sends the buyer back to the shop’s return route after approving, and to /sales when cancelling', () => {
+  it('sends the buyer back to the shop’s return route after approving, and to the public /checkout page when cancelling', () => {
     expect(checkoutUrls('https://shop.example')).toEqual({
       returnUrl: 'https://shop.example/api/sales/paypal-return',
-      cancelUrl: 'https://shop.example/sales?order=cancelled',
+      cancelUrl: 'https://shop.example/checkout?order=cancelled',
     });
   });
 });

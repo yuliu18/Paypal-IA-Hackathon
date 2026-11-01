@@ -105,5 +105,11 @@
       "hugeQuantity": "Huge quantity",
       "returnLink": "Return link elsewhere"
     }
+  },
+  "checkout": {
+    "title": "Your PayPal payment",
+    "none": "There is no payment to show here.",
+    "close": "You can close this page.",
+    "back": "Back to the sales desk"
   }
 }

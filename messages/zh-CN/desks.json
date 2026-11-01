@@ -105,5 +105,11 @@
       "hugeQuantity": "超大数量",
       "returnLink": "返回链接指向别处"
     }
+  },
+  "checkout": {
+    "title": "您的 PayPal 付款",
+    "none": "这里没有可显示的付款。",
+    "close": "您可以关闭此页面。",
+    "back": "返回销售台"
   }
 }

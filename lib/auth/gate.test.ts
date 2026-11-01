@@ -79,9 +79,10 @@ describe('gate with Neon Auth', () => {
     expect(response.headers.get('set-cookie')).toContain('__Secure-neon-auth.session_token=new');
   });
 
-  it('keeps the PayPal return route behind the session, as it was behind the demo password', async () => {
-    expect((await gate(request('/api/sales/paypal-return?token=X'), deps())).status).toBe(401);
-    expect(passedThrough(await gate(request('/api/sales/paypal-return?token=X'), deps({ session: async () => ({ userId: 'owner-1', cookies: [] }) })))).toBe(true);
+  it('lets a buyer back from PayPal reach the capture route and its result page without signing in', async () => {
+    expect(passedThrough(await gate(request('/api/sales/paypal-return?token=X'), deps()))).toBe(true);
+    expect(passedThrough(await gate(request('/checkout?paid=ok'), deps()))).toBe(true);
+    expect((await gate(request('/api/support/paypal-return?token=X'), deps())).status).not.toBe(200);
   });
 
   it('refuses a signed-in account that is not the owner', async () => {

@@ -4,7 +4,9 @@
 // signing out, asking for a reset code and resetting the password are plain form posts to their
 // own endpoints (app/api/auth/*). Paths match exactly, nothing below them. Server Actions are never
 // public: their ids are global, so any public path that accepted them would run any action in the app.
-const PUBLIC_PAGES = ['/login', '/login/forgot', '/login/reset'];
+// A buyer coming back from PayPal's checkout never signs in: the capture route (it captures only an
+// order the guard created and bound, once the buyer approved it on PayPal) and its result page.
+const PUBLIC_PAGES = ['/login', '/login/forgot', '/login/reset', '/api/sales/paypal-return', '/checkout'];
 const PUBLIC_POSTS = ['/api/auth/sign-in', '/api/auth/owner', '/api/auth/sign-out', '/api/auth/forgot', '/api/auth/reset'];
 
 export function isPublicRequest({ method, pathname, serverAction = false }: { method: string; pathname: string; serverAction?: boolean }): boolean {

@@ -73,7 +73,7 @@ export function AppNav({ signOut = false }: { signOut?: boolean }) {
   const active = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   // Labels hide only from md up: the small-screen top bar always shows them.
   const label = compact ? 'md:sr-only' : '';
-  if (pathname === '/login' || pathname.startsWith('/login/')) return null;
+  if (pathname === '/login' || pathname.startsWith('/login/') || pathname === '/checkout') return null;
   return (
     <nav
       className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-surface px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto [scrollbar-color:var(--pp-border)_transparent] [scrollbar-width:thin] md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}

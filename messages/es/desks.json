@@ -105,5 +105,11 @@
       "hugeQuantity": "Cantidad enorme",
       "returnLink": "Enlace de vuelta a otro sitio"
     }
+  },
+  "checkout": {
+    "title": "Tu pago con PayPal",
+    "none": "No hay ningún pago que mostrar aquí.",
+    "close": "Ya puedes cerrar esta página.",
+    "back": "Volver al agente de ventas"
   }
 }

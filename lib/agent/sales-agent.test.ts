@@ -77,7 +77,7 @@ describe('runSalesAgent', () => {
     expect(system).toContain('shippingCost 0');
     expect(system).toMatch(/itemTotal.*itemCost × quantity/);
     expect(system).toContain('"returnUrl": "https://shop.example/api/sales/paypal-return"');
-    expect(system).toContain('"cancelUrl": "https://shop.example/sales?order=cancelled"');
+    expect(system).toContain('"cancelUrl": "https://shop.example/checkout?order=cancelled"');
     expect(system).toMatch(/one order/i);
   });
 
