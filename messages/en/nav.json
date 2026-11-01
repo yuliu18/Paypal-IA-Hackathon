@@ -15,5 +15,6 @@
     "sales": "Sales",
     "evaluate": "Evaluate a model",
     "settings": "Settings"
-  }
+  },
+  "signOut": "Sign out"
 }

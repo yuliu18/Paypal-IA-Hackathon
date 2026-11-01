@@ -3,6 +3,7 @@ import { Geist_Mono, Schibsted_Grotesk } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import "./globals.css";
+import { authMode } from "@/lib/auth/config";
 import { AppNav } from "./app-nav";
 
 // The interface's one typeface; Geist Mono is kept for PayPal ids.
@@ -41,7 +42,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             append to <body> can never stretch the page and leave a gap below the menu. */}
         <NextIntlClientProvider>
           <div className="flex h-dvh flex-col md:flex-row">
-            <AppNav />
+            <AppNav signOut={authMode().kind === "neon"} />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
           </div>
         </NextIntlClientProvider>

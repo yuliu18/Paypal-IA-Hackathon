@@ -15,5 +15,6 @@
     "sales": "Ventas",
     "evaluate": "Evaluar un modelo",
     "settings": "Ajustes"
-  }
+  },
+  "signOut": "Cerrar sesión"
 }

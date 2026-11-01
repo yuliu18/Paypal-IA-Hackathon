@@ -1,7 +1,7 @@
 // The interface's text, one JSON file per area of the app under messages/<locale>/<area>.json, so
 // each area can be translated on its own. A message keeps its area as namespace:
 // messages/es/nav.json → t('nav.…') / useTranslations('nav').
-export const MESSAGE_AREAS = ['common', 'nav', 'settings', 'home', 'desks', 'guard', 'evaluate', 'dashboard'] as const;
+export const MESSAGE_AREAS = ['common', 'nav', 'settings', 'home', 'desks', 'guard', 'evaluate', 'dashboard', 'auth'] as const;
 
 export type Messages = { [key: string]: string | Messages };
 

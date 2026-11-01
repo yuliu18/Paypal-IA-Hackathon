@@ -15,5 +15,6 @@
     "sales": "销售",
     "evaluate": "评估模型",
     "settings": "设置"
-  }
+  },
+  "signOut": "退出登录"
 }

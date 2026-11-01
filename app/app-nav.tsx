@@ -24,6 +24,7 @@ const Icons = {
   check: <path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />,
   collapse: <path d="M15 6l-6 6 6 6" />,
   expand: <path d="M9 6l6 6-6 6" />,
+  signOut: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
   gear: <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0-5v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />,
 };
 
@@ -58,7 +59,9 @@ const Icon = ({ name }: { name: keyof typeof Icons }) => (
   </svg>
 );
 
-export function AppNav() {
+// `signOut`: the owner signed in with Neon Auth, so the menu ends with a "Sign out" button. With
+// the demo password (HTTP Basic) there is nothing to sign out of. The login page has no menu.
+export function AppNav({ signOut = false }: { signOut?: boolean }) {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const onDashboard = pathname.startsWith('/dashboard');
@@ -70,6 +73,7 @@ export function AppNav() {
   const active = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   // Labels hide only from md up: the small-screen top bar always shows them.
   const label = compact ? 'md:sr-only' : '';
+  if (pathname === '/login') return null;
   return (
     <nav
       className={`flex shrink-0 gap-1 overflow-x-auto border-b border-pp-border bg-pp-surface px-3 py-2 font-paypal text-sm md:h-full md:flex-col md:overflow-y-auto [scrollbar-color:var(--pp-border)_transparent] [scrollbar-width:thin] md:border-r md:border-b-0 md:py-5 ${compact ? 'md:w-16 md:px-2' : 'md:w-60 md:px-3'}`}
@@ -127,6 +131,18 @@ export function AppNav() {
           )}
         </div>
       ))}
+      {signOut && (
+        <form method="post" action="/api/auth/sign-out" className="flex shrink-0 md:mt-auto md:border-t md:border-pp-border md:pt-3">
+          <button
+            type="submit"
+            title={compact ? t('signOut') : undefined}
+            className={`flex w-full shrink-0 items-center gap-2.5 rounded px-2 py-1.5 text-pp-ink hover:bg-pp-canvas ${compact ? 'md:justify-center md:py-2' : ''}`}
+          >
+            <Icon name="signOut" />
+            <span className={label}>{t('signOut')}</span>
+          </button>
+        </form>
+      )}
     </nav>
   );
 }
