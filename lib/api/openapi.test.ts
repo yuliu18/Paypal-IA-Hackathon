@@ -23,6 +23,12 @@ describe('openApiDocument', () => {
     expect(request.properties.agent).toMatchObject({ enum: ['careful', 'vulnerable'], default: 'careful' });
   });
 
+  it('tells the caller which PayPal environment ran, with the reply for the customer and the steps for the shop', () => {
+    const result = doc.components.schemas.AgentResult;
+    expect(result.required).toEqual(['reply', 'steps', 'redacted', 'environment']);
+    expect(result.properties.environment).toMatchObject({ enum: ['sandbox', 'live'] });
+  });
+
   it('documents the answers every endpoint can give', () => {
     for (const path of API_KEY_ROUTES) expect(Object.keys(paths[path].post.responses)).toEqual(['200', '400', '401', '429', '502']);
   });

@@ -28,7 +28,7 @@ describe('POST /api/sales/chats', () => {
     const res = await post({ ...chat, agent: 'vulnerable' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: 'Pay here', steps: [] });
+    expect(await res.json()).toEqual({ reply: 'Pay here', steps: [], environment: 'sandbox' });
     expect(handleSalesChat).toHaveBeenCalledWith(chat, 'vulnerable', { shopOrigin: shopOrigin(), environment: 'sandbox' });
     expect(shopOrigin()).not.toBe('https://shop.example');
   });
@@ -89,7 +89,9 @@ describe('the PayPal environment of api/sales/chats', () => {
     vi.stubEnv('ALLOW_LIVE_MODE', 'true');
     settings = LIVE;
     handleSalesChat.mockResolvedValue({ reply: 'Done', steps: [] });
-    expect((await send('careful', apiKey, '10.9.0.2')).status).toBe(200);
+    const res = await send('careful', apiKey, '10.9.0.2');
+    expect(res.status).toBe(200);
+    expect((await res.json()).environment).toBe('live');
     expect(handleSalesChat.mock.calls[0]).toEqual([{ customerEmail: 'ana@example.com', message: 'Two mug sets.' }, 'careful', { shopOrigin: shopOrigin(), environment: 'live' }]);
   });
 

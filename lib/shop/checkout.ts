@@ -80,3 +80,27 @@ export async function checkoutEnvironment(orderId: string, records: GuardOrderRe
   if (!liveActive || !ORDER_ID.test(orderId)) return 'sandbox';
   return (await records.boundOrderCustomer(orderId, 'live')) ? 'live' : 'sandbox';
 }
+
+export type ConfirmedSale = { orderId: string; amount: string };
+
+// What the public /checkout page may say about `orderId`: paid, with PayPal's amount, only when the
+// guard's log records creating it for a customer, PayPal names that customer and calls the order
+// COMPLETED. Never the link's own words, which anyone can write. Undefined for anything else,
+// including an unreadable log or PayPal (the page then confirms nothing). The guard's log decides
+// the environment, as for the capture (`deps.environment`; the sandbox by default).
+export async function confirmedSale(orderId: string, records: GuardOrderRecords, deps: DemoDeps = {}): Promise<ConfirmedSale | undefined> {
+  if (!ORDER_ID.test(orderId)) return undefined;
+  const environment: PaymentEnvironment = deps.environment === 'live' ? 'live' : 'sandbox';
+  try {
+    const boundTo = await records.boundOrderCustomer(orderId, environment);
+    if (!boundTo) return undefined;
+    const order = await demoClient({ ...deps, environment }).call<Order>('GET', `/v2/checkout/orders/${orderId}`);
+    const units = order.purchase_units ?? [];
+    if (order.status !== 'COMPLETED' || units.length !== 1 || units[0].custom_id !== boundTo) return undefined;
+    const amount = units[0].amount;
+    return { orderId, amount: `${amount?.value ?? '?'} ${amount?.currency_code ?? ''}`.trim() };
+  } catch (error) {
+    console.error('The checkout result could not be confirmed', error);
+    return undefined;
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkoutEnvironment, checkoutUrls, completeSalesOrder, shopOrigin } from './checkout';
+import { checkoutEnvironment, checkoutUrls, completeSalesOrder, confirmedSale, shopOrigin } from './checkout';
 
 type Sent = { method: string; path: string; body?: unknown };
 
@@ -159,5 +159,37 @@ describe('the PayPal environment of a checkout', () => {
     expect(await checkoutEnvironment(ORDER, boundIn('live').records, { liveActive: true })).toBe('live');
     expect(await checkoutEnvironment(ORDER, boundIn('live').records, { liveActive: false })).toBe('sandbox');
     expect(await checkoutEnvironment(ORDER, boundIn('sandbox').records, { liveActive: true })).toBe('sandbox');
+  });
+});
+
+describe('confirmedSale', () => {
+  it('reports a paid order with the amount PayPal states, for an order the guard created', async () => {
+    const { fetch, sent } = fakePayPal({ [`GET ${PATH}`]: () => order('COMPLETED', 'ana@example.com') });
+    expect(await confirmedSale(ORDER, records, { fetch, token })).toEqual({ orderId: ORDER, amount: '99.98 USD' });
+    expect(sent).toEqual([{ method: 'GET', path: PATH, body: undefined }]);
+  });
+
+  it('confirms nothing for an order PayPal has not completed', async () => {
+    const { fetch } = fakePayPal({ [`GET ${PATH}`]: () => order('APPROVED', 'ana@example.com') });
+    expect(await confirmedSale(ORDER, records, { fetch, token })).toBeUndefined();
+  });
+
+  it('never asks PayPal about an order the guard did not create, or a malformed id', async () => {
+    const { fetch, sent } = fakePayPal({});
+    expect(await confirmedSale('9XX00000000000000', records, { fetch, token })).toBeUndefined();
+    expect(await confirmedSale('../evil', records, { fetch, token })).toBeUndefined();
+    expect(sent).toEqual([]);
+  });
+
+  it('confirms nothing when PayPal names another customer on the order', async () => {
+    const { fetch } = fakePayPal({ [`GET ${PATH}`]: () => order('COMPLETED', 'carla@example.com') });
+    expect(await confirmedSale(ORDER, records, { fetch, token })).toBeUndefined();
+  });
+
+  it('confirms nothing when the log or PayPal cannot be read', async () => {
+    const broken = { boundOrderCustomer: async () => { throw new Error('db down'); } };
+    const { fetch } = fakePayPal({ [`GET ${PATH}`]: () => ({ status: 500, json: {} }) });
+    expect(await confirmedSale(ORDER, broken, { fetch, token })).toBeUndefined();
+    expect(await confirmedSale(ORDER, records, { fetch, token })).toBeUndefined();
   });
 });

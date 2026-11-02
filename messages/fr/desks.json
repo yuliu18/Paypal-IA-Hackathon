@@ -110,6 +110,6 @@
     "title": "Votre paiement PayPal",
     "none": "Aucun paiement à afficher ici.",
     "close": "Vous pouvez fermer cette page.",
-    "back": "Retour au poste des ventes"
+    "unconfirmed": "Nous n'avons pas encore pu confirmer le paiement de cette commande. Si vous venez de payer, rechargez cette page dans un instant."
   }
 }

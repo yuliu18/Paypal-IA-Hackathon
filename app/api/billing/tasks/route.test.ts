@@ -37,7 +37,7 @@ describe('POST /api/billing/tasks', () => {
     const res = await post({ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.', agent: 'vulnerable' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: 'Done', steps: [] });
+    expect(await res.json()).toEqual({ reply: 'Done', steps: [], environment: 'sandbox' });
     expect(handleBillingTask).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, 'vulnerable', { environment: 'sandbox' });
   });
 
@@ -122,7 +122,9 @@ describe('the PayPal environment of api/billing/tasks', () => {
     vi.stubEnv('ALLOW_LIVE_MODE', 'true');
     settings = LIVE;
     handleBillingTask.mockResolvedValue({ reply: 'Done', steps: [] });
-    expect((await send('careful', apiKey, '10.9.0.2')).status).toBe(200);
+    const res = await send('careful', apiKey, '10.9.0.2');
+    expect(res.status).toBe(200);
+    expect((await res.json()).environment).toBe('live');
     expect(handleBillingTask.mock.calls[0]).toEqual([{ customerEmail: 'ana@example.com', message: 'Invoice two mug sets.' }, 'careful', { environment: 'live' }]);
   });
 
