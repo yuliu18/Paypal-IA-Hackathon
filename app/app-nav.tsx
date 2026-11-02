@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Fragment, Suspense, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { setNavSlot } from './nav-slot';
 import { SettingsNav } from './settings/settings-nav';
@@ -112,25 +112,25 @@ export function AppNav({ signOut = false }: { signOut?: boolean }) {
             </p>
           )}
           {section.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={compact ? t(item.label) : undefined}
-              aria-current={active(item.href) ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-2.5 rounded px-2 py-1.5 ${compact ? 'md:justify-center md:py-2' : ''} ${active(item.href) ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-canvas'}`}
-            >
-              <Icon name={item.icon} />
-              <span className={label}>{t(item.label)}</span>
-            </Link>
+            // Each sub-menu sits right under its own item: Settings' sections, the dashboard's reports.
+            <Fragment key={item.href}>
+              <Link
+                href={item.href}
+                title={compact ? t(item.label) : undefined}
+                aria-current={active(item.href) ? 'page' : undefined}
+                className={`flex shrink-0 items-center gap-2.5 rounded px-2 py-1.5 ${compact ? 'md:justify-center md:py-2' : ''} ${active(item.href) ? 'bg-pp-highlight font-semibold text-pp-blue' : 'text-pp-ink hover:bg-pp-canvas'}`}
+              >
+                <Icon name={item.icon} />
+                <span className={label}>{t(item.label)}</span>
+              </Link>
+              {item.href === '/settings' && onSettings && !compact && (
+                <Suspense fallback={null}>
+                  <SettingsNav />
+                </Suspense>
+              )}
+              {item.href === '/dashboard' && onDashboard && !compact && <div ref={setNavSlot} className="hidden md:block" />}
+            </Fragment>
           ))}
-          {section.items.some((item) => item.href === '/settings') && onSettings && !compact && (
-            <Suspense fallback={null}>
-              <SettingsNav />
-            </Suspense>
-          )}
-          {section.items.some((item) => item.href === '/dashboard') && onDashboard && !compact && (
-            <div ref={setNavSlot} className="hidden md:block" />
-          )}
         </div>
       ))}
       {signOut && (

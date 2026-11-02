@@ -90,7 +90,7 @@ export function ApiKeysSection({ hidden, view, locked }: { hidden: boolean; view
           <span className="mb-1 block font-semibold text-pp-ink">{t('name')}</span>
           <input name="name" required maxLength={60} autoComplete="off" placeholder={t('namePlaceholder')} disabled={disabled} className={input} />
         </label>
-        <button type="submit" disabled={disabled || creating} className={`${primaryButton} shrink-0`}>
+        <button type="submit" disabled={disabled || creating} className={`${primaryButton} h-10 shrink-0 sm:self-end`}>
           {creating && <Spinner />}
           {creating ? t('creating') : t('create')}
         </button>
