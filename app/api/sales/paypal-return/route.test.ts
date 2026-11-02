@@ -29,7 +29,7 @@ describe('GET /api/sales/paypal-return', () => {
 
     expect(completeSalesOrder).toHaveBeenCalledWith('5O190127TN364715T', audit, { environment: 'sandbox' });
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('https://shop.example/checkout?order=5O190127TN364715T');
+    expect(res.headers.get('location')).toBe('/checkout?order=5O190127TN364715T');
   });
 
   it('goes to /checkout with a failure notice when the order could not be captured, details in the server log', async () => {
@@ -39,7 +39,7 @@ describe('GET /api/sales/paypal-return', () => {
     const res = await back('X');
 
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('https://shop.example/checkout?paid=failed');
+    expect(res.headers.get('location')).toBe('/checkout?paid=failed');
     expect(log).toHaveBeenCalledWith('Sales order could not be captured', expect.any(Error));
   });
 });
