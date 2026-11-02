@@ -17,9 +17,9 @@ export async function GET(request: NextRequest) {
     // Live PayPal only for an order the guard created live, while live mode is on.
     const environment = await checkoutEnvironment(orderId, log, { liveActive: liveModeStatus(await loadSettings()).active });
     const sale = await completeSalesOrder(orderId, log, { environment });
-    back.searchParams.set('paid', 'ok');
+    // Only the order id: /checkout asks the guard's log and PayPal whether it is paid, so a link
+    // that merely says "paid" proves nothing.
     back.searchParams.set('order', sale.orderId);
-    back.searchParams.set('amount', sale.amount);
   } catch (error) {
     // Details stay in the server log, as in the other demo routes.
     console.error('Sales order could not be captured', error);

@@ -110,6 +110,6 @@
     "title": "Your PayPal payment",
     "none": "There is no payment to show here.",
     "close": "You can close this page.",
-    "back": "Back to the sales desk"
+    "unconfirmed": "We could not confirm a payment for this order yet. If you just paid, reload this page in a moment."
   }
 }

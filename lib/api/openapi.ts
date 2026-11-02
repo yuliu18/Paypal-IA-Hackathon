@@ -107,10 +107,22 @@ export function openApiDocument(serverUrl?: string) {
         },
         AgentResult: {
           type: 'object',
-          required: ['reply', 'steps', 'redacted'],
+          required: ['reply', 'steps', 'redacted', 'environment'],
           properties: {
-            reply: { type: 'string', description: 'The agent’s answer to the customer, without other people’s data.' },
-            steps: { type: 'array', items: { $ref: '#/components/schemas/AgentStep' } },
+            reply: {
+              type: 'string',
+              description: 'The text to show your customer: the agent’s answer, without other people’s data. For a sale it carries the PayPal link where the buyer pays.',
+            },
+            steps: {
+              type: 'array',
+              description: 'For your logs and support staff, not for the customer: each PayPal call the agent tried and what the guard answered. The same decisions are in the guard log at /guard.',
+              items: { $ref: '#/components/schemas/AgentStep' },
+            },
+            environment: {
+              type: 'string',
+              enum: ['sandbox', 'live'],
+              description: 'Where the PayPal calls ran: `live` moved real money, `sandbox` only test money. A key request runs on the sandbox whenever live mode is not fully on, so check this before telling a customer a refund or payment is real.',
+            },
             redacted: {
               type: 'object',
               required: ['ticket', 'reply'],

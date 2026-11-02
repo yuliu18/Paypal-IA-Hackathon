@@ -37,7 +37,7 @@ describe('POST /api/support/tickets', () => {
     const res = await post({ customerEmail: 'ana@example.com', message: 'Broken mug.', agent: 'vulnerable' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: 'Done', steps: [] });
+    expect(await res.json()).toEqual({ reply: 'Done', steps: [], environment: 'sandbox' });
     expect(handleTicket).toHaveBeenCalledWith({ customerEmail: 'ana@example.com', message: 'Broken mug.' }, 'vulnerable', { environment: 'sandbox' });
   });
 
@@ -112,7 +112,9 @@ describe('the PayPal environment of api/support/tickets', () => {
     vi.stubEnv('ALLOW_LIVE_MODE', 'true');
     settings = LIVE;
     handleTicket.mockResolvedValue({ reply: 'Done', steps: [] });
-    expect((await send('careful', apiKey, '10.9.0.2')).status).toBe(200);
+    const res = await send('careful', apiKey, '10.9.0.2');
+    expect(res.status).toBe(200);
+    expect((await res.json()).environment).toBe('live');
     expect(handleTicket.mock.calls[0]).toEqual([{ customerEmail: 'ana@example.com', message: 'Broken mug.' }, 'careful', { environment: 'live' }]);
   });
 

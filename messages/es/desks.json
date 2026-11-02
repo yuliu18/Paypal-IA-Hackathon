@@ -110,6 +110,6 @@
     "title": "Tu pago con PayPal",
     "none": "No hay ningún pago que mostrar aquí.",
     "close": "Ya puedes cerrar esta página.",
-    "back": "Volver al agente de ventas"
+    "unconfirmed": "Aún no hemos podido confirmar el pago de este pedido. Si acabas de pagar, recarga esta página en un momento."
   }
 }

@@ -55,7 +55,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    return Response.json(await handleTicket({ customerEmail, message }, agent, { environment }));
+    // `environment` tells the caller whether real money could move (live) or only test money.
+    return Response.json({ ...(await handleTicket({ customerEmail, message }, agent, { environment })), environment });
   } catch (cause) {
     // The cause can carry provider responses or configuration names, so it stays in the server log.
     console.error('Support agent failed', cause);
