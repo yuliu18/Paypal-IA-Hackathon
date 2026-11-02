@@ -2,7 +2,7 @@
 // client within a window, a cap on one client's tickets running at the same time, and a cap on
 // all tickets running at the same time. It sits in front of the agent; the payment guard behind
 // it protects the money, this protects the bill. Kept in memory: one server process, like
-// lib/demo-auth.ts FailedAttempts.
+// lib/auth/failed-attempts.ts FailedAttempts.
 
 // How long a client turned away for a busy agent should wait before trying again.
 const BUSY_RETRY_MS = 5_000;

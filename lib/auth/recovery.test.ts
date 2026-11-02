@@ -1,6 +1,6 @@
 import { AccountLockout } from './account-lockout';
 import { describe, expect, it, vi } from 'vitest';
-import { FailedAttempts } from '@/lib/demo-auth';
+import { FailedAttempts } from '@/lib/auth/failed-attempts';
 import { CodeThrottle, requestResetCode, resetOwnerPassword, type ForgotDeps, type ResetDeps } from './recovery';
 
 const OWNER = 'owner@shop.example';

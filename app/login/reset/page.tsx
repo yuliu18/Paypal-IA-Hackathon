@@ -16,10 +16,10 @@ type ErrorCode = (typeof ERRORS)[number];
 const isErrorCode = (value: unknown): value is ErrorCode => ERRORS.includes(value as ErrorCode);
 
 // The emailed code and a new password replace the owner's password (app/api/auth/reset). Only with
-// Neon Auth; with the demo password there is no account to recover.
+// Neon Auth; the built-in owner account is recovered on the server (npm run owner:reset).
 export default async function ResetPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
-  if (authMode().kind !== 'neon') redirect('/');
+  if (authMode().kind !== 'neon') redirect('/login');
   const t = await getTranslations('auth');
   const params = await searchParams;
   const error = first(params.error);

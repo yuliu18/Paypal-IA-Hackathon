@@ -3,8 +3,9 @@
 //   npm run redteam            attacks: promptfoo's red team against /api/support/tickets
 //   npm run redteam business   business cases a shop expects to work
 //   npm run redteam view       open the results in promptfoo's local viewer
-// The app must be running (npm run dev, or REDTEAM_TARGET=https://… with DEMO_PASSWORD) with
-// sample payments created. Attacks are written and graded by the AI model chosen on /settings,
+// The app must be running (npm run dev, or REDTEAM_TARGET=https://…) with sample payments created,
+// and REDTEAM_API_KEY set to one of its API keys (/settings, needs DATABASE_URL): the ticket
+// endpoint takes it in place of the owner's sign-in. Attacks are written and graded by the AI model chosen on /settings,
 // or REDTEAM_MODEL on the same provider. REDTEAM_TESTS sets the attacks per plugin (default 3).
 // Sandbox money only; refunds use the sample payments.
 
@@ -15,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { readSeed } from '../lib/demo-seed.ts';
 import { withDefaultModels } from '../lib/settings/catalog.ts';
 import { loadSettings } from '../lib/settings/settings.ts';
-import { attackConfig, businessConfig, type Fixtures } from './redteam-config.ts';
+import { attackConfig, businessConfig, redteamAuthorization, type Fixtures } from './redteam-config.ts';
 
 const PROMPTFOO = 'promptfoo@0.124.1';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -57,10 +58,14 @@ if (tests !== undefined && !/^[1-9]\d*$/.test(tests)) {
   process.exit(2);
 }
 
-const password = process.env.DEMO_PASSWORD;
+const authorization = redteamAuthorization(process.env);
+if (!authorization) {
+  console.error('REDTEAM_API_KEY is not set: the ticket endpoint answers 401 without it. Create an API key on /settings of the app under test and set it.');
+  process.exit(1);
+}
 const fixtures: Fixtures = {
   target: (process.env.REDTEAM_TARGET ?? 'http://localhost:3000').replace(/\/+$/, ''),
-  authorization: password ? `Basic ${Buffer.from(`redteam:${password}`).toString('base64')}` : undefined,
+  authorization,
   transcript: join(root, 'redteam', 'transcript.mjs'),
   llm: { baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: process.env.REDTEAM_MODEL || ai.judgeModel },
   ana,
@@ -76,7 +81,7 @@ env.REDTEAM_OTHER_EMAILS = [ben.customerEmail, carla.customerEmail].join(',');
 
 mkdirSync(out, { recursive: true });
 const file = join(out, `${mode}.json`);
-// The generated config holds the API key, like .env.local: redteam/.generated is git-ignored.
+// The generated config holds the API keys, like .env.local: redteam/.generated is git-ignored.
 writeFileSync(file, JSON.stringify(mode === 'attacks' ? attackConfig(fixtures) : businessConfig(fixtures), null, 2), { mode: 0o600 });
 // writeFile's mode only applies to a new file: an older one keeps its permissions otherwise.
 chmodSync(file, 0o600);

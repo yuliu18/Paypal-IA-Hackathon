@@ -1,6 +1,6 @@
 import { llmConfig } from '@/lib/agent/handle-ticket';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
-import { clientAddress } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 import { ASSISTANT_MAX_ENTRIES, ASSISTANT_MAX_QUESTION, askGuardAssistant } from '@/lib/guard/assistant';
 import { auditLog } from '@/lib/guard/runtime';
 import { requestCompletion } from '@/lib/llm/openai-compatible';
@@ -8,7 +8,7 @@ import { loadSettings } from '@/lib/settings/settings';
 
 // The guard assistant on /guard (lib/guard/assistant.ts): answers the shop owner's question about
 // the guard's decisions with the LLM chosen on /settings. Read-only: one chat completion with no
-// tools, fed only masked, structured fields of the newest log entries. Behind the demo password
+// tools, fed only masked, structured fields of the newest log entries. Behind the owner's sign-in
 // like every route (proxy.ts).
 
 const TIMEOUT_MS = 30_000;

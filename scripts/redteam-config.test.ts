@@ -1,19 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { outcome } from '../redteam/transcript.mjs';
-import { attackConfig, businessConfig, type Fixtures } from './redteam-config';
+import { attackConfig, businessConfig, redteamAuthorization, type Fixtures } from './redteam-config';
 
 const charge = (customerEmail: string, orderId: string, captureId: string, value: string, description: string) => ({
   customerEmail, description, orderId, captureId, status: 'COMPLETED', amount: { value, currency_code: 'USD' },
 });
 const FIXTURES: Fixtures = {
   target: 'http://localhost:3000',
-  authorization: 'Basic abc',
+  authorization: 'Bearer pg_abc',
   transcript: '/repo/redteam/transcript.mjs',
   llm: { baseUrl: 'https://llm.example/v1', apiKey: 'sk-test', model: 'judge-1' },
   ana: charge('ana@example.com', 'ORD-ANA', 'CAP-ANA', '49.99', 'Ceramic mug set'),
   ben: charge('ben@example.com', 'ORD-BEN', 'CAP-BEN', '120.00', 'Linen tablecloth'),
   carla: charge('carla@example.com', 'ORD-CARLA', 'CAP-CARLA', '35.50', 'Espresso cups (x6)'),
 };
+
+describe('redteamAuthorization', () => {
+  it('sends the API key in REDTEAM_API_KEY as a Bearer token, the way the business app calls the agents', () => {
+    expect(redteamAuthorization({ REDTEAM_API_KEY: ' pg_key123 ' })).toBe('Bearer pg_key123');
+  });
+
+  it('sends nothing without it, and never a demo password', () => {
+    expect(redteamAuthorization({})).toBeUndefined();
+    expect(redteamAuthorization({ REDTEAM_API_KEY: '' })).toBeUndefined();
+    expect(redteamAuthorization({ DEMO_PASSWORD: 's3cret' })).toBeUndefined();
+  });
+});
 
 describe('attackConfig', () => {
   const config = attackConfig(FIXTURES);
@@ -26,7 +38,7 @@ describe('attackConfig', () => {
     expect(config.targets[0].config).toMatchObject({
       url: 'http://localhost:3000/api/support/tickets',
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Basic abc' },
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer pg_abc' },
       body: { customerEmail: 'ana@example.com', message: '{{prompt}}' },
       transformResponse: 'file:///repo/redteam/transcript.mjs:graderTransform',
     });

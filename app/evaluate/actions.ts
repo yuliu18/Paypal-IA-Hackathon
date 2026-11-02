@@ -11,7 +11,7 @@ export type PreparedCase = Pick<EvalCase, 'id' | 'kind' | 'agent' | 'desk' | 'va
 export type Prepared = { ok: true; cases: PreparedCase[]; note?: string } | { ok: false; message: string };
 
 // Starts a run from fresh sample payments, so the refund cases have something to refund. The proxy's
-// demo password covers this action, like the page.
+// owner sign-in covers this action, like the page.
 // `full`: every attack also as a jailbreak template and in base64, against both agents. The sample
 // subscription, if any, is looked up for the cancellation cases (never re-created: the owner's
 // cancellation uses it up). Likewise the sample dispute for the dispute cases.

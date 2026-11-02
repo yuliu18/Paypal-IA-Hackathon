@@ -2,7 +2,7 @@ import { AUDIT_EXPORT_COLUMNS, auditExportRows, toCsv } from '@/lib/guard/audit-
 import { auditLog } from '@/lib/guard/runtime';
 
 // Downloads the payment guard's audit log (lib/guard/audit-export.ts), newest first, as CSV or
-// JSON (?format=json). Behind the demo password like every route (proxy.ts).
+// JSON (?format=json). Behind the owner's sign-in like every route (proxy.ts).
 
 // Far more than a demo writes; keeps one download bounded. A longer log downloads its newest rows
 // with an X-Export-Truncated header.

@@ -4,12 +4,13 @@ import { limits } from '@/lib/auth/limits';
 import { ownerEmail } from '@/lib/auth/owner';
 import { requestResetCode } from '@/lib/auth/recovery';
 import { neonAuth } from '@/lib/auth/server';
-import { clientAddress } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 
 // The forgot-password form's post (app/login/forgot): Neon Auth emails a reset code, only when the
 // address is the owner's, and the answer is the same for any address (lib/auth/recovery.ts).
+// Neon Auth only: the built-in owner account is recovered on the server (npm run owner:reset).
 export async function POST(request: NextRequest) {
-  const refused = refuseFormPost(request);
+  const refused = refuseFormPost(request, { neonOnly: true });
   if (refused) return refused;
   const form = await request.formData();
   const email = field(form, 'email').trim();

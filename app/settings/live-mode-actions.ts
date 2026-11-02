@@ -4,7 +4,7 @@ import { refresh } from 'next/cache';
 import { turnOffLiveMode, turnOnLiveMode, type LiveSwitchResult } from '@/lib/settings/live-switch';
 
 // The Test / Live switch, saved on its own, at once, apart from the settings form. Like the page,
-// these actions sit behind the owner's session (or the demo password): the proxy never lets a
+// these actions sit behind the owner's session (Neon Auth or the built-in login): the proxy never lets a
 // Server Action through without it, and an API key never opens one. The rules are in
 // lib/settings/live-switch.ts.
 

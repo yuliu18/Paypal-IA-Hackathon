@@ -1,6 +1,6 @@
 import { handleBillingTask } from '@/lib/agent/handle-billing-task';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
-import { clientAddress } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 import { requestEnvironment } from '@/lib/settings/live-mode';
 
 // Runs the demo billing agent on one task: bill this customer for this. Every PayPal call it makes

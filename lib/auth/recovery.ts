@@ -3,7 +3,7 @@
 // address ever gets a code or a reset, and the "send me a code" answer is the same for any
 // address, so these public pages never reveal which address is the owner's.
 
-import type { FailedAttempts } from '@/lib/demo-auth';
+import type { FailedAttempts } from './failed-attempts';
 import type { AccountLockout } from './account-lockout';
 import { looksLikeEmail, passwordProblems } from './password';
 

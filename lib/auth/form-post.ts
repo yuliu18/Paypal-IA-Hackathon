@@ -1,5 +1,6 @@
-// What the sign-in form posts share (app/api/auth/*): only with Neon Auth, only from this site,
-// and the answer is always a 303 back to a page, so the browser follows it with a GET.
+// What the sign-in form posts share (app/api/auth/*): only while a sign-in is configured (Neon Auth
+// or the built-in owner account; the recovery posts with Neon Auth only), only from this site, and
+// the answer is always a 303 back to a page, so the browser follows it with a GET.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { sameOrigin } from './access';
@@ -17,8 +18,9 @@ export function backToLogin(request: NextRequest, error: string, next = '/') {
 }
 
 // Undefined when the post may go ahead; otherwise the refusal to return.
-export function refuseFormPost(request: NextRequest): NextResponse | undefined {
-  if (authMode().kind !== 'neon') return new NextResponse('Not found.', { status: 404 });
+export function refuseFormPost(request: NextRequest, { neonOnly = false }: { neonOnly?: boolean } = {}): NextResponse | undefined {
+  const kind = authMode().kind;
+  if (kind === 'misconfigured' || (neonOnly && kind !== 'neon')) return new NextResponse('Not found.', { status: 404 });
   if (!sameOrigin(request.headers)) return new NextResponse('Cross-site form posts are refused.', { status: 403 });
   return undefined;
 }

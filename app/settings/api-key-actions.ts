@@ -4,7 +4,7 @@ import { refresh } from 'next/cache';
 import { apiKeys, type ApiKeySummary } from '@/lib/apikeys/keys';
 
 // Creating and revoking API keys from Settings. Like the page, these actions sit behind the owner's
-// session (or the demo password): the proxy never lets a Server Action through without it, and an
+// session (Neon Auth or the built-in login): the proxy never lets a Server Action through without it, and an
 // API key never opens one (lib/auth/gate.ts). The new key goes back to the page once and is never
 // logged or stored.
 

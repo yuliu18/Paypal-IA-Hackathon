@@ -15,10 +15,10 @@ type ErrorCode = (typeof ERRORS)[number];
 const isErrorCode = (value: unknown): value is ErrorCode => ERRORS.includes(value as ErrorCode);
 
 // Forgot password: the owner asks Neon Auth to email a reset code (app/api/auth/forgot). Only with
-// Neon Auth; with the demo password there is no account to recover.
+// Neon Auth; the built-in owner account is recovered on the server (npm run owner:reset).
 export default async function ForgotPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
-  if (authMode().kind !== 'neon') redirect('/');
+  if (authMode().kind !== 'neon') redirect('/login');
   const t = await getTranslations('auth');
   const error = first((await searchParams).error);
 

@@ -50,7 +50,7 @@ function settingsForm(form: FormData): SettingsForm {
 const locked = () => process.env.SETTINGS_LOCKED === 'true';
 const lockedError = async () => (await getTranslations('settings'))('lockedError');
 
-// The proxy's demo password covers these actions, like the page.
+// The proxy's owner sign-in covers these actions, like the page.
 export async function saveSettingsAction(_previous: SaveState, form: FormData): Promise<SaveState> {
   const result = await saveSettings(settingsForm(form));
   if (result.ok) refresh();

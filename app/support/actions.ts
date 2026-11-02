@@ -10,7 +10,7 @@ import { createSampleSubscription } from '@/lib/demo-subscription';
 export type SeedState = { ok: boolean; message: string } | null;
 
 // Creates new sample payments in the PayPal sandbox, as `npm run seed` does, so a deployed demo
-// needs no shell. The proxy's demo password covers this action, like the page.
+// needs no shell. The proxy's owner sign-in covers this action, like the page.
 export async function createSamplePaymentsAction(): Promise<SeedState> {
   const t = await getTranslations('desks.seed');
   try {
@@ -27,7 +27,7 @@ export async function createSamplePaymentsAction(): Promise<SeedState> {
 export type SubscriptionState = { ok: true; approveUrl: string; subscriptionId: string } | { ok: false; message: string } | null;
 
 // Creates the sample subscription in the PayPal sandbox and returns the link a sandbox buyer opens
-// to approve it. Covered by the demo password like the action above.
+// to approve it. Covered by the owner sign-in like the action above.
 export async function createSampleSubscriptionAction(): Promise<SubscriptionState> {
   const t = await getTranslations('desks.subscription');
   try {
@@ -45,7 +45,7 @@ export async function createSampleSubscriptionAction(): Promise<SubscriptionStat
 export type DisputePaymentState = { ok: true; approveUrl: string } | { ok: false; message: string } | null;
 
 // Creates the sample PayPal payment a sandbox buyer pays and can then dispute, and returns the link
-// to pay it. Covered by the demo password like the actions above.
+// to pay it. Covered by the owner sign-in like the actions above.
 export async function createSampleDisputePaymentAction(): Promise<DisputePaymentState> {
   const t = await getTranslations('desks.disputePayment');
   try {

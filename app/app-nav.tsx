@@ -61,8 +61,8 @@ const Icon = ({ name }: { name: keyof typeof Icons }) => (
   </svg>
 );
 
-// `signOut`: the owner signed in with Neon Auth, so the menu ends with a "Sign out" button. With
-// the demo password (HTTP Basic) there is nothing to sign out of. The login page has no menu.
+// `signOut`: the owner signed in (with Neon Auth or the built-in account), so the menu ends with a
+// "Sign out" button. The login page has no menu.
 export function AppNav({ signOut = false }: { signOut?: boolean }) {
   const t = useTranslations('nav');
   const pathname = usePathname();

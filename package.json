@@ -12,7 +12,8 @@
     "redteam": "node --experimental-transform-types --env-file-if-exists=.env.local scripts/redteam.mts",
     "db:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-migrate.mts",
     "db:probe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-probe.mts",
-    "db:copy-sqlite": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-copy-sqlite.mts"
+    "db:copy-sqlite": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-copy-sqlite.mts",
+    "owner:reset": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/owner-reset.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

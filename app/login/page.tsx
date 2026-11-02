@@ -5,6 +5,7 @@ import { connection } from 'next/server';
 import { getTranslations } from 'next-intl/server';
 import { safeNextPath } from '@/lib/auth/access';
 import { authMode } from '@/lib/auth/config';
+import { localAuthStore } from '@/lib/auth/local-store';
 import { owner } from '@/lib/auth/owner';
 import { PASSWORD_MAX, PASSWORD_MIN } from '@/lib/auth/password';
 import { AuthCard, buttonClass, fieldClass, first, labelClass, linkClass } from './auth-card';
@@ -17,12 +18,14 @@ const ERRORS = ['invalid', 'locked', 'notOwner', 'ownerExists', 'email', 'mismat
 type ErrorCode = (typeof ERRORS)[number];
 const isErrorCode = (value: unknown): value is ErrorCode => ERRORS.includes(value as ErrorCode);
 
-// The owner's way in when Neon Auth protects the app (lib/auth/config.ts): the sign-in form, or,
-// while the installation has no owner yet, the form that creates the owner account. Without Neon
-// Auth the demo password protects the app and this page just leads home.
+// The owner's way in (lib/auth/config.ts), whether Neon Auth or the app keeps the account: the
+// sign-in form, or, while the installation has no owner yet, the form that creates the owner
+// account. Password recovery is Neon Auth's emailed code, or npm run owner:reset on the server.
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
-  if (authMode().kind !== 'neon') redirect('/');
+  const mode = authMode();
+  if (mode.kind === 'misconfigured') redirect('/');
+  const local = mode.kind === 'local';
   const t = await getTranslations('auth');
   const params = await searchParams;
   const next = safeNextPath(first(params.next));
@@ -30,16 +33,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   let setup = false;
   try {
-    setup = (await owner.ownerId()) === null;
+    setup = local ? (await localAuthStore().owner()) === null : (await owner.ownerId()) === null;
   } catch (cause) {
     console.error('Owner lookup failed on the login page', cause);
     error = 'unavailable';
   }
-  const mode = setup ? 'setup' : 'signIn';
+  const form = setup ? 'setup' : 'signIn';
   const notice = !setup && first(params.reset) === 'done' ? t('signIn.resetDone') : undefined;
 
   return (
-    <AuthCard title={t(`${mode}.title`)} intro={t(`${mode}.intro`)} error={isErrorCode(error) ? t(`errors.${error}`) : undefined} notice={notice}>
+    <AuthCard title={t(`${form}.title`)} intro={t(`${form}.intro`)} error={isErrorCode(error) ? t(`errors.${error}`) : undefined} notice={notice}>
       <form method="post" action={setup ? '/api/auth/owner' : '/api/auth/sign-in'} className="mt-6 flex flex-col gap-4">
         {!setup && <input type="hidden" name="next" value={next} />}
         <label className={labelClass}>
@@ -69,14 +72,19 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </>
         )}
         <button type="submit" className={buttonClass}>
-          {t(`${mode}.submit`)}
+          {t(`${form}.submit`)}
         </button>
       </form>
-      {!setup && (
+      {!setup && !local && (
         <p className="mt-5 text-center">
           <Link href="/login/forgot" className={linkClass}>
             {t('signIn.forgot')}
           </Link>
+        </p>
+      )}
+      {!setup && local && (
+        <p className="mt-5 text-center text-[13px] leading-relaxed text-pp-muted">
+          {t.rich('signIn.localRecovery', { code: (chunks) => <code className="font-mono text-pp-ink">{chunks}</code> })}
         </p>
       )}
     </AuthCard>

@@ -1,5 +1,5 @@
 // Failed sign-ins counted per account (the email tried), whatever client they claim to come from:
-// the per-client lockout (lib/demo-auth.ts FailedAttempts) keys on headers a caller can forge, so
+// the per-client lockout (./failed-attempts.ts) keys on headers a caller can forge, so
 // on its own it can be dodged by changing them on every try. After `freeFailures` failures in a row
 // the account is locked, for `baseMs`, then twice as long with every further failure, up to
 // `maxMs`. A success, or `resetAfterMs` with no failure, starts the count over. In memory, per
