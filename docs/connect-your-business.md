@@ -34,6 +34,8 @@ From a fresh clone to your shop's own app calling the guarded agents, first on t
      -d '{"customerEmail":"ana@example.com","message":"My mug arrived broken."}'
    ```
 
+   Show your customer `reply`; keep `steps` (each PayPal call and the guard's decision) for your logs; check `environment` (`live` or `sandbox`) before telling them money really moved.
+
    `customerEmail` is the customer your app has already identified (a signed-in user, the sender of a help-desk ticket). The guard lets the agent act only on that customer's orders, so never take it from what the customer typed.
 
 ## 4. Fit it to your shop
