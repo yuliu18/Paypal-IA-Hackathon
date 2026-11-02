@@ -51,12 +51,49 @@ describe('AccountLockout', () => {
     expect(accounts.retryAfterMs('owner@shop.example', day)).toBe(0);
   });
 
-  it('keeps a bounded number of accounts, dropping the oldest', () => {
+  it('keeps a bounded number of accounts, but never drops one that is locked or failing', () => {
     const accounts = new AccountLockout({ freeFailures: 1, baseMs: MIN, maxMs: MIN, resetAfterMs: MIN, maxAccounts: 2 });
-    accounts.recordFailure('a@x.example', 0);
-    accounts.recordFailure('b@x.example', 0);
-    accounts.recordFailure('c@x.example', 0);
-    expect(accounts.retryAfterMs('a@x.example', 0)).toBe(0);
-    expect(accounts.retryAfterMs('c@x.example', 0)).toBe(MIN);
+    accounts.recordFailure('owner@x.example', 0);
+    for (let i = 0; i < 100; i++) accounts.recordFailure(`junk${i}@x.example`, 0);
+    expect(accounts.retryAfterMs('owner@x.example', 0)).toBe(MIN);
+  });
+
+  it('drops accounts whose failures are a day old first', () => {
+    const accounts = new AccountLockout({ freeFailures: 5, baseMs: MIN, maxMs: MIN, resetAfterMs: MIN, maxAccounts: 2 });
+    accounts.recordFailure('old@x.example', 0);
+    accounts.recordFailure('kept@x.example', 2 * MIN);
+    for (let i = 0; i < 4; i++) accounts.recordFailure('new@x.example', 2 * MIN);
+    accounts.recordFailure('new@x.example', 2 * MIN);
+    expect(accounts.retryAfterMs('new@x.example', 2 * MIN)).toBe(MIN);
+  });
+
+  it('lets only as many attempts run at once as failures remain before the lock', () => {
+    const accounts = lockout();
+    const started = Array.from({ length: 200 }, () => accounts.begin('owner@shop.example', 0));
+    expect(started.filter(Boolean)).toHaveLength(5);
+    for (let i = 0; i < 5; i++) accounts.end('owner@shop.example', 'failure', 0);
+    expect(accounts.retryAfterMs('owner@shop.example', 0)).toBe(MIN);
+    expect(accounts.begin('owner@shop.example', 0)).toBe(false);
+  });
+
+  it('after the lock, lets one attempt at a time through', () => {
+    const accounts = lockout();
+    for (let i = 0; i < 5; i++) accounts.recordFailure('owner@shop.example', 0);
+    expect(accounts.begin('owner@shop.example', MIN)).toBe(true);
+    expect(accounts.begin('owner@shop.example', MIN)).toBe(false);
+    accounts.end('owner@shop.example', 'failure', MIN);
+    expect(accounts.retryAfterMs('owner@shop.example', MIN)).toBe(2 * MIN);
+  });
+
+  it('frees the slot without counting a failure when the attempt was no guess (the service was down)', () => {
+    const accounts = lockout();
+    for (let i = 0; i < 4; i++) accounts.recordFailure('owner@shop.example', 0);
+    expect(accounts.begin('owner@shop.example', 0)).toBe(true);
+    accounts.end('owner@shop.example', 'neutral', 0);
+    expect(accounts.retryAfterMs('owner@shop.example', 0)).toBe(0);
+    expect(accounts.begin('owner@shop.example', 0)).toBe(true);
+    accounts.end('owner@shop.example', 'success', 0);
+    accounts.recordFailure('owner@shop.example', 0);
+    expect(accounts.retryAfterMs('owner@shop.example', 0)).toBe(0);
   });
 });

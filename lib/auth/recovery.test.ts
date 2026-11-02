@@ -93,6 +93,7 @@ const resetDeps = (overrides: Partial<ResetDeps> = {}): ResetDeps => ({
   signOutEverywhere: vi.fn(async () => undefined),
   failures: new FailedAttempts({ maxFailures: 10, windowMs: minutes(15) }),
   accounts: new AccountLockout({ freeFailures: 5, baseMs: minutes(1), maxMs: minutes(60), resetAfterMs: minutes(24 * 60) }),
+  otherAccounts: new AccountLockout({ freeFailures: 5, baseMs: minutes(1), maxMs: minutes(60), resetAfterMs: minutes(24 * 60), keepActive: false }),
   ...overrides,
 });
 const input = (overrides: Partial<Parameters<typeof resetOwnerPassword>[0]> = {}) => ({ email: OWNER, code: '123456', password: GOOD, confirm: GOOD, client: 'a', now: 0, ...overrides });
@@ -169,6 +170,30 @@ describe('resetOwnerPassword against a code guessed from many clients', () => {
     for (let i = 0; i < 5; i++) expect(await resetOwnerPassword(input({ client: `forged-${i}` }), deps)).toBe('invalidCode');
     expect(await resetOwnerPassword(input({ client: 'forged-new' }), deps)).toBe('locked');
     expect(resetPassword).toHaveBeenCalledTimes(5);
+  });
+
+  it('lets at most 5 codes reach Neon Auth when 200 arrive at once', async () => {
+    const resetPassword = vi.fn(() => new Promise<'invalidCode'>((resolve) => setTimeout(() => resolve('invalidCode'), 5)));
+    const deps = resetDeps({ resetPassword });
+    const outcomes = await Promise.all(Array.from({ length: 200 }, (_, i) => resetOwnerPassword(input({ client: `c${i}` }), deps)));
+    expect(resetPassword).toHaveBeenCalledTimes(5);
+    expect(outcomes.filter((o) => o === 'locked')).toHaveLength(195);
+  });
+
+  it('never tracks other addresses, so junk ones cannot push the owner out of the count', async () => {
+    const deps = resetDeps({ resetPassword: vi.fn(async () => 'invalidCode' as const) });
+    for (let i = 0; i < 5; i++) await resetOwnerPassword(input({ client: `o${i}` }), deps);
+    for (let i = 0; i < 50; i++) expect(await resetOwnerPassword(input({ email: `junk${i}@x.example`, client: `j${i}` }), deps)).toBe('invalidCode');
+    expect(deps.accounts.retryAfterMs(`junk0@x.example`, 0)).toBe(0);
+    expect(await resetOwnerPassword(input({ client: 'o-new' }), deps)).toBe('locked');
+  });
+
+  it('answers any other address the same way, so "locked" never reveals the owner', async () => {
+    const deps = resetDeps();
+    const answers = [];
+    for (let i = 0; i < 6; i++) answers.push(await resetOwnerPassword(input({ email: 'someone@x.example', client: `s${i}` }), deps));
+    expect(answers).toEqual(['invalidCode', 'invalidCode', 'invalidCode', 'invalidCode', 'invalidCode', 'locked']);
+    expect(deps.resetPassword).not.toHaveBeenCalled();
   });
 
   it('starts the account count over once the password is reset', async () => {
