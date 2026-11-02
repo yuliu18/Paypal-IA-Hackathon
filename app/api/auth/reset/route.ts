@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
       },
       signOutEverywhere: (input) => signOutEverywhere({ ...input, origin: request.headers.get('origin') ?? request.nextUrl.origin }),
       failures: limits.signInFailures,
+      accounts: limits.accountFailures,
+      otherAccounts: limits.otherAccountFailures,
     },
   );
   if (outcome === 'done') return seeOther(request, '/login?reset=done');

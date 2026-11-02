@@ -4,6 +4,7 @@
 // address, so these public pages never reveal which address is the owner's.
 
 import type { FailedAttempts } from '@/lib/demo-auth';
+import type { AccountLockout } from './account-lockout';
 import { looksLikeEmail, passwordProblems } from './password';
 
 // At most one code per address per interval (the oldest addresses are forgotten past `maxEntries`).
@@ -63,8 +64,11 @@ export type ResetDeps = {
   // 'invalidCode' for a wrong, used or expired code; 'unavailable' when Neon Auth can't be reached.
   resetPassword: (input: { email: string; code: string; password: string }) => Promise<'done' | 'invalidCode' | 'unavailable'>;
   signOutEverywhere: (input: { email: string; password: string }) => Promise<void>;
-  // The sign-in lockout: wrong codes count with wrong passwords.
+  // The sign-in lockouts: wrong codes count with wrong passwords, per client and per account (the
+  // owner's in `accounts`, any other address in `otherAccounts`, lib/auth/limits.ts).
   failures: FailedAttempts;
+  accounts: AccountLockout;
+  otherAccounts: AccountLockout;
 };
 
 export type ResetOutcome = 'done' | 'locked' | 'email' | 'mismatch' | 'weak' | 'invalidCode' | 'unavailable';
@@ -88,13 +92,24 @@ export async function resetOwnerPassword(
     console.error('Owner lookup failed while resetting the password', error);
     return 'unavailable';
   }
-  // Another address gets the wrong-code answer: the page must not tell it is not the owner's.
-  const result = owner !== null && address === normalize(owner) ? await deps.resetPassword({ email: address, code: otp, password }) : 'invalidCode';
-  if (result === 'unavailable') return 'unavailable';
+  // Only the owner's address is counted in the lockout that matters (deps.accounts), so other
+  // addresses can't push it out; every other address gets the same answers from its own count, and
+  // the wrong-code answer, so the page never tells which address is the owner's.
+  const isOwner = owner !== null && address === normalize(owner);
+  const accounts = isOwner ? deps.accounts : deps.otherAccounts;
+  // Reserved before asking Neon Auth, so codes sent at the same moment can't all get through.
+  if (!accounts.begin(address, now)) return 'locked';
+  const result = isOwner ? await deps.resetPassword({ email: address, code: otp, password }) : 'invalidCode';
+  if (result === 'unavailable') {
+    accounts.end(address, 'neutral', now);
+    return 'unavailable';
+  }
   if (result === 'invalidCode') {
     deps.failures.record(client, now);
+    accounts.end(address, 'failure', now);
     return 'invalidCode';
   }
+  accounts.end(address, 'success', now);
   try {
     await deps.signOutEverywhere({ email: address, password });
   } catch (error) {
