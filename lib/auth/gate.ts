@@ -8,6 +8,7 @@
 // only for a key it checked (./api-key-header.ts).
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { relativeRedirect } from '@/lib/http/redirect';
 import { acceptsApiKey, bearerToken, isPublicRequest, neonAccess } from './access';
 import { API_KEY_AUTH_HEADER, apiKeyAuthValue } from './api-key-header';
 import type { AuthMode } from './config';
@@ -80,8 +81,6 @@ export async function gate(request: NextRequest, deps: GateDeps): Promise<NextRe
     return response;
   }
   if (isApi(pathname)) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 });
-  const login = new URL('/login', request.url);
   const next = `${pathname}${search}`;
-  if (next !== '/') login.searchParams.set('next', next);
-  return NextResponse.redirect(login);
+  return relativeRedirect(next === '/' ? '/login' : `/login?${new URLSearchParams({ next })}`);
 }

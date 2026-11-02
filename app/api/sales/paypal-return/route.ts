@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { auditLog } from '@/lib/guard/runtime';
+import { relativeRedirect } from '@/lib/http/redirect';
 import { liveModeStatus } from '@/lib/settings/live-mode';
 import { loadSettings } from '@/lib/settings/settings';
 import { CHECKOUT_RESULT_PATH, checkoutEnvironment, completeSalesOrder } from '@/lib/shop/checkout';
@@ -10,7 +11,7 @@ import { CHECKOUT_RESULT_PATH, checkoutEnvironment, completeSalesOrder } from '@
 // (lib/auth/access.ts): the buyer coming back from PayPal never signs in to the shop's guard.
 export async function GET(request: NextRequest) {
   const orderId = request.nextUrl.searchParams.get('token') ?? '';
-  const back = new URL(CHECKOUT_RESULT_PATH, request.url);
+  const back = new URLSearchParams();
   try {
     // auditLog() inside the try: a log that can't be opened captures nothing (fails closed).
     const log = auditLog();
@@ -19,11 +20,11 @@ export async function GET(request: NextRequest) {
     const sale = await completeSalesOrder(orderId, log, { environment });
     // Only the order id: /checkout asks the guard's log and PayPal whether it is paid, so a link
     // that merely says "paid" proves nothing.
-    back.searchParams.set('order', sale.orderId);
+    back.set('order', sale.orderId);
   } catch (error) {
     // Details stay in the server log, as in the other demo routes.
     console.error('Sales order could not be captured', error);
-    back.searchParams.set('paid', 'failed');
+    back.set('paid', 'failed');
   }
-  return Response.redirect(back, 303);
+  return relativeRedirect(`${CHECKOUT_RESULT_PATH}?${back}`, 303);
 }

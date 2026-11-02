@@ -58,12 +58,12 @@ describe('gate with Neon Auth', () => {
   it('sends a visitor without a session from a page to the login page, remembering where they were going', async () => {
     const response = await gate(request('/guard?verdict=blocked'), deps());
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://guard.example/login?next=%2Fguard%3Fverdict%3Dblocked');
+    expect(response.headers.get('location')).toBe('/login?next=%2Fguard%3Fverdict%3Dblocked');
   });
 
   it('sends a visitor from the home page to the login page without a next', async () => {
     const response = await gate(request('/'), deps());
-    expect(response.headers.get('location')).toBe('https://guard.example/login');
+    expect(response.headers.get('location')).toBe('/login');
   });
 
   it('refuses an API call without a session with 401, no redirect', async () => {
@@ -93,7 +93,7 @@ describe('gate with Neon Auth', () => {
 
   it('sends everyone to the owner set-up while there is no owner', async () => {
     const response = await gate(request('/settings'), deps({ ownerId: async () => null, session: async () => ({ userId: 'someone', cookies: [] }) }));
-    expect(response.headers.get('location')).toBe('https://guard.example/login?next=%2Fsettings');
+    expect(response.headers.get('location')).toBe('/login?next=%2Fsettings');
   });
 
   it('fails closed when the session or the owner cannot be checked', async () => {

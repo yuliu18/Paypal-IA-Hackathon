@@ -3,9 +3,11 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { sameOrigin } from './access';
+import { relativeRedirect } from '@/lib/http/redirect';
 import { authMode } from './config';
 
-export const seeOther = (request: NextRequest, path: string) => NextResponse.redirect(new URL(path, request.url), 303);
+// `request` is unused: the redirect is relative (lib/http/redirect.ts), so it never names the server's internal address.
+export const seeOther = (_request: NextRequest, path: string) => relativeRedirect(path, 303);
 
 // Back to the login page with an error code (messages/<locale>/auth.json → errors.<code>).
 export function backToLogin(request: NextRequest, error: string, next = '/') {
