@@ -20,16 +20,26 @@ export type CompletionMessage = {
 
 // `body` carries the request fields beyond the model (messages, tools...). The timeout bounds a hung
 // provider; any non-2xx answer or missing message throws.
+// Temperature 0 keeps answers as steady as the model allows. Some models (often reasoning ones)
+// accept only their own temperature and answer 400: they are asked once more without one.
 export async function requestCompletion(
   { baseUrl, apiKey, model, timeoutMs, headers = {} }: OpenAiCompatibleConfig,
   body: Record<string, unknown>,
 ): Promise<CompletionMessage> {
-  const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, temperature: 0, ...body }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const signal = AbortSignal.timeout(timeoutMs);
+  const send = (fields: Record<string, unknown>) =>
+    fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+      signal,
+    });
+  let res = await send({ model, temperature: 0, ...body });
+  if (res.status === 400) {
+    const refusal = await res.text();
+    if (!/temperature/i.test(refusal)) throw new Error(`LLM 400: ${refusal.slice(0, 200)}`);
+    res = await send({ model, ...body });
+  }
   if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const parsed = (await res.json()) as { choices?: { message?: CompletionMessage }[] };
   const message = parsed.choices?.[0]?.message;
