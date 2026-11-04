@@ -46,7 +46,8 @@ For each proposal, quote the exact sentence of the document it comes from, copie
 Answer with JSON only: {"proposals":[{"field":"<setting>","value":"<value>","quote":"<sentence>"}]}. Leave out settings the document says nothing about; answer {"proposals":[]} when it states none.`;
 
 // Strips what could pass for the document's own delimiters.
-const undelimited = (text: string) => text.replace(/<\/?\s*document\s*>/gi, '');
+// Spaces and zero-width characters around the slash don't hide one.
+const undelimited = (text: string) => text.replace(/<[\s\u200b-\u200d\ufeff]*\/?[\s\u200b-\u200d\ufeff]*document[\s\u200b-\u200d\ufeff]*>/gi, '');
 
 // Case, spacing and typographic quotes don't stop a quote from matching.
 const normalized = (text: string) =>
@@ -116,7 +117,7 @@ export async function proposeRules({ document, current, complete }: { document: 
     if (typeof raw.value !== 'string' && typeof raw.value !== 'number') continue;
     if (typeof raw.quote !== 'string') continue;
     const quote = raw.quote.trim();
-    if (quote.length < MIN_QUOTE || !source.includes(normalized(quote))) continue;
+    if (normalized(quote).length < MIN_QUOTE || !source.includes(normalized(quote))) continue;
     const proposed = proposedValue(field, String(raw.value), current.currency);
     if (proposed === undefined || proposed === current[field]) continue;
     proposals.push({ field, current: current[field], proposed, quote, effect: effectOf(field, current[field], proposed) });
