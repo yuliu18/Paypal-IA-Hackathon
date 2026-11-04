@@ -9,6 +9,7 @@
     "language": "语言",
     "business": "业务",
     "limits": "限额",
+    "documents": "从您的文档",
     "ai": "AI 模型",
     "paypal": "PayPal 应用",
     "notifications": "通知",
@@ -243,5 +244,35 @@
       "check": "PayPal live 未接受该 live 应用，因此仍保持测试模式：{detail}",
       "unreadable": "无法读取已保存的设置，因此未做任何更改。请稍后重试。"
     }
+  },
+  "documents": {
+    "title": "从您的文档",
+    "detail": "粘贴您的退款政策、条款或客服手册，或以文本文件加载。AI 会根据其中的内容提出退款政策和退款限额，并附上每条建议所依据的原文。只有在您勾选并应用后才会生效。",
+    "label": "您的文档",
+    "placeholder": "例如：超过 50 USD 的退款需经理审核。单笔订单退款绝不超过 150 USD。",
+    "load": "加载文本文件",
+    "formats": "纯文本或 Markdown（.txt、.md）。{count} / {max} 个字符。",
+    "propose": "提出规则",
+    "reading": "正在读取…",
+    "proposalsTitle": "建议的规则",
+    "none": "文档中没有与当前设置不同的退款政策或退款限额。",
+    "effect": {
+      "tightens": "更严格",
+      "loosens": "更宽松",
+      "changes": "新的政策文本"
+    },
+    "warning": {
+      "loosens": "这会让更多资金在无人审核的情况下流出。仅在确有需要时应用。",
+      "changes": "客服代理和 guard 的审核模型将改为遵循此文本。应用前请先阅读。"
+    },
+    "apply": "{count, plural, =0 {应用所选} other {应用 # 条规则}}",
+    "applying": "正在应用…",
+    "applyScope": "保存到您的设置中，与其他修改一样经过检查。",
+    "applied": "{count, plural, other {已应用 # 条规则。}}",
+    "empty": "请先粘贴或加载文档。",
+    "tooLong": "文档过长：最多 {max} 个字符。",
+    "busy": "读取次数过多。请在 {seconds} 秒后重试。",
+    "noneChosen": "请至少勾选一条建议。",
+    "failed": "无法读取文档。请在设置中检查 AI 模型；详情见服务器日志。"
   }
 }

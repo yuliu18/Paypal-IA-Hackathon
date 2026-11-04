@@ -3,7 +3,7 @@ import { firstSectionWithError, sectionFrom, SETTINGS_SECTIONS } from './section
 
 describe('settings sections', () => {
   it('lists the sections in the order the menu shows them', () => {
-    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Language', 'Business', 'Limits', 'AI model', 'PayPal app', 'Notifications', 'API keys']);
+    expect(SETTINGS_SECTIONS.map((s) => s.label)).toEqual(['Language', 'Business', 'Limits', 'From your documents', 'AI model', 'PayPal app', 'Notifications', 'API keys']);
   });
 
   it('opens the first section, in menu order, that holds a field the save rejected', () => {

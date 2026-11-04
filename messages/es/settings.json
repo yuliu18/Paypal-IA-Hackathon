@@ -9,6 +9,7 @@
     "language": "Idioma",
     "business": "Negocio",
     "limits": "Límites",
+    "documents": "Desde tus documentos",
     "ai": "Modelo de IA",
     "paypal": "App de PayPal",
     "notifications": "Notificaciones",
@@ -243,5 +244,35 @@
       "check": "PayPal live no aceptó la app live, así que sigue el modo de prueba: {detail}",
       "unreadable": "No se pudo leer la configuración guardada, así que no se cambió nada. Inténtalo de nuevo en un momento."
     }
+  },
+  "documents": {
+    "title": "Desde tus documentos",
+    "detail": "Pega tu política de reembolsos, tus condiciones o tu manual de atención al cliente, o cárgalos como archivos de texto. La IA propone la política y los límites de reembolso que indican, cada uno con la frase de la que sale. Nada cambia hasta que marcas una propuesta y la aplicas.",
+    "label": "Tus documentos",
+    "placeholder": "p. ej. Los reembolsos de más de 50 USD los revisa un responsable. Nunca reembolsamos más de 150 USD por pedido.",
+    "load": "Cargar archivos de texto",
+    "formats": "Texto plano o Markdown (.txt, .md). {count} de {max} caracteres.",
+    "propose": "Proponer reglas",
+    "reading": "Leyendo…",
+    "proposalsTitle": "Reglas propuestas",
+    "none": "Los documentos no indican ninguna política ni límite de reembolso distinto de tus ajustes.",
+    "effect": {
+      "tightens": "Más estricta",
+      "loosens": "Más permisiva",
+      "changes": "Nueva política"
+    },
+    "warning": {
+      "loosens": "Dejaría mover más dinero sin que lo revise una persona. Aplícala solo si es lo que quieres.",
+      "changes": "El agente de soporte y el juez del guard seguirán este texto en lugar del actual. Léelo antes de aplicarlo."
+    },
+    "apply": "{count, plural, =0 {Aplicar selección} one {Aplicar # regla} other {Aplicar # reglas}}",
+    "applying": "Aplicando…",
+    "applyScope": "Se guarda en tus ajustes, con las mismas comprobaciones que cualquier cambio.",
+    "applied": "{count, plural, one {# regla aplicada.} other {# reglas aplicadas.}}",
+    "empty": "Primero pega o carga un documento.",
+    "tooLong": "Los documentos son demasiado largos: como máximo {max} caracteres.",
+    "busy": "Demasiadas lecturas. Inténtalo de nuevo en {seconds} segundos.",
+    "noneChosen": "Marca al menos una propuesta.",
+    "failed": "No se pudieron leer los documentos. Revisa el modelo de IA en Ajustes; los detalles están en el registro del servidor."
   }
 }

@@ -14,6 +14,7 @@ import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
 import { ApiKeysSection, type ApiKeysView } from './api-keys-section';
+import { DocumentsSection } from './documents-section';
 import { LiveModeSection } from './live-mode-section';
 import type { LiveModeStatus } from '@/lib/settings/live-mode';
 
@@ -495,8 +496,8 @@ export function SettingsEditor({
             </Channel>
           </Section>
 
-          {/* The language and the API keys save on their own, so the form's button stays out of their sections. */}
-          <div hidden={open === 'language' || open === 'api-keys'} className="flex flex-wrap items-center gap-4">
+          {/* The language, the documents' rules and the API keys save on their own, so the form's button stays out of their sections. */}
+          <div hidden={open === 'language' || open === 'documents' || open === 'api-keys'} className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={saving} className={primaryButton}>
               {saving && <Spinner />}
               {saving ? t('save.saving') : t('save.button')}
@@ -511,6 +512,7 @@ export function SettingsEditor({
       </form>
       {/* Outside the settings form: a form can't hold another. */}
       <div className="max-w-4xl">
+        <DocumentsSection hidden={open !== 'documents'} locked={view.locked} currency={view.form.currency} />
         <ApiKeysSection hidden={open !== 'api-keys'} view={apiKeys} locked={view.locked} />
         <LiveModeSection hidden={open !== 'paypal'} status={liveMode} locked={view.locked} />
       </div>

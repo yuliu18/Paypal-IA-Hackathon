@@ -7,6 +7,8 @@ export const SETTINGS_SECTIONS = [
   { id: 'language', label: 'Language', fields: [] },
   { id: 'business', label: 'Business', fields: ['name', 'contactEmails', 'refundPolicy'] },
   { id: 'limits', label: 'Limits', fields: ['currency', 'autoRefundUpTo', 'approvalUpTo', 'dailyCap'] },
+  // Rules proposed from the shop's documents are applied on their own (./document-rules-actions), outside the form.
+  { id: 'documents', label: 'From your documents', fields: [] },
   { id: 'ai', label: 'AI model', fields: ['provider', 'baseUrl', 'agentModel', 'judgeModel', 'apiKey'] },
   { id: 'paypal', label: 'PayPal app', fields: ['paypalClientId', 'paypalSecret', 'paypalLiveClientId', 'paypalLiveSecret'] },
   {

@@ -9,6 +9,7 @@
     "language": "Langue",
     "business": "Entreprise",
     "limits": "Limites",
+    "documents": "Depuis vos documents",
     "ai": "Modèle d'IA",
     "paypal": "App PayPal",
     "notifications": "Notifications",
@@ -243,5 +244,35 @@
       "check": "PayPal live n'a pas accepté l'app live, le mode test reste donc actif : {detail}",
       "unreadable": "Les réglages enregistrés n'ont pas pu être lus, rien n'a été modifié. Réessayez dans un instant."
     }
+  },
+  "documents": {
+    "title": "Depuis vos documents",
+    "detail": "Collez votre politique de remboursement, vos conditions ou votre manuel de service client, ou chargez-les en fichiers texte. L'IA propose la politique et les limites de remboursement qu'ils énoncent, chacune avec la phrase dont elle vient. Rien ne change tant que vous ne cochez pas une proposition et ne l'appliquez pas.",
+    "label": "Vos documents",
+    "placeholder": "ex. Les remboursements de plus de 50 USD sont vérifiés par un responsable. Nous ne remboursons jamais plus de 150 USD par commande.",
+    "load": "Charger des fichiers texte",
+    "formats": "Texte brut ou Markdown (.txt, .md). {count} sur {max} caractères.",
+    "propose": "Proposer des règles",
+    "reading": "Lecture…",
+    "proposalsTitle": "Règles proposées",
+    "none": "Les documents n'énoncent aucune politique ni limite de remboursement différente de vos paramètres.",
+    "effect": {
+      "tightens": "Plus stricte",
+      "loosens": "Plus souple",
+      "changes": "Nouvelle politique"
+    },
+    "warning": {
+      "loosens": "Cela laisserait passer plus d'argent sans contrôle humain. Ne l'appliquez que si c'est voulu.",
+      "changes": "L'agent de support et le juge du guard suivront ce texte au lieu de l'actuel. Lisez-le avant de l'appliquer."
+    },
+    "apply": "{count, plural, =0 {Appliquer la sélection} one {Appliquer # règle} other {Appliquer # règles}}",
+    "applying": "Application…",
+    "applyScope": "Enregistré dans vos paramètres, vérifié comme toute modification.",
+    "applied": "{count, plural, one {# règle appliquée.} other {# règles appliquées.}}",
+    "empty": "Collez ou chargez d'abord un document.",
+    "tooLong": "Les documents sont trop longs : {max} caractères au maximum.",
+    "busy": "Trop de lectures. Réessayez dans {seconds} secondes.",
+    "noneChosen": "Cochez au moins une proposition.",
+    "failed": "Les documents n'ont pas pu être lus. Vérifiez le modèle d'IA dans les paramètres ; les détails sont dans le journal du serveur."
   }
 }
