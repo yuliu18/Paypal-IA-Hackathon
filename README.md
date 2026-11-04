@@ -53,7 +53,7 @@ npm run dev
 ```
 
 1. Open [localhost:3000](http://localhost:3000) › **Settings**: save your PayPal sandbox app and an AI provider (any OpenAI-compatible API: OpenAI, Anthropic, Gemini, OpenRouter, Ollama…).
-2. `npm run seed` charges three sandbox payments to play with.
+2. `npm run seed` charges three sandbox payments to play with. For a fuller dashboard, `npm run seed:showcase` adds six months of invoices to sample customers (paid, partly paid, overdue, open), card payments, products and subscription plans.
 3. **Support** › pick a sample ticket (try the prompt-injection one, and tick **Vulnerable agent**), then watch the **Guard log**.
 
 With no database configured it keeps its data in local files, which is fine for trying it out.

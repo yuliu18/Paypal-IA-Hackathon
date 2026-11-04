@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "seed": "node --experimental-transform-types --env-file=.env.local scripts/seed-sandbox.mts",
+    "seed:showcase": "node --experimental-transform-types --env-file=.env.local scripts/seed-showcase.mts",
     "redteam": "node --experimental-transform-types --env-file-if-exists=.env.local scripts/redteam.mts",
     "db:migrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-migrate.mts",
     "db:probe": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/db-probe.mts",
