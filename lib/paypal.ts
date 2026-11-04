@@ -205,10 +205,14 @@ export type Invoice = {
   };
 };
 
-// The list omits line items, payments and refunds; the detail endpoint has them.
+// The list omits line items, payments and refunds; the detail endpoint has them. An invoice whose
+// detail still fails after the retries keeps its list entry (status, amount, recipient), so one
+// sandbox hiccup doesn't take the whole dashboard down.
 export async function listInvoices(): Promise<Invoice[]> {
-  const summaries = await listAll<{ id: string }>('/v2/invoicing/invoices?total_required=true', 'items', 100);
-  return Promise.all(summaries.map((i) => get<Invoice>(`/v2/invoicing/invoices/${encodeURIComponent(i.id)}`)));
+  const summaries = await listAll<Invoice>('/v2/invoicing/invoices?total_required=true', 'items', 100);
+  return Promise.all(
+    summaries.map((summary) => get<Invoice>(`/v2/invoicing/invoices/${encodeURIComponent(summary.id)}`).catch(() => summary)),
+  );
 }
 
 // --- Transaction Search & balances -------------------------------------------------
