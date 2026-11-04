@@ -24,6 +24,7 @@ import { SHOP_CATALOGUE } from '@/lib/shop/catalogue';
 import { checkoutUrls, shopOrigin as defaultShopOrigin } from '@/lib/shop/checkout';
 import { withClient } from './in-memory-mcp';
 import { openAiCompatibleToolChat } from './openai-tool-chat';
+import { llmTimeouts } from '@/lib/llm/timeouts';
 import { runSupportAgent, type AgentStep, type SupportTicket } from './support-agent';
 
 // What the demo's "vulnerable agent" mode tells the agent instead: an agent that trusts the
@@ -46,7 +47,7 @@ export async function llmConfig(chosen: ShopSettings['ai']) {
   const ai = await withDefaultModels(chosen);
   if (!ai.baseUrl || !ai.apiKey) throw new Error('Choose an AI provider and API key on /settings, or set LLM_BASE_URL and LLM_API_KEY in .env.local');
   if (!ai.agentModel) throw new Error('Choose the agent model on /settings: the catalog knows no default for this provider');
-  return { ...ai, headers: clientHeaders() };
+  return { ...ai, headers: clientHeaders(), timeouts: llmTimeouts(ai.baseUrl) };
 }
 
 const SUPPORT_ACTIONS = { orders: { get: true }, payments: { createRefund: true }, subscriptions: { show: true, cancel: true }, disputes: { get: true, create: true } };
@@ -98,7 +99,7 @@ export async function handleTicket(
     const guard = createPaymentGuard({
       upstream,
       task: { mandate: { customerEmail: ticket.customerEmail }, instructions: shop.business.refundPolicy, untrustedInput: ticket.message },
-      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
+      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers, timeoutMs: llm.timeouts.judgeMs })),
       captures,
       subscriptions,
       disputes,
@@ -108,7 +109,8 @@ export async function handleTicket(
     });
     return withClient(guard, 'support-agent', (tools) =>
       runSupportAgent({
-        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers }),
+        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: llm.timeouts.agentStepMs }),
+        deadlineMs: llm.timeouts.agentTicketMs,
         tools,
         ticket,
         instructions: mode === 'vulnerable' ? VULNERABLE_INSTRUCTIONS : shop.business.refundPolicy,

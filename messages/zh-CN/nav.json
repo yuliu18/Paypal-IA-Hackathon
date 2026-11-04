@@ -15,12 +15,13 @@
     "sales": "销售",
     "evaluate": "评估模型",
     "settings": "设置",
-    "apiDocs": "API 文档"
+    "apiDocs": "API"
   },
   "signOut": "退出登录",
   "apiDocs": {
-    "title": "API 文档",
-    "intro": "您商店自己的应用使用“设置 › API 密钥”中的密钥调用这三个接口。点击 Authorize 粘贴密钥即可在此试用：带密钥时，在真实模式开启期间请求走真实 PayPal；不带密钥时使用您的会话，始终走沙盒。",
+    "title": "API",
+    "intro": "您商店自己的应用使用 API 密钥调用三个接口：请在下方创建。在参考文档中点击 Authorize 粘贴密钥即可在此试用：带密钥时，在真实模式开启期间请求走真实 PayPal；不带密钥时使用您的会话，始终走沙盒。",
+    "reference": "参考文档",
     "download": "下载 OpenAPI 文档",
     "failed": "无法加载 Swagger UI（来自 cdn.jsdelivr.net）。下方仍可获取 OpenAPI 文档。"
   }

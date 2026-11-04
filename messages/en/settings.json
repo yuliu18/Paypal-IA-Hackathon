@@ -7,12 +7,10 @@
   "hasError": "has an error",
   "sections": {
     "language": "Language",
-    "business": "Business",
-    "limits": "Limits",
+    "business": "Business and rules",
     "ai": "AI model",
     "paypal": "PayPal app",
-    "notifications": "Notifications",
-    "api-keys": "API keys"
+    "notifications": "Notifications"
   },
   "language": {
     "title": "Language",
@@ -50,6 +48,7 @@
   },
   "testConnection": "Test connection",
   "business": {
+    "title": "Your business",
     "detail": "Who the agents work for and the refund policy they follow. The guard's AI judge checks every refund against this policy.",
     "name": "Business name",
     "contactEmails": "Contact emails",
@@ -57,6 +56,7 @@
     "refundPolicy": "Refund policy"
   },
   "limits": {
+    "title": "Refund limits",
     "detail": "Enforced by the guard whatever the AI decides: no prompt can raise them.",
     "currency": "Currency",
     "noDecimals": "no decimals",
@@ -243,5 +243,37 @@
       "check": "Live PayPal didn't accept the live app, so test mode stays on: {detail}",
       "unreadable": "The saved settings could not be read, so nothing was changed. Try again in a moment."
     }
+  },
+  "documents": {
+    "title": "From your documents",
+    "detail": "Paste your refund policy, terms or customer service handbook, or load them as text files. The AI proposes the refund policy and refund limits they state, each with the sentence it comes from. Nothing changes until you tick a proposal and apply it.",
+    "label": "Your documents",
+    "placeholder": "e.g. Refunds over 50 USD must be checked by a manager. We never refund more than 150 USD for a single order.",
+    "load": "Load text files",
+    "formats": "Plain text or Markdown (.txt, .md). {count} of {max} characters.",
+    "propose": "Propose rules",
+    "reading": "Reading…",
+    "proposalsTitle": "Proposed rules",
+    "none": "The documents state no refund policy or refund limit that differs from your settings.",
+    "effect": {
+      "tightens": "Stricter",
+      "loosens": "Looser",
+      "changes": "New policy text"
+    },
+    "warning": {
+      "loosens": "This would let more money move without a person. Apply it only if you mean to.",
+      "changes": "The support agent and the guard's judge will follow this text instead of the current one. Read it before applying."
+    },
+    "apply": "{count, plural, =0 {Apply selected} one {Apply # rule} other {Apply # rules}}",
+    "applying": "Applying…",
+    "applyScope": "Saved to your settings, checked like any edit.",
+    "applied": "{count, plural, one {# rule applied.} other {# rules applied.}}",
+    "empty": "Paste or load a document first.",
+    "tooLong": "The documents are too long: at most {max} characters.",
+    "busy": "Too many readings. Try again in {seconds} seconds.",
+    "noneChosen": "Tick at least one proposal.",
+    "failed": "The documents could not be read. Check the AI model in Settings; details are in the server log.",
+    "timeout": "The AI model took more than {minutes} minutes. Try again, try a shorter document, or choose a faster model in Settings › AI model.",
+    "readingHint": "Reading… this can take a minute or two with some models."
   }
 }

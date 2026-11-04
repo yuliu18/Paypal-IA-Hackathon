@@ -364,7 +364,7 @@ export async function loadSettings(options: SettingsOptions = {}): Promise<ShopS
 }
 
 // As the owner types it: "100.00", or "5000" in a currency without decimals.
-const decimal = (minor: number, currency: string) => (minor / 100).toFixed(currencyFor(currency)?.decimals ?? 2);
+export const decimal = (minor: number, currency: string) => (minor / 100).toFixed(currencyFor(currency)?.decimals ?? 2);
 
 // What the page shows: every value except the keys, which appear only as their last 4 characters.
 export async function settingsView(options: SettingsOptions = {}): Promise<SettingsView> {
@@ -411,7 +411,7 @@ export async function settingsView(options: SettingsOptions = {}): Promise<Setti
 }
 
 // "12", "12.5" or "12.50" in minor units; undefined for anything else or for 0.
-function toMinor(text: string): number | undefined {
+export function toMinor(text: string): number | undefined {
   const match = /^(\d{1,9})(?:\.(\d{1,2}))?$/.exec(text.trim());
   if (!match) return undefined;
   const minor = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));

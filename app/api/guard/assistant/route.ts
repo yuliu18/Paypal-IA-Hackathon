@@ -11,8 +11,6 @@ import { loadSettings } from '@/lib/settings/settings';
 // tools, fed only masked, structured fields of the newest log entries. Behind the owner's sign-in
 // like every route (proxy.ts).
 
-const TIMEOUT_MS = 30_000;
-
 // Each question spends LLM tokens: 30 per address per 10 minutes, one at a time, 2 at once overall.
 const questions = new TicketLimiter({ perClient: 30, windowMs: 10 * 60_000, inFlightPerClient: 1, inFlight: 2 });
 
@@ -40,7 +38,7 @@ export async function POST(request: Request) {
 
   try {
     const llm = await llmConfig((await loadSettings()).ai);
-    const config = { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: TIMEOUT_MS };
+    const config = { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: llm.timeouts.assistantMs };
     const answer = await askGuardAssistant({
       question,
       entries: await auditLog().list(ASSISTANT_MAX_ENTRIES),

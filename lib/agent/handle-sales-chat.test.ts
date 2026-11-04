@@ -15,7 +15,7 @@ const shop = {
 };
 
 vi.mock('./handle-ticket', () => ({
-  llmConfig: async () => ({ baseUrl: 'https://llm.test', apiKey: 'k', agentModel: 'agent-m', judgeModel: 'judge-m', headers: {} }),
+  llmConfig: async () => ({ baseUrl: 'https://llm.test', apiKey: 'k', agentModel: 'agent-m', judgeModel: 'judge-m', headers: {}, timeouts: { agentStepMs: 60_000, agentTicketMs: 90_000, judgeMs: 15_000, assistantMs: 30_000, documentsMs: 150_000 } }),
   payPalToolkit: (actions: unknown, environment?: unknown) => payPalToolkit(actions, environment),
   heldNotifier: () => 'NOTIFIER',
 }));

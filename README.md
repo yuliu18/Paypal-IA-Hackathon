@@ -37,7 +37,7 @@ More detail: [How it works](docs/how-it-works.md).
 
 ## What's inside
 
-- **Production:** overview, **guard log** (every decision, approvals, black box check, CSV/JSON export, a read-only assistant that explains decisions), an AG Studio **dashboard**, **settings** (business, limits, AI provider, PayPal apps, notifications, API keys), **API docs** (Swagger UI).
+- **Production:** overview, **guard log** (every decision, approvals, black box check, CSV/JSON export, a read-only assistant that explains decisions), an AG Studio **dashboard**, **settings** (business, limits, rules proposed from your own documents, AI provider, PayPal apps, notifications, API keys), **API docs** (Swagger UI).
 - **Test a model** (always on the PayPal sandbox): support, billing and sales desks to try the agents, and an **evaluation** that runs business cases and attacks against any model and scores it.
 - **Live mode:** a sandbox app and a live app, and a guarded switch between them (server flag, credential check, typed confirmation). Only your app's API-key calls ever go live.
 - Owner login with password recovery, exponential lockout against brute force, four languages.
@@ -74,7 +74,7 @@ Step by step, from a fresh clone to real money: [Connect your business](docs/con
 
 ## Connect your app
 
-Create a key in Settings › **API keys**, then call an agent with the customer your app has already identified:
+Create a key on the **API** page (`/api-docs`), then call an agent with the customer your app has already identified:
 
 ```bash
 curl -X POST https://your-guard.example/api/support/tickets \
@@ -86,7 +86,7 @@ Show the customer `reply`; keep `steps` (each PayPal call and the guard's decisi
 
 ## Make it yours
 
-- **Without code:** in Settings, your refund policy in plain words (the agent follows it, the judge checks against it), the limits, the AI model, where held actions are announced.
+- **Without code:** in Settings, your refund policy in plain words (the agent follows it, the judge checks against it), the limits, the AI model, where held actions are announced. Or paste your refund policy or handbook into **From your documents**: the AI proposes the policy and limits it states, quoting each sentence, and you approve each one.
 - **With code:** the guard is hexagonal. Its rules are pure functions in [`lib/guard/domain`](lib/guard/domain), and everything it asks the outside world (PayPal lookups, the judge, your customer list, your catalogue, the log, notifications) is a port in [`lib/guard/ports.ts`](lib/guard/ports.ts) with swappable adapters. Add a rule, plug in your CRM or catalogue, or change storage without touching the core: [Architecture](docs/architecture.md).
 - **Pick a model with evidence:** **Evaluate a model** runs the same business cases and attacks against any provider, and `npm run redteam` adds promptfoo's red team ([Testing an AI model](docs/evaluation.md)).
 

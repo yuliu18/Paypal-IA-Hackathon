@@ -13,7 +13,7 @@ import { firstSectionWithError, sectionFrom, type SettingsSectionId } from './se
 import { PageHeader } from '../ui/page-header';
 import { primaryButton, Spinner } from '../ui/desk';
 import { LanguagePicker } from './language-picker';
-import { ApiKeysSection, type ApiKeysView } from './api-keys-section';
+import { DocumentsSection } from './documents-section';
 import { LiveModeSection } from './live-mode-section';
 import type { LiveModeStatus } from '@/lib/settings/live-mode';
 
@@ -37,6 +37,17 @@ function Section({ id, open, title, detail, cards, children }: { id: SettingsSec
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>
       {cards ? <div className="mt-5 space-y-4">{children}</div> : <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>}
     </section>
+  );
+}
+
+// One card of a section made of cards, e.g. the business and its limits.
+function SubCard({ title, detail, children }: { title: string; detail?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-pp-border bg-pp-surface p-6">
+      <h3 className="font-semibold">{title}</h3>
+      {detail && <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{detail}</p>}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">{children}</div>
+    </div>
   );
 }
 
@@ -128,13 +139,11 @@ export function SettingsEditor({
   view,
   providers,
   initialModels,
-  apiKeys,
   liveMode,
 }: {
   view: SettingsView;
   providers: CatalogProvider[];
   initialModels: CatalogModel[];
-  apiKeys: ApiKeysView;
   liveMode: LiveModeStatus;
 }) {
   const t = useTranslations('settings');
@@ -156,7 +165,7 @@ export function SettingsEditor({
   const [testing, startTesting] = useTransition();
   const errors: Partial<Record<keyof SettingsForm | 'form', string>> = state && !state.ok ? state.errors : {};
   const defaults = view.form;
-  // The open section is in the address (/settings?section=limits), so the side menu's list of
+  // The open section is in the address (/settings?section=ai), so the side menu's list of
   // sections (./settings-nav.tsx) and the page agree on it.
   const router = useRouter();
   const open = sectionFrom(useSearchParams().get('section'));
@@ -245,37 +254,42 @@ export function SettingsEditor({
           <LanguagePicker />
         </Section>
         <fieldset disabled={view.locked} className="min-w-0 space-y-6">
-          <Section id="business" open={open} title={t('sections.business')} detail={t('business.detail')}>
-            <Field label={t('business.name')} error={errors.name}>
-              <input name="name" defaultValue={defaults.name} className={input} />
-            </Field>
-            <Field label={t('business.contactEmails')} error={errors.contactEmails} hint={t('business.contactEmailsHint')}>
-              <input name="contactEmails" defaultValue={defaults.contactEmails} placeholder="help@yourshop.com" className={input} />
-            </Field>
-            <Field label={t('business.refundPolicy')} error={errors.refundPolicy} wide>
-              <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={8} className={`${input} h-auto leading-relaxed`} />
-            </Field>
-          </Section>
-
-          <Section id="limits" open={open} title={t('sections.limits')} detail={t('limits.detail')}>
-            <Field label={t('limits.currency')} error={errors.currency}>
-              <Picker
-                name="currency"
-                value={currency}
-                onChange={setCurrency}
-                options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? t('limits.noDecimals') : undefined }))}
-                disabled={view.locked}
-              />
-            </Field>
-            <Field label={t('limits.autoRefundUpTo')} error={errors.autoRefundUpTo} hint={t('limits.autoRefundUpToHint')}>
-              <input name="autoRefundUpTo" defaultValue={defaults.autoRefundUpTo} inputMode="decimal" className={input} />
-            </Field>
-            <Field label={t('limits.approvalUpTo')} error={errors.approvalUpTo} hint={t('limits.approvalUpToHint')}>
-              <input name="approvalUpTo" defaultValue={defaults.approvalUpTo} inputMode="decimal" className={input} />
-            </Field>
-            <Field label={t('limits.dailyCap')} error={errors.dailyCap} hint={t('limits.dailyCapHint')}>
-              <input name="dailyCap" defaultValue={defaults.dailyCap} inputMode="decimal" className={input} />
-            </Field>
+          {/* Keyed by the saved rules: rules applied from the documents (below the form) reach these
+              fields, so a later save can't write the old ones back. */}
+          <Section id="business" open={open} title={t('sections.business')} detail={t('business.detail')} cards>
+            <div key={[defaults.refundPolicy, defaults.autoRefundUpTo, defaults.approvalUpTo, defaults.dailyCap].join('\u0000')} className="space-y-4">
+              <SubCard title={t('business.title')}>
+                <Field label={t('business.name')} error={errors.name}>
+                  <input name="name" defaultValue={defaults.name} className={input} />
+                </Field>
+                <Field label={t('business.contactEmails')} error={errors.contactEmails} hint={t('business.contactEmailsHint')}>
+                  <input name="contactEmails" defaultValue={defaults.contactEmails} placeholder="help@yourshop.com" className={input} />
+                </Field>
+                <Field label={t('business.refundPolicy')} error={errors.refundPolicy} wide>
+                  <textarea name="refundPolicy" defaultValue={defaults.refundPolicy} rows={8} className={`${input} h-auto leading-relaxed`} />
+                </Field>
+              </SubCard>
+              <SubCard title={t('limits.title')} detail={t('limits.detail')}>
+                <Field label={t('limits.currency')} error={errors.currency}>
+                  <Picker
+                    name="currency"
+                    value={currency}
+                    onChange={setCurrency}
+                    options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, detail: c.decimals === 0 ? t('limits.noDecimals') : undefined }))}
+                    disabled={view.locked}
+                  />
+                </Field>
+                <Field label={t('limits.autoRefundUpTo')} error={errors.autoRefundUpTo} hint={t('limits.autoRefundUpToHint')}>
+                  <input name="autoRefundUpTo" defaultValue={defaults.autoRefundUpTo} inputMode="decimal" className={input} />
+                </Field>
+                <Field label={t('limits.approvalUpTo')} error={errors.approvalUpTo} hint={t('limits.approvalUpToHint')}>
+                  <input name="approvalUpTo" defaultValue={defaults.approvalUpTo} inputMode="decimal" className={input} />
+                </Field>
+                <Field label={t('limits.dailyCap')} error={errors.dailyCap} hint={t('limits.dailyCapHint')}>
+                  <input name="dailyCap" defaultValue={defaults.dailyCap} inputMode="decimal" className={input} />
+                </Field>
+              </SubCard>
+            </div>
           </Section>
 
           <Section id="ai" open={open} title={t('sections.ai')} detail={t('ai.detail')}>
@@ -495,8 +509,8 @@ export function SettingsEditor({
             </Channel>
           </Section>
 
-          {/* The language and the API keys save on their own, so the form's button stays out of their sections. */}
-          <div hidden={open === 'language' || open === 'api-keys'} className="flex flex-wrap items-center gap-4">
+          {/* The language saves on its own, at once, so the form's button stays out of its section. */}
+          <div hidden={open === 'language'} className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={saving} className={primaryButton}>
               {saving && <Spinner />}
               {saving ? t('save.saving') : t('save.button')}
@@ -511,7 +525,7 @@ export function SettingsEditor({
       </form>
       {/* Outside the settings form: a form can't hold another. */}
       <div className="max-w-4xl">
-        <ApiKeysSection hidden={open !== 'api-keys'} view={apiKeys} locked={view.locked} />
+        <DocumentsSection hidden={open !== 'business'} locked={view.locked} currency={view.form.currency} />
         <LiveModeSection hidden={open !== 'paypal'} status={liveMode} locked={view.locked} />
       </div>
     </main>
