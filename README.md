@@ -65,7 +65,7 @@ Payment Guard is a standard Next.js server: it runs on any host that runs Node 2
 | Choice | Options |
 |---|---|
 | **Database** | None (local files, development only) · any Postgres: Neon, Supabase, RDS, Render Postgres, your own, or `docker compose up -d` locally ([`docker-compose.yml`](docker-compose.yml)). Set `DATABASE_URL`. |
-| **Sign-in** | **Owner login** with Neon Auth (email and password, recovery by code; the data then lives in that Neon database) · or one shared `DEMO_PASSWORD` with any database. |
+| **Sign-in** | **Owner login** with email and password on any setup: built in (kept in your Postgres, or a local file without one; recovery with `npm run owner:reset` on the server) · or with Neon Auth (recovery by emailed code; the data then lives in that Neon database). |
 | **Money** | Sandbox only (default) · live PayPal when you set `ALLOW_LIVE_MODE=true` and switch it on in Settings. |
 
 Build command `npm ci && npm run build && npm run db:migrate`, start command `npm run start`. The environment only holds what the server needs before anyone signs in, listed in [`env.example`](env.example); everything else is set in the app and stored encrypted.
@@ -104,7 +104,6 @@ Show the customer `reply`; keep `steps` (each PayPal call and the guard's decisi
 
 - **Bring your own agent:** expose the guard itself as an MCP endpoint behind an API key, so an agent a shop already runs gets the same checks.
 - **Your records as the source of truth:** customer directory and catalogue read from the shop's own systems instead of sample data ([how](docs/connect-your-business.md#4-fit-it-to-your-shop)).
-- **Owner login without Neon:** self-hosted accounts on any Postgres.
 - **Several businesses per installation**, each with its own settings, keys and black box.
 - **Live dashboard data** and separate daily caps for sandbox and live.
 - **Scale-out:** limits shared across server instances (today they live in one process).

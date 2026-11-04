@@ -29,7 +29,7 @@ export function liveModeStatus(settings: Pick<ShopSettings, 'mode' | 'paypalLive
 }
 
 // The PayPal environment one request runs in. `apiKeyId`: the API key it came in with
-// (lib/auth/api-key-header.ts apiKeyIdFrom), null for the owner's session or the demo password.
+// (lib/auth/api-key-header.ts apiKeyIdFrom), null for the owner's session.
 export function paymentEnvironment({
   settings,
   env = process.env,

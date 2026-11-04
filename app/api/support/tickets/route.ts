@@ -1,6 +1,6 @@
 import { handleTicket } from '@/lib/agent/handle-ticket';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
-import { clientAddress } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 import { requestEnvironment } from '@/lib/settings/live-mode';
 
 // Runs the demo support agent on one ticket. Every PayPal call it makes goes through the payment

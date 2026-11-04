@@ -1,5 +1,5 @@
-// How the proxy tells a route that its caller used an API key rather than the owner's session or
-// the demo password: it sets `x-pg-auth: api-key:<key id>` on the request it forwards, after
+// How the proxy tells a route that its caller used an API key rather than the owner's session:
+// it sets `x-pg-auth: api-key:<key id>` on the request it forwards, after
 // removing any copy the client sent (lib/auth/gate.ts), so a route can trust it.
 
 export const API_KEY_AUTH_HEADER = 'x-pg-auth';

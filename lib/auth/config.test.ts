@@ -4,9 +4,10 @@ import { authMode } from './config';
 const secret = 'x'.repeat(32);
 
 describe('authMode', () => {
-  it('uses the demo password when Neon Auth is not configured', () => {
-    expect(authMode({})).toEqual({ kind: 'demo' });
-    expect(authMode({ NEON_AUTH_BASE_URL: '', DATABASE_URL: 'postgres://db' })).toEqual({ kind: 'demo' });
+  it('uses the built-in owner accounts when Neon Auth is not configured, with or without a database', () => {
+    expect(authMode({})).toEqual({ kind: 'local' });
+    expect(authMode({ NEON_AUTH_BASE_URL: '', DATABASE_URL: 'postgres://db' })).toEqual({ kind: 'local' });
+    expect(authMode({ DEMO_PASSWORD: 'anything' })).toEqual({ kind: 'local' });
   });
 
   it('uses the owner login when Neon Auth, its cookie secret and the database are configured', () => {

@@ -1,6 +1,6 @@
 import { handleSalesChat } from '@/lib/agent/handle-sales-chat';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
-import { clientAddress } from '@/lib/demo-auth';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 import { requestEnvironment } from '@/lib/settings/live-mode';
 import { shopOrigin } from '@/lib/shop/checkout';
 

@@ -1,17 +1,53 @@
 import type { NextRequest } from 'next/server';
 import { safeNextPath } from '@/lib/auth/access';
+import { authMode } from '@/lib/auth/config';
+import { clientAddress } from '@/lib/auth/failed-attempts';
 import { backToLogin, field, refuseFormPost, seeOther } from '@/lib/auth/form-post';
 import { limits } from '@/lib/auth/limits';
+import { sessionCookie, startSession } from '@/lib/auth/local-session';
+import { localAuthStore, type LocalOwner } from '@/lib/auth/local-store';
 import { owner, ownerEmail } from '@/lib/auth/owner';
+import { spendPasswordCheck, verifyPassword } from '@/lib/auth/scrypt';
 import { neonAuth } from '@/lib/auth/server';
-import { clientAddress } from '@/lib/demo-auth';
+import { signInOwner, type PasswordCheck, type SignInDeps } from '@/lib/auth/sign-in';
 
-// 10 wrong passwords (or reset codes) lock that client out for 15 minutes; from the 5th in a row for
-// the owner's account, from any client, it is locked for 1 minute, doubling with every further
-// failure up to an hour (lib/auth/limits.ts).
-const failures = limits.signInFailures;
+// With Neon Auth: its own sign-in, then only the owner's account may stay signed in.
+function neonCheck(email: string, password: string): Pick<SignInDeps, 'ownerEmail' | 'check'> {
+  return {
+    ownerEmail,
+    async check(): Promise<PasswordCheck> {
+      const auth = neonAuth();
+      const { data, error } = await auth.signIn.email({ email, password });
+      if (error) return (error.status ?? 500) >= 500 ? 'unavailable' : 'wrong';
+      if (data?.user?.id === undefined || data.user.id !== (await owner.ownerId())) {
+        await auth.signOut().catch(() => undefined);
+        return 'notOwner';
+      }
+      return 'ok';
+    },
+  };
+}
 
-// The sign-in form's post (app/login). Only the owner's account may sign in here.
+// With the built-in account: the scrypt hash in the store. An address that is not the owner's still
+// costs one hash, so the answer's timing doesn't tell. A right password starts a session.
+function localCheck(password: string, signedIn: (token: string) => void): Pick<SignInDeps, 'ownerEmail' | 'check'> {
+  let account: LocalOwner | null = null;
+  return {
+    async ownerEmail() {
+      account = await localAuthStore().owner();
+      return account?.email ?? null;
+    },
+    async check(isOwner): Promise<PasswordCheck> {
+      if (!isOwner || account === null) return spendPasswordCheck(password).then(() => 'wrong');
+      if (!(await verifyPassword(password, account.passwordHash))) return 'wrong';
+      signedIn(await startSession(localAuthStore()));
+      return 'ok';
+    },
+  };
+}
+
+// The sign-in form's post (app/login). Only the owner's account may sign in here, with the limits
+// lib/auth/sign-in.ts describes.
 export async function POST(request: NextRequest) {
   const refused = refuseFormPost(request);
   if (refused) return refused;
@@ -19,47 +55,22 @@ export async function POST(request: NextRequest) {
   const next = safeNextPath(field(form, 'next'));
   const email = field(form, 'email').trim().toLowerCase();
   const password = field(form, 'password');
-  const client = clientAddress(request.headers);
-  if (failures.retryAfterMs(client, Date.now()) > 0) return backToLogin(request, 'locked', next);
-  if (!email || !password) return backToLogin(request, 'invalid', next);
 
-  // Only the owner's address is counted in the lockout that matters, so guesses at other addresses
-  // can't push it out; they get the same answers from their own count, so "locked" never reveals
-  // which address is the owner's.
-  let isOwner: boolean;
-  try {
-    const address = await ownerEmail();
-    isOwner = address !== null && address.trim().toLowerCase() === email;
-  } catch (error) {
-    console.error('Owner lookup failed while signing in', error);
-    return backToLogin(request, 'unavailable', next);
+  let token: string | undefined;
+  const outcome = await signInOwner(
+    { email, password, client: clientAddress(request.headers) },
+    {
+      ...(authMode().kind === 'neon' ? neonCheck(email, password) : localCheck(password, (t) => (token = t))),
+      failures: limits.signInFailures,
+      accounts: limits.accountFailures,
+      otherAccounts: limits.otherAccountFailures,
+    },
+  );
+  if (outcome !== 'ok') return backToLogin(request, outcome, next);
+  const response = seeOther(request, next);
+  if (token !== undefined) {
+    const { name, value, options } = sessionCookie(request, token);
+    response.cookies.set(name, value, options);
   }
-  const accounts = isOwner ? limits.accountFailures : limits.otherAccountFailures;
-  // Reserved before asking Neon Auth, so guesses sent at the same moment can't all get through.
-  if (!accounts.begin(email, Date.now())) return backToLogin(request, 'locked', next);
-
-  const auth = neonAuth();
-  try {
-    const { data, error } = await auth.signIn.email({ email, password });
-    if (error) {
-      if ((error.status ?? 500) >= 500) {
-        accounts.end(email, 'neutral', Date.now());
-        return backToLogin(request, 'unavailable', next);
-      }
-      failures.record(client, Date.now());
-      accounts.end(email, 'failure', Date.now());
-      return backToLogin(request, 'invalid', next);
-    }
-    if (data?.user?.id === undefined || data.user.id !== (await owner.ownerId())) {
-      accounts.end(email, 'neutral', Date.now());
-      await auth.signOut().catch(() => undefined);
-      return backToLogin(request, 'notOwner', next);
-    }
-    accounts.end(email, 'success', Date.now());
-  } catch (error) {
-    accounts.end(email, 'neutral', Date.now());
-    console.error('Sign-in failed', error);
-    return backToLogin(request, 'unavailable', next);
-  }
-  return seeOther(request, next);
+  return response;
 }

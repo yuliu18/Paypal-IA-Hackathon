@@ -1,7 +1,8 @@
 // The decision proxy.ts makes for every page and API route (static assets never reach it).
-// With Neon Auth, only the owner's session opens the app; pages without it go to /login, API
-// calls get 401. Without Neon Auth, the demo password decides, unchanged. Anything that cannot be
-// checked (Neon Auth or the database unreachable) counts as no session: it fails closed.
+// Only the owner's session opens the app, whether Neon Auth keeps the account or the app does
+// (lib/auth/local-session.ts); pages without it go to /login, API calls get 401. Anything that
+// cannot be checked (Neon Auth, the database or the account file unreachable) counts as no
+// session: it fails closed.
 // In either mode, the three agent routes also take `Authorization: Bearer <api key>` (the
 // business's own app); a key that doesn't check out is refused with 401, and no other route looks
 // at it. Every request let through loses any x-pg-auth header the client sent; the proxy sets it
@@ -17,7 +18,6 @@ export type SessionRead = { userId: string | undefined; cookies: SessionCookie[]
 
 export type GateDeps = {
   mode: AuthMode;
-  demo: (request: NextRequest) => NextResponse | Promise<NextResponse>;
   session: (request: NextRequest) => Promise<SessionRead>;
   ownerId: () => Promise<string | null>;
   // The key's id when it is a live API key, otherwise null.
@@ -33,8 +33,6 @@ function pass(request: NextRequest, apiKeyId?: string): NextResponse {
   if (apiKeyId !== undefined) headers.set(API_KEY_AUTH_HEADER, apiKeyAuthValue(apiKeyId));
   return NextResponse.next({ request: { headers } });
 }
-
-const passedThrough = (response: NextResponse) => response.headers.get('x-middleware-next') === '1';
 
 async function keyHolder(key: string, deps: GateDeps): Promise<string | undefined> {
   try {
@@ -55,11 +53,6 @@ export async function gate(request: NextRequest, deps: GateDeps): Promise<NextRe
   if (key !== undefined && acceptsApiKey({ method: request.method, pathname, serverAction })) {
     const keyId = await keyHolder(key, deps);
     return keyId === undefined ? NextResponse.json({ error: 'Invalid or revoked API key.' }, { status: 401 }) : pass(request, keyId);
-  }
-
-  if (mode.kind === 'demo') {
-    const response = await deps.demo(request);
-    return passedThrough(response) ? pass(request) : response;
   }
 
   if (isPublicRequest({ method: request.method, pathname, serverAction })) return pass(request);

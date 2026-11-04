@@ -45,7 +45,7 @@ The guard fails closed: a missing adapter, a failed lookup, a judge that times o
 
 ## Data
 
-One Postgres database, separate schemas: `neon_auth` (Neon Auth's users), `auth`, and `guard` (`audit_log`, `audit_head`, `settings`, `settings_key`, `api_keys`). Migrations in [`lib/db`](../lib/db) run on deploy (`npm run db:migrate`) and before the first query. Secrets saved in Settings are sealed with AES-256-GCM; API keys are stored only as SHA-256 hashes.
+One Postgres database, separate schemas: `auth` (the built-in owner account: `owner`, `sessions`), `neon_auth` (Neon Auth's users, when it is used), and `guard` (`audit_log`, `audit_head`, `settings`, `settings_key`, `api_keys`). Migrations in [`lib/db`](../lib/db) run on deploy (`npm run db:migrate`) and before the first query. Secrets saved in Settings are sealed with AES-256-GCM; API keys and session cookies are stored only as SHA-256 hashes, the owner's password only as a scrypt hash. Without a database the owner account is a SQLite file (`AUTH_DB`, default `data/auth.db`).
 
 ## Limits of this version
 

@@ -1,7 +1,7 @@
 // The rate limits the public sign-in and recovery endpoints share, one set per server process
 // (kept on globalThis across dev reloads).
 
-import { FailedAttempts } from '@/lib/demo-auth';
+import { FailedAttempts } from './failed-attempts';
 import { AccountLockout } from './account-lockout';
 import { CodeThrottle } from './recovery';
 

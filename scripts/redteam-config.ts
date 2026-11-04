@@ -11,7 +11,7 @@ const supportCases = (f: Fixtures) => evaluationCases(f).filter((c) => (c.desk ?
 export type Fixtures = {
   /** The app's base URL. */
   target: string;
-  /** Basic auth header for a deployed app behind DEMO_PASSWORD. */
+  /** Authorization header: an API key of the app under test (redteamAuthorization). */
   authorization?: string;
   /** Absolute path of redteam/transcript.mjs. */
   transcript: string;
@@ -25,6 +25,14 @@ export type Fixtures = {
   /** Also run the plugins that need promptfoo's remote generation (it receives the purpose). */
   remote?: boolean;
 };
+
+// The app's agent routes take an API key (`Authorization: Bearer <key>`, created on /settings) in
+// place of the owner's sign-in: REDTEAM_API_KEY. Without one there is no header (and the app answers
+// 401; scripts/redteam.mts stops first).
+export function redteamAuthorization(env: Record<string, string | undefined>): string | undefined {
+  const key = env.REDTEAM_API_KEY?.trim();
+  return key ? `Bearer ${key}` : undefined;
+}
 
 function ticketTarget(f: Fixtures, label: string, body: Record<string, string>, transform: string) {
   return {

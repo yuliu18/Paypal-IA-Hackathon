@@ -10,7 +10,7 @@ export type DecideState = HeldDecision | null;
 
 // Approve or reject one held call from the /guard page. A held order is re-checked against the
 // shop's origin, as the sales desk created it (APP_URL, else the local dev server: lib/shop/checkout.ts shopOrigin).
-// The proxy's demo password already covers this action, since Server Actions post to the page's
+// The proxy's owner sign-in already covers this action, since Server Actions post to the page's
 // own route.
 export async function decideHeldAction(_previous: DecideState, form: FormData): Promise<DecideState> {
   const id = form.get('id');

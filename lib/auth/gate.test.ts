@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { NextRequest } from 'next/server';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { AuthMode } from './config';
 import { gate, type GateDeps } from './gate';
+import { localSession, SESSION_COOKIE, startSession } from './local-session';
+import { createSqliteAuthStore } from './sqlite-auth-store';
 
 const neon: AuthMode = { kind: 'neon', baseUrl: 'https://auth.example/neondb/auth', cookieSecret: 'x'.repeat(32) };
 const request = (path: string, init: { method?: string; headers?: Record<string, string> } = {}) =>
@@ -9,7 +14,6 @@ const request = (path: string, init: { method?: string; headers?: Record<string,
 
 const deps = (overrides: Partial<GateDeps> = {}): GateDeps => ({
   mode: neon,
-  demo: () => new NextResponse('demo', { status: 401 }),
   session: async () => ({ userId: undefined, cookies: [] }),
   ownerId: async () => 'owner-1',
   apiKey: async () => null,
@@ -26,14 +30,76 @@ const forwardedAuth = (response: Response) => {
   return overridden.includes('x-pg-auth') ? response.headers.get('x-middleware-request-x-pg-auth') : null;
 };
 
-describe('gate without Neon Auth (demo password)', () => {
-  it('leaves every request, the login page included, to the demo password unchanged', async () => {
-    const demo = vi.fn(() => new NextResponse('Authentication required.', { status: 401 }));
-    for (const path of ['/', '/login', '/api/guard/export', '/api/auth/sign-in']) {
-      const response = await gate(request(path), deps({ mode: { kind: 'demo' }, demo }));
-      expect(response.status).toBe(401);
+// The built-in owner account, as proxy.ts wires it: sessions read from a real SQLite store.
+const scratch = mkdtempSync(join(tmpdir(), 'gate-'));
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+let stores = 0;
+const localStore = () => createSqliteAuthStore(join(scratch, `auth-${++stores}.db`));
+const local: AuthMode = { kind: 'local' };
+const withCookie = (path: string, token: string, init: { method?: string } = {}) => request(path, { ...init, headers: { cookie: `${SESSION_COOKIE}=${token}` } });
+
+describe('gate with the built-in owner account', () => {
+  const t0 = new Date('2026-11-02T10:00:00Z');
+  const setUp = async () => {
+    const store = localStore();
+    await store.createOwner({ email: 'owner@shop.example', passwordHash: 'scrypt$x' }, t0);
+    let clock = t0;
+    const read = localSession(() => store, () => clock);
+    return { store, read, token: await startSession(store, t0), at: (date: Date) => (clock = date) };
+  };
+
+  it('lets the owner’s session through', async () => {
+    const { read, token } = await setUp();
+    expect(passedThrough(await gate(withCookie('/guard', token), deps({ mode: local, ...read })))).toBe(true);
+    expect(passedThrough(await gate(withCookie('/api/guard/export', token), deps({ mode: local, ...read })))).toBe(true);
+  });
+
+  it('sends a page without a session to the login page (an absolute URL) and refuses an API call with 401', async () => {
+    const { read } = await setUp();
+    const page = await gate(request('/guard?verdict=blocked'), deps({ mode: local, ...read }));
+    expect(page.status).toBe(307);
+    expect(page.headers.get('location')).toBe('https://guard.example/login?next=%2Fguard%3Fverdict%3Dblocked');
+    const api = await gate(request('/api/guard/export'), deps({ mode: local, ...read }));
+    expect(api.status).toBe(401);
+    expect(await api.json()).toEqual({ error: 'Sign in required.' });
+    expect((await gate(withCookie('/guard', 'made-up'), deps({ mode: local, ...read }))).status).toBe(307);
+  });
+
+  it('refuses a session once it has expired, 7 days after it started', async () => {
+    const { read, token, at } = await setUp();
+    at(new Date(t0.getTime() + 7 * 24 * 3600_000 - 1));
+    expect(passedThrough(await gate(withCookie('/guard', token), deps({ mode: local, ...read })))).toBe(true);
+    at(new Date(t0.getTime() + 7 * 24 * 3600_000));
+    expect((await gate(withCookie('/guard', token), deps({ mode: local, ...read }))).status).toBe(307);
+    expect((await gate(withCookie('/api/guard/export', token), deps({ mode: local, ...read }))).status).toBe(401);
+  });
+
+  it('lets anyone reach the login page and the sign-in endpoints without reading the store', async () => {
+    const store = vi.fn(() => {
+      throw new Error('should not be read');
+    });
+    const read = localSession(store);
+    expect(passedThrough(await gate(request('/login'), deps({ mode: local, ...read })))).toBe(true);
+    for (const path of ['/api/auth/sign-in', '/api/auth/owner', '/api/auth/sign-out']) {
+      expect(passedThrough(await gate(request(path, { method: 'POST' }), deps({ mode: local, ...read })))).toBe(true);
     }
-    expect(demo).toHaveBeenCalledTimes(4);
+    expect(passedThrough(await gate(request('/checkout?paid=ok'), deps({ mode: local, ...read })))).toBe(true);
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the store cannot be opened or read', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { token } = await setUp();
+    const broken = localSession(() => {
+      throw new Error('disk gone');
+    });
+    expect((await gate(withCookie('/guard', token), deps({ mode: local, ...broken }))).status).toBe(307);
+    expect((await gate(withCookie('/api/guard/export', token), deps({ mode: local, ...broken }))).status).toBe(401);
+    const store = localStore();
+    store.close?.();
+    expect((await gate(withCookie('/api/guard/export', token), deps({ mode: local, ...localSession(() => store) }))).status).toBe(401);
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 });
 
@@ -135,25 +201,22 @@ describe('gate with an API key', () => {
   const AGENT_ROUTES = ['/api/support/tickets', '/api/billing/tasks', '/api/sales/chats'];
   const bearer = (key = KEY, extra: Record<string, string> = {}) => ({ method: 'POST', headers: { authorization: `Bearer ${key}`, ...extra } });
   const apiKey = vi.fn(async (key: string) => (key === KEY ? { keyId: 'key-1' } : null));
-  const demo = { kind: 'demo' } as const;
 
-  it('lets a valid key POST to the three agent routes, with owner login or the demo password, and tells the route', async () => {
-    for (const mode of [neon, demo]) {
+  it('lets a valid key POST to the three agent routes, with Neon Auth or the built-in owner account, and tells the route', async () => {
+    for (const mode of [neon, local]) {
       for (const path of AGENT_ROUTES) {
         const session = vi.fn();
-        const demoGate = vi.fn();
-        const response = await gate(request(path, bearer()), deps({ mode, apiKey, session, demo: demoGate }));
+        const response = await gate(request(path, bearer()), deps({ mode, apiKey, session }));
         expect(passedThrough(response)).toBe(true);
         expect(forwardedAuth(response)).toBe('api-key:key-1');
         expect(session).not.toHaveBeenCalled();
-        expect(demoGate).not.toHaveBeenCalled();
       }
     }
   });
 
   it('refuses a wrong or revoked key on an agent route with 401 JSON, never a redirect, even with a session', async () => {
     const owner = async () => ({ userId: 'owner-1', cookies: [] });
-    for (const mode of [neon, demo]) {
+    for (const mode of [neon, local]) {
       const response = await gate(request('/api/support/tickets', bearer(`pg_${'x'.repeat(43)}`)), deps({ mode, apiKey, session: owner }));
       expect(response.status).toBe(401);
       expect(response.headers.get('location')).toBeNull();
@@ -183,14 +246,13 @@ describe('gate with an API key', () => {
       ['/api/billing/tasks', { ...bearer(), method: 'PUT' }],
       ['/api/sales/chats', bearer(KEY, { 'next-action': 'abc123' })],
     ];
-    for (const [path, init] of elsewhere) {
-      const response = await gate(request(path, init), deps({ apiKey }));
-      expect(passedThrough(response)).toBe(false);
-      expect(response.status === 401 || response.status === 307).toBe(true);
+    for (const mode of [neon, local]) {
+      for (const [path, init] of elsewhere) {
+        const response = await gate(request(path, init), deps({ mode, apiKey }));
+        expect(passedThrough(response)).toBe(false);
+        expect(response.status === 401 || response.status === 307).toBe(true);
+      }
     }
-    const demoGate = vi.fn(() => new NextResponse('Authentication required.', { status: 401 }));
-    expect((await gate(request('/api/guard/export', bearer()), deps({ mode: demo, apiKey, demo: demoGate }))).status).toBe(401);
-    expect(demoGate).toHaveBeenCalledTimes(1);
     expect(apiKey).not.toHaveBeenCalled();
   });
 
@@ -208,10 +270,9 @@ describe('gate with an API key', () => {
   it('removes an x-pg-auth header the client sent, whoever lets the request through', async () => {
     const forged = { 'x-pg-auth': 'api-key:forged' };
     const owner = async () => ({ userId: 'owner-1', cookies: [] });
-    const allowDemo = () => NextResponse.next();
     const cases: [string, Parameters<typeof request>[1], Partial<GateDeps>][] = [
       ['/api/support/tickets', { method: 'POST', headers: forged }, { session: owner }],
-      ['/api/support/tickets', { method: 'POST', headers: forged }, { mode: demo, demo: allowDemo }],
+      ['/api/support/tickets', { method: 'POST', headers: forged }, { mode: local, session: owner }],
       ['/settings', { headers: forged }, { session: owner }],
       ['/login', { headers: forged }, {}],
       ['/api/auth/sign-in', { method: 'POST', headers: forged }, {}],

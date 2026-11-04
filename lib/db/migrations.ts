@@ -3,13 +3,15 @@
 // two processes starting together apply each migration once, and a failed one leaves nothing half
 // applied.
 //
-// Two stores, as the owner asked: schema `auth` is reserved for accounts (created empty here; the
-// login owns its content, and Neon Auth keeps its own users in schema `neon_auth`), and schema
+// Two stores, as the owner asked: schema `auth` holds the built-in owner account and its sessions
+// (lib/auth/local-store.ts; Neon Auth keeps its own users in schema `neon_auth`), and schema
 // `guard` holds what the guard writes: its black box and the installation's settings.
 
 import { schemaName, type Db } from './db.ts';
 
-type Migration = { version: number; name: string; statements: (s: string) => string[] };
+// `s` is the guard schema, `a` the auth schema (the guard schema too when migrate is told to leave
+// the auth schema alone, as db-probe does).
+type Migration = { version: number; name: string; statements: (s: string, a: string) => string[] };
 
 // Columns mirror the SQLite black box (lib/guard/adapters/sqlite-audit-log.ts) one for one, as text
 // where SQLite stores text, so a row hashes the same in both. Never edit a migration that shipped:
@@ -91,6 +93,28 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 3,
+    name: 'owner account',
+    statements: (_s, a) => [
+      // The installation's one owner when Neon Auth is not used: the row with id 1, or none yet.
+      // Only the scrypt hash of the password is kept (lib/auth/scrypt.ts).
+      `CREATE TABLE IF NOT EXISTS ${a}.owner (
+        id SMALLINT PRIMARY KEY CHECK (id = 1),
+        email TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )`,
+      // The owner's signed-in sessions: only the SHA-256 hash of each session cookie.
+      `CREATE TABLE IF NOT EXISTS ${a}.sessions (
+        token_hash TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS sessions_expires_at ON ${a}.sessions (expires_at)`,
+    ],
+  },
 ];
 
 export type MigrateOptions = { guardSchema?: string; authSchema?: string | null };
@@ -98,10 +122,11 @@ export type MigrateOptions = { guardSchema?: string; authSchema?: string | null 
 // Returns the versions applied by this call (empty when the database was already current).
 export async function migrate(db: Db, { guardSchema = 'guard', authSchema = 'auth' }: MigrateOptions = {}): Promise<number[]> {
   const s = schemaName(guardSchema);
+  const a = authSchema === null ? s : schemaName(authSchema);
   return db.transaction(async (tx) => {
     // Any constant: it only has to be the same in every process running migrations.
     await tx.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`migrate:${s}`]);
-    if (authSchema !== null) await tx.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName(authSchema)}`);
+    if (authSchema !== null) await tx.query(`CREATE SCHEMA IF NOT EXISTS ${a}`);
     await tx.query(`CREATE SCHEMA IF NOT EXISTS ${s}`);
     await tx.query(`CREATE TABLE IF NOT EXISTS ${s}.schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -112,7 +137,7 @@ export async function migrate(db: Db, { guardSchema = 'guard', authSchema = 'aut
     const applied: number[] = [];
     for (const migration of MIGRATIONS) {
       if (done.has(migration.version)) continue;
-      for (const statement of migration.statements(s)) await tx.query(statement);
+      for (const statement of migration.statements(s, a)) await tx.query(statement);
       await tx.query(`INSERT INTO ${s}.schema_migrations (version, name) VALUES ($1, $2)`, [migration.version, migration.name]);
       applied.push(migration.version);
     }
