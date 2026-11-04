@@ -53,7 +53,7 @@ describe('proposeRulesAction', () => {
       proposals: [{ field: 'approvalUpTo', current: '250.00', proposed: '150.00', quote: 'We never refund more than 150 dollars', effect: 'tightens' }],
     });
     const [config, body] = requestCompletion.mock.calls[0];
-    expect(config).toEqual(expect.objectContaining({ model: 'model-a', timeoutMs: 60_000 }));
+    expect(config).toEqual(expect.objectContaining({ model: 'model-a', timeoutMs: 150_000 }));
     expect(body).not.toHaveProperty('tools');
     expect(saveSettings).not.toHaveBeenCalled();
   });
@@ -64,6 +64,14 @@ describe('proposeRulesAction', () => {
 
     expect(await proposeRulesAction(DOCUMENT)).toEqual({ ok: false, error: 'documents.failed' });
     expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('says so when the model takes too long', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    requestCompletion.mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+
+    expect(await proposeRulesAction(DOCUMENT)).toEqual({ ok: false, error: 'documents.timeout' });
     error.mockRestore();
   });
 

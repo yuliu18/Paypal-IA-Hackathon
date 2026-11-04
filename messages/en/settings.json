@@ -273,6 +273,8 @@
     "tooLong": "The documents are too long: at most {max} characters.",
     "busy": "Too many readings. Try again in {seconds} seconds.",
     "noneChosen": "Tick at least one proposal.",
-    "failed": "The documents could not be read. Check the AI model in Settings; details are in the server log."
+    "failed": "The documents could not be read. Check the AI model in Settings; details are in the server log.",
+    "timeout": "The AI model took more than 2½ minutes. Try again, try a shorter document, or choose a faster model in Settings › AI model.",
+    "readingHint": "Reading… this can take a minute or two with some models."
   }
 }

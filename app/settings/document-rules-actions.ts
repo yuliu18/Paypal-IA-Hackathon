@@ -14,8 +14,9 @@ import { loadSettings, saveSettings, settingsView } from '@/lib/settings/setting
 // the shop's model and saves nothing; applying saves the rules the owner chose, through saveSettings
 // like any edit on /settings. The proxy's owner sign-in covers both, like the page.
 
-// A long document can take the model a while.
-const TIMEOUT_MS = 60_000;
+// Proposals carry quotes and a rewritten policy: a model that thinks before answering (e.g. a free
+// GLM on OpenCode Go) needed over a minute for a one-page handbook.
+const TIMEOUT_MS = 150_000;
 
 // Each reading spends LLM tokens: 10 per address per 10 minutes, one at a time, 2 at once overall.
 const readings = new TicketLimiter({ perClient: 10, windowMs: 10 * 60_000, inFlightPerClient: 1, inFlight: 2 });
@@ -43,7 +44,8 @@ export async function proposeRulesAction(document: string): Promise<ProposeResul
   } catch (cause) {
     // The cause can carry provider responses or configuration names.
     console.error('Reading the document for rules failed', cause);
-    return { ok: false, error: t('documents.failed') };
+    const timedOut = cause instanceof Error && cause.name === 'TimeoutError';
+    return { ok: false, error: t(timedOut ? 'documents.timeout' : 'documents.failed') };
   } finally {
     slot.release();
   }

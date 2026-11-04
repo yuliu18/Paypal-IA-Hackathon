@@ -273,6 +273,8 @@
     "tooLong": "Les documents sont trop longs : {max} caractères au maximum.",
     "busy": "Trop de lectures. Réessayez dans {seconds} secondes.",
     "noneChosen": "Cochez au moins une proposition.",
-    "failed": "Les documents n'ont pas pu être lus. Vérifiez le modèle d'IA dans les paramètres ; les détails sont dans le journal du serveur."
+    "failed": "Les documents n'ont pas pu être lus. Vérifiez le modèle d'IA dans les paramètres ; les détails sont dans le journal du serveur.",
+    "timeout": "Le modèle d'IA a mis plus de 2 min 30. Réessayez, essayez un document plus court ou choisissez un modèle plus rapide dans Paramètres › Modèle d'IA.",
+    "readingHint": "Lecture… cela peut prendre une ou deux minutes avec certains modèles."
   }
 }

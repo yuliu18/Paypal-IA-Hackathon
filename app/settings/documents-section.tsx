@@ -112,7 +112,7 @@ export function DocumentsSection({ hidden, locked, currency }: { hidden: boolean
             files.reduce((done, file) => done.then(() => load(file)), Promise.resolve());
           }} />
         </label>
-        <span className="text-xs text-pp-muted">{t('documents.formats', { count: document.length.toLocaleString('en'), max: MAX_CHARS.toLocaleString('en') })}</span>
+        <span className="text-xs text-pp-muted">{reading ? t('documents.readingHint') : t('documents.formats', { count: document.length.toLocaleString('en'), max: MAX_CHARS.toLocaleString('en') })}</span>
       </div>
 
       {proposals && (
