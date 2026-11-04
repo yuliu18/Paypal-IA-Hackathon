@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { maskPersonalData } from '@/lib/guard/domain/redact';
 import { PageHeader } from './page-header';
 import { stepOutcome } from './step-outcome';
@@ -106,13 +106,17 @@ export function SamplePicker<T extends Sample>({
 
 // The PayPal test records the samples act on, apart from the conversation itself: a refund needs a
 // payment to refund, a cancellation a subscription to cancel.
+// One column per action: a single action (billing, in the narrow side column) keeps the full width.
+const sandboxColumns = ['', '', 'md:grid-cols-2 md:divide-x', 'md:grid-cols-3 md:divide-x'];
+
 export function SandboxData({ children }: { children: ReactNode }) {
   const t = useTranslations('desks.sandbox');
+  const columns = sandboxColumns[Math.min(Children.toArray(children).length, 3)];
   return (
     <section>
       <h2 className={sectionTitle}>{t('heading')}</h2>
       <p className="mt-1 max-w-3xl text-sm text-pp-muted">{t('intro')}</p>
-      <div className="mt-3 grid rounded-lg border border-pp-border bg-pp-surface max-md:divide-y max-md:divide-pp-gridline md:grid-cols-3 md:divide-x md:divide-pp-gridline">
+      <div className={`mt-3 grid rounded-lg border border-pp-border bg-pp-surface max-md:divide-y max-md:divide-pp-gridline md:divide-pp-gridline ${columns}`}>
         {children}
       </div>
     </section>

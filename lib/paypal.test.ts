@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { accessToken, chargeCard, getCapture, payPalApi } from './paypal';
+import { accessToken, chargeCard, getCapture, listInvoices, payPalApi } from './paypal';
 import { saveSettings, setPaymentMode } from './settings/settings';
 
 describe('chargeCard', () => {
@@ -173,5 +173,41 @@ describe('the PayPal environment', () => {
     await setPaymentMode('live', { file, env });
     await expect(accessToken('live')).rejects.toThrow('Live mode is off');
     expect(seen).toEqual([]);
+  });
+});
+
+describe('listInvoices', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  const summary = (id: string) => ({ id, status: 'SENT', detail: { invoice_number: id, currency_code: 'USD' }, amount: { value: '10.00', currency_code: 'USD' } });
+
+  it('keeps the list entry of an invoice whose detail PayPal fails to send, so one bad invoice does not sink the dashboard', async () => {
+    vi.stubEnv('PAYPAL_CLIENT_ID', 'id');
+    vi.stubEnv('PAYPAL_SECRET', 'secret');
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url.endsWith('/v1/oauth2/token')) return Response.json({ access_token: 't', expires_in: 3600 });
+      if (url.includes('/v2/invoicing/invoices?')) return Response.json({ items: [summary('INV-1'), summary('INV-2')], total_pages: 1 });
+      if (url.endsWith('/INV-1')) return Response.json({ ...summary('INV-1'), items: [{ name: 'Mug', quantity: '1', unit_amount: { value: '10.00', currency_code: 'USD' } }] });
+      return new Response('not found', { status: 404 });
+    });
+
+    const invoices = await listInvoices();
+
+    expect(invoices.map((i) => i.id)).toEqual(['INV-1', 'INV-2']);
+    expect(invoices[0].items).toHaveLength(1);
+    expect(invoices[1]).toEqual(summary('INV-2'));
+  });
+
+  it('still fails when the list itself cannot be read', async () => {
+    vi.stubEnv('PAYPAL_CLIENT_ID', 'id');
+    vi.stubEnv('PAYPAL_SECRET', 'secret');
+    vi.stubGlobal('fetch', async (url: string) =>
+      url.endsWith('/v1/oauth2/token') ? Response.json({ access_token: 't', expires_in: 3600 }) : new Response('forbidden', { status: 403 }),
+    );
+
+    await expect(listInvoices()).rejects.toThrow('PayPal 403');
   });
 });

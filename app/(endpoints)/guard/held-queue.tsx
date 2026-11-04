@@ -76,7 +76,7 @@ function HeldItem({ held, action, pending }: { held: HeldCall; action: (form: Fo
     <li className="border-b border-pp-gridline px-5 py-4 last:border-b-0">
       <form action={action} className="flex flex-wrap items-start gap-x-6 gap-y-3 text-sm">
         <input type="hidden" name="id" value={held.id} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-64">
           <p className="text-[15px]">
             {t.rich('heading', {
               action: t(`kinds.${TITLE[held.kind]}`),
