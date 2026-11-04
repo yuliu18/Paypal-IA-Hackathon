@@ -7,13 +7,10 @@
   "hasError": "contient une erreur",
   "sections": {
     "language": "Langue",
-    "business": "Entreprise",
-    "limits": "Limites",
-    "documents": "Depuis vos documents",
+    "business": "Activité et règles",
     "ai": "Modèle d'IA",
     "paypal": "App PayPal",
-    "notifications": "Notifications",
-    "api-keys": "Clés API"
+    "notifications": "Notifications"
   },
   "language": {
     "title": "Langue",
@@ -51,6 +48,7 @@
   },
   "testConnection": "Tester la connexion",
   "business": {
+    "title": "Votre activité",
     "detail": "Pour qui travaillent les agents et la politique de remboursement qu'ils suivent. Le juge IA du guard vérifie chaque remboursement selon cette politique.",
     "name": "Nom de l'entreprise",
     "contactEmails": "E-mails de contact",
@@ -58,6 +56,7 @@
     "refundPolicy": "Politique de remboursement"
   },
   "limits": {
+    "title": "Limites de remboursement",
     "detail": "Appliquées par le guard quoi que décide l'IA : aucun prompt ne peut les relever.",
     "currency": "Devise",
     "noDecimals": "sans décimales",

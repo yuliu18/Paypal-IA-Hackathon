@@ -47,7 +47,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// Settings › API keys: the business's own app calls the agents with a key instead of signing in.
+// API › API keys (/api-docs): the business's own app calls the agents with a key instead of signing in.
 // Its own card, outside the settings form: creating or revoking a key saves at once.
 export function ApiKeysSection({ hidden, view, locked }: { hidden: boolean; view: ApiKeysView; locked: boolean }) {
   const t = useTranslations('settings.apiKeys');

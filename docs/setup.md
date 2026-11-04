@@ -73,7 +73,7 @@ To start over (a new owner) with the built-in login, delete the `owner` row (and
 
 Your shop's own app (a checkout, a help-desk integration) calls the agents with a key instead of signing in. Keys need `DATABASE_URL`; without it the section explains that and no key is accepted.
 
-1. **Create:** Settings › **API keys**, give the key a name, **Create key**. The whole key (`pg_` and 43 more characters) is shown once: copy it into your app's secrets. Only its SHA-256 hash and last 4 characters are stored (`guard.api_keys`).
+1. **Create:** the **API** page (`/api-docs`), **API keys**: give the key a name, **Create key**. The whole key (`pg_` and 43 more characters) is shown once: copy it into your app's secrets. Only its SHA-256 hash and last 4 characters are stored (`guard.api_keys`).
 2. **Call:** send it as a bearer token:
 
    ```bash
@@ -83,15 +83,15 @@ Your shop's own app (a checkout, a help-desk integration) calls the agents with 
      -d '{"customerEmail":"ana@example.com","message":"My mug arrived broken."}'
    ```
 
-   The answer is JSON: `reply` is the text to show your customer (for a sale, with the PayPal link where they pay); `steps` lists each PayPal call the agent tried and what the guard decided, for your logs and staff, not for the customer; `environment` says whether real money could move (`live`) or only test money (`sandbox`). Every field and error is in [API docs](#api-docs).
+   The answer is JSON: `reply` is the text to show your customer (for a sale, with the PayPal link where they pay); `steps` lists each PayPal call the agent tried and what the guard decided, for your logs and staff, not for the customer; `environment` says whether real money could move (`live`) or only test money (`sandbox`). Every field and error is in [API docs](#api-reference).
 
 3. **Revoke:** **Revoke** next to the key in the list; calls with it get 401 at once. The list shows when each key was created and last used (updated at most once a minute).
 
 **Scope:** a key opens exactly three endpoints, `POST /api/support/tickets`, `POST /api/billing/tasks` and `POST /api/sales/chats`, with either sign-in. Nothing else accepts it: not the pages, not `/api/guard/*`, not `/api/auth/*`, not Server Actions. A wrong or revoked key gets `401 {"error":"Invalid or revoked API key."}`, never a redirect. The proxy tells the route a request came in with a key in the `x-pg-auth: api-key:<key id>` request header, after removing any copy the client sent.
 
-### API docs
+### API reference
 
-**API docs** in the menu (`/api-docs`) shows the three agent endpoints in [Swagger UI](https://swagger.io/tools/swagger-ui/): each request field and its limits, the reply with every guarded tool call, and every error. **Authorize** takes an API key so *Try it out* calls them as your app would (on live PayPal while live mode is on); without a key the calls use your session and run on the sandbox. The OpenAPI 3.1 document itself is at `/api/openapi` ([`lib/api/openapi.ts`](../lib/api/openapi.ts)), for client generators; its server is `APP_URL`. Both need the owner's sign-in; an API key does not open them. Swagger UI is loaded from jsDelivr at a pinned version checked with Subresource Integrity, so the app gains no dependency.
+**API** in the menu (`/api-docs`) shows your API keys and the three agent endpoints in [Swagger UI](https://swagger.io/tools/swagger-ui/): each request field and its limits, the reply with every guarded tool call, and every error. **Authorize** takes an API key so *Try it out* calls them as your app would (on live PayPal while live mode is on); without a key the calls use your session and run on the sandbox. The OpenAPI 3.1 document itself is at `/api/openapi` ([`lib/api/openapi.ts`](../lib/api/openapi.ts)), for client generators; its server is `APP_URL`. Both need the owner's sign-in; an API key does not open them. Swagger UI is loaded from jsDelivr at a pinned version checked with Subresource Integrity, so the app gains no dependency.
 
 ### Live mode
 
@@ -115,13 +115,10 @@ Payment Guard starts in **test mode**: every PayPal call runs on the sandbox, wi
 
 | Section | What it sets |
 |---|---|
-| Business | Name, contact emails replies may include, and the refund policy the agent follows and the judge checks against |
-| Limits | Currency, refunds that run on their own, refunds a person approves (above: blocked), daily cap |
-| From your documents | Paste or load (.txt, .md) your refund policy, terms or handbook; the AI model proposes the refund policy and refund limits they state, each with the sentence it comes from. A proposal is kept only when that sentence really is in the document. Stricter limits start ticked; looser limits and a new policy text start unticked with a warning. Nothing is saved until you apply, and applying goes through the same checks as the form |
+| Business and rules | **Your business:** name, contact emails replies may include, and the refund policy the agent follows and the judge checks against. **Refund limits:** currency, refunds that run on their own, refunds a person approves (above: blocked), daily cap. **From your documents:** paste or load (.txt, .md) your refund policy, terms or handbook; the AI model proposes the refund policy and refund limits they state, each with the sentence it comes from. A proposal is kept only when that sentence really is in the document. Stricter limits start ticked; looser limits and a new policy text start unticked with a warning. Nothing is saved until you apply, and applying goes through the same checks as the form |
 | AI | Provider from the catalog, base URL, API key, agent and judge models; **Test connection** lists the provider's models |
 | PayPal | Two apps: the sandbox app (client ID and secret, test money) and the live app (real money, saved here only); **Test connection** asks the sandbox, or live PayPal for the live app, for a token. The **Mode** switch, Test or Live ([Live mode](#live-mode)) |
 | Notifications | Where every refund held for a person is announced, each optional: a Slack or Discord webhook URL (or `GUARD_WEBHOOK_URL`); email to the contact emails through your own mail server over SMTP (or `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) or through Resend, with its API key (or `RESEND_API_KEY`), from a sender address (or `NOTIFY_EMAIL_FROM`); a Telegram bot token and chat id (or `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) |
-| API keys | Keys your shop's own app calls the agent endpoints with ([API keys](#api-keys)); needs `DATABASE_URL` |
 
 The AI catalog ([`lib/settings/catalog.ts`](../lib/settings/catalog.ts)) comes from [models.dev](https://models.dev), the open provider and model database OpenCode and Pi use: every provider it serves through an OpenAI-compatible API, and for each only the models that can call tools, with context size and price. Verified presets ([`lib/settings/providers.ts`](../lib/settings/providers.ts)) come first: Anthropic, OpenAI, Gemini, Mistral, xAI, DeepSeek, Qwen, Kimi, GLM, MiniMax, OpenRouter, Groq, OpenCode Go, and local Ollama and LM Studio. Any other OpenAI-compatible URL works as **Custom**. The catalog is fetched once every 6 hours; if models.dev can't be reached, the presets still work and models can be typed.
 

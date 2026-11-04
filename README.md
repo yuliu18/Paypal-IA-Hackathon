@@ -74,7 +74,7 @@ Step by step, from a fresh clone to real money: [Connect your business](docs/con
 
 ## Connect your app
 
-Create a key in Settings › **API keys**, then call an agent with the customer your app has already identified:
+Create a key on the **API** page (`/api-docs`), then call an agent with the customer your app has already identified:
 
 ```bash
 curl -X POST https://your-guard.example/api/support/tickets \

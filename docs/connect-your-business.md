@@ -14,18 +14,16 @@ From a fresh clone to your shop's own app calling the guarded agents, first on t
 
 | Section | What to enter |
 |---|---|
-| Business | Shop name, contact emails, and your refund policy in plain words: the agent follows it and the judge checks every call against it |
-| Limits | Currency, the refund amount that runs on its own, the amount above which a person must approve (above the second: blocked), daily cap |
+| Business and rules | Shop name, contact emails, and your refund policy in plain words: the agent follows it and the judge checks every call against it. Then the limits: currency, the refund amount that runs on its own, the amount above which a person must approve (above the second: blocked), daily cap. Or paste your handbook under **From your documents** and apply the rules it proposes |
 | AI model | Any OpenAI-compatible provider and key; **Test connection**, then the agent and judge models |
 | PayPal app | Your **Sandbox app** (client ID and secret from [developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox)); leave Live empty for now |
 | Notifications | Where a held action is announced: Slack/Discord webhook, email, Telegram |
-| API keys | **Create key** for your shop's app; it is shown once |
 
 ## 3. Try it on the sandbox
 
 1. `npm run seed` (locally, with the same `.env.local`) creates three paid sample orders for ana, ben and carla.
 2. **Test a model › Support** sends a ticket through the real agent and guard; the decision appears in **Guard log**. **Evaluate a model** runs the business and attack bench against your chosen model.
-3. Call it from your app with the key. Every request field, response and error is in **API docs** (`/api-docs`, Swagger UI with *Try it out*), and the raw document at `/api/openapi` feeds any OpenAPI client generator.
+3. On the **API** page (`/api-docs`), **Create key** for your shop's app (it is shown once) and call it from your app with that key. Every request field, response and error is in the reference below the keys (Swagger UI with *Try it out*), and the raw document at `/api/openapi` feeds any OpenAPI client generator.
 
    ```bash
    curl -X POST "$APP_URL/api/support/tickets" \
@@ -47,7 +45,7 @@ These pieces are demo data today. Each sits behind a small interface, so replaci
 | Who owns an order | `custom_id` of the PayPal purchase unit, which the demo sets to the customer's email when it charges | Have your checkout set `custom_id` to your customer's id or email on every order |
 | Your customers (billing) | The seeded sample customers ([`seed-customer-directory.ts`](../lib/guard/adapters/seed-customer-directory.ts)) | A `CustomerDirectory` that asks your own customer records |
 | Your catalogue (sales) | [`lib/shop/catalogue.ts`](../lib/shop/catalogue.ts) | Your products and prices, from your store or database |
-| Agent instructions | Business › refund policy, and the built-in prompts in [`lib/agent`](../lib/agent) | Your policy text; edit the prompts only to change the agent's role |
+| Agent instructions | Business and rules › refund policy, and the built-in prompts in [`lib/agent`](../lib/agent) | Your policy text; edit the prompts only to change the agent's role |
 
 See [architecture.md](architecture.md) for the ports and how to add a check.
 

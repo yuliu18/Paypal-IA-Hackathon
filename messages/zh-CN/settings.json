@@ -7,13 +7,10 @@
   "hasError": "有错误",
   "sections": {
     "language": "语言",
-    "business": "业务",
-    "limits": "限额",
-    "documents": "从您的文档",
+    "business": "业务与规则",
     "ai": "AI 模型",
     "paypal": "PayPal 应用",
-    "notifications": "通知",
-    "api-keys": "API 密钥"
+    "notifications": "通知"
   },
   "language": {
     "title": "语言",
@@ -51,6 +48,7 @@
   },
   "testConnection": "测试连接",
   "business": {
+    "title": "你的业务",
     "detail": "智能体为谁工作，以及它们遵循的退款政策。守卫的 AI 裁判会依据此政策检查每一笔退款。",
     "name": "业务名称",
     "contactEmails": "联系邮箱",
@@ -58,6 +56,7 @@
     "refundPolicy": "退款政策"
   },
   "limits": {
+    "title": "退款限额",
     "detail": "无论 AI 如何决定，守卫都会强制执行：任何提示词都无法提高这些限额。",
     "currency": "货币",
     "noDecimals": "无小数",

@@ -83,7 +83,7 @@ export function DocumentsSection({ hidden, locked, currency }: { hidden: boolean
   const shown = (p: RuleProposal, value: string) => (p.field === 'refundPolicy' ? value : `${value} ${currency}`);
 
   return (
-    <section id="settings-documents" hidden={hidden} className="rounded-lg border border-pp-border bg-pp-surface p-6">
+    <section id="settings-documents" hidden={hidden} className="mt-6 rounded-lg border border-pp-border bg-pp-surface p-6">
       <h2 className="text-lg font-semibold">{t('documents.title')}</h2>
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-pp-muted">{t('documents.detail')}</p>
 

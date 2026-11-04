@@ -7,13 +7,10 @@
   "hasError": "tiene un error",
   "sections": {
     "language": "Idioma",
-    "business": "Negocio",
-    "limits": "Límites",
-    "documents": "Desde tus documentos",
+    "business": "Negocio y reglas",
     "ai": "Modelo de IA",
     "paypal": "App de PayPal",
-    "notifications": "Notificaciones",
-    "api-keys": "Claves de API"
+    "notifications": "Notificaciones"
   },
   "language": {
     "title": "Idioma",
@@ -51,6 +48,7 @@
   },
   "testConnection": "Probar conexión",
   "business": {
+    "title": "Tu negocio",
     "detail": "Para quién trabajan los agentes y la política de reembolsos que siguen. El juez de IA del guard revisa cada reembolso con esta política.",
     "name": "Nombre del negocio",
     "contactEmails": "Emails de contacto",
@@ -58,6 +56,7 @@
     "refundPolicy": "Política de reembolsos"
   },
   "limits": {
+    "title": "Límites de reembolso",
     "detail": "El guard los aplica decida lo que decida la IA: ningún prompt puede subirlos.",
     "currency": "Moneda",
     "noDecimals": "sin decimales",

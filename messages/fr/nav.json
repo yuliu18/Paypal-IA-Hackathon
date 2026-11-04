@@ -15,12 +15,13 @@
     "sales": "Ventes",
     "evaluate": "Évaluer un modèle",
     "settings": "Paramètres",
-    "apiDocs": "Docs API"
+    "apiDocs": "API"
   },
   "signOut": "Se déconnecter",
   "apiDocs": {
-    "title": "Documentation de l'API",
-    "intro": "L'application de votre boutique appelle ces trois points d'accès avec une clé de Paramètres › Clés API. Utilisez Authorize pour coller une clé et les essayer ici : avec une clé, la requête passe par PayPal réel tant que le mode réel est actif ; sans clé, votre session est utilisée et tout reste dans le sandbox.",
+    "title": "API",
+    "intro": "L'application de votre boutique appelle trois points d'accès avec une clé API : créez-la ci-dessous. Dans la référence, utilisez Authorize pour coller une clé et les essayer ici : avec une clé, la requête passe par PayPal réel tant que le mode réel est actif ; sans clé, votre session est utilisée et tout reste dans le sandbox.",
+    "reference": "Référence",
     "download": "Télécharger le document OpenAPI",
     "failed": "Swagger UI n'a pas pu se charger (il vient de cdn.jsdelivr.net). Le document OpenAPI reste disponible ci-dessous."
   }

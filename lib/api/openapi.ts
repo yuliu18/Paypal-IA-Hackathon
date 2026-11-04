@@ -50,7 +50,7 @@ export function openApiDocument(serverUrl?: string) {
       description: [
         "Your shop's own app (a help desk, a checkout, a chat widget) sends a customer's message to one of the agents. The agent works on your PayPal account through the payment guard: deterministic limits and ownership checks, an intent judge that can only tighten, held actions for a person to approve, and a hash-chained audit log at /guard.",
         '',
-        'Create an API key in Settings › API keys and send it as `Authorization: Bearer pg_…`. A key opens these three endpoints and nothing else.',
+        'Create an API key on the API page (/api-docs) and send it as `Authorization: Bearer pg_…`. A key opens these three endpoints and nothing else.',
         '',
         LIVE_NOTE,
       ].join('\n'),
@@ -79,7 +79,7 @@ export function openApiDocument(serverUrl?: string) {
     },
     components: {
       securitySchemes: {
-        apiKey: { type: 'http', scheme: 'bearer', bearerFormat: 'pg_ API key', description: 'Created in Settings › API keys; shown once.' },
+        apiKey: { type: 'http', scheme: 'bearer', bearerFormat: 'pg_ API key', description: 'Created on the API page (/api-docs); shown once.' },
       },
       schemas: {
         AgentRequest: {

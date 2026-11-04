@@ -15,12 +15,13 @@
     "sales": "Ventas",
     "evaluate": "Evaluar un modelo",
     "settings": "Ajustes",
-    "apiDocs": "Documentación API"
+    "apiDocs": "API"
   },
   "signOut": "Cerrar sesión",
   "apiDocs": {
-    "title": "Documentación de la API",
-    "intro": "La app de tu tienda llama a estos tres endpoints con una clave de Ajustes › Claves de API. Pulsa Authorize para pegar una clave y probarlos aquí: con clave, la petición va a PayPal real mientras el modo real está activo; sin clave se usa tu sesión y siempre va al sandbox.",
+    "title": "API",
+    "intro": "La app de tu tienda llama a tres endpoints con una clave de API: créala abajo. En la referencia, pulsa Authorize para pegar una clave y probarlos aquí: con clave, la petición va a PayPal real mientras el modo real está activo; sin clave se usa tu sesión y siempre va al sandbox.",
+    "reference": "Referencia",
     "download": "Descargar el documento OpenAPI",
     "failed": "Swagger UI no se pudo cargar (viene de cdn.jsdelivr.net). El documento OpenAPI sigue disponible abajo."
   }

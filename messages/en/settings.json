@@ -7,13 +7,10 @@
   "hasError": "has an error",
   "sections": {
     "language": "Language",
-    "business": "Business",
-    "limits": "Limits",
-    "documents": "From your documents",
+    "business": "Business and rules",
     "ai": "AI model",
     "paypal": "PayPal app",
-    "notifications": "Notifications",
-    "api-keys": "API keys"
+    "notifications": "Notifications"
   },
   "language": {
     "title": "Language",
@@ -51,6 +48,7 @@
   },
   "testConnection": "Test connection",
   "business": {
+    "title": "Your business",
     "detail": "Who the agents work for and the refund policy they follow. The guard's AI judge checks every refund against this policy.",
     "name": "Business name",
     "contactEmails": "Contact emails",
@@ -58,6 +56,7 @@
     "refundPolicy": "Refund policy"
   },
   "limits": {
+    "title": "Refund limits",
     "detail": "Enforced by the guard whatever the AI decides: no prompt can raise them.",
     "currency": "Currency",
     "noDecimals": "no decimals",
