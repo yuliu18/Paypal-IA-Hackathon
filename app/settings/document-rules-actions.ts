@@ -7,16 +7,13 @@ import { llmConfig } from '@/lib/agent/handle-ticket';
 import { TicketLimiter } from '@/lib/agent/ticket-limiter';
 import { clientAddress } from '@/lib/auth/failed-attempts';
 import { requestCompletion } from '@/lib/llm/openai-compatible';
+import { CLOUD_TIMEOUTS } from '@/lib/llm/timeouts';
 import { DOCUMENT_MAX_CHARS, proposeRules, RULE_FIELDS, type RuleField, type RuleProposal } from '@/lib/settings/document-rules';
 import { loadSettings, saveSettings, settingsView } from '@/lib/settings/settings';
 
 // Settings › From your documents (lib/settings/document-rules.ts). Proposing reads a document with
 // the shop's model and saves nothing; applying saves the rules the owner chose, through saveSettings
 // like any edit on /settings. The proxy's owner sign-in covers both, like the page.
-
-// Proposals carry quotes and a rewritten policy: a model that thinks before answering (e.g. a free
-// GLM on OpenCode Go) needed over a minute for a one-page handbook.
-const TIMEOUT_MS = 150_000;
 
 // Each reading spends LLM tokens: 10 per address per 10 minutes, one at a time, 2 at once overall.
 const readings = new TicketLimiter({ perClient: 10, windowMs: 10 * 60_000, inFlightPerClient: 1, inFlight: 2 });
@@ -31,10 +28,12 @@ export async function proposeRulesAction(document: string): Promise<ProposeResul
 
   const slot = readings.acquire(clientAddress(await headers()), Date.now());
   if (!slot.ok) return { ok: false, error: t('documents.busy', { seconds: Math.ceil(slot.retryAfterMs / 1000) }) };
+  let waitMs = CLOUD_TIMEOUTS.documentsMs;
   try {
     const [{ form }, settings] = await Promise.all([settingsView(), loadSettings()]);
     const llm = await llmConfig(settings.ai);
-    const config = { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: TIMEOUT_MS };
+    waitMs = llm.timeouts.documentsMs;
+    const config = { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: waitMs };
     const proposals = await proposeRules({
       document,
       current: { currency: form.currency, refundPolicy: form.refundPolicy, autoRefundUpTo: form.autoRefundUpTo, approvalUpTo: form.approvalUpTo, dailyCap: form.dailyCap },
@@ -45,7 +44,7 @@ export async function proposeRulesAction(document: string): Promise<ProposeResul
     // The cause can carry provider responses or configuration names.
     console.error('Reading the document for rules failed', cause);
     const timedOut = cause instanceof Error && cause.name === 'TimeoutError';
-    return { ok: false, error: t(timedOut ? 'documents.timeout' : 'documents.failed') };
+    return { ok: false, error: timedOut ? t('documents.timeout', { minutes: waitMs / 60_000 }) : t('documents.failed') };
   } finally {
     slot.release();
   }

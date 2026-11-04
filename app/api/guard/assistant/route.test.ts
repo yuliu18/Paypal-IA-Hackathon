@@ -16,7 +16,7 @@ const list = vi.fn<(limit: number) => AuditRow[]>(() => entries);
 vi.mock('@/lib/guard/runtime', () => ({ auditLog: () => ({ list }) }));
 vi.mock('@/lib/settings/settings', () => ({ loadSettings: async () => ({ ai: {} }) }));
 vi.mock('@/lib/agent/handle-ticket', () => ({
-  llmConfig: async () => ({ baseUrl: 'https://llm.test/v1', apiKey: 'sk-test', agentModel: 'model-a', headers: { 'User-Agent': 'x' } }),
+  llmConfig: async () => ({ baseUrl: 'https://llm.test/v1', apiKey: 'sk-test', agentModel: 'model-a', headers: { 'User-Agent': 'x' }, timeouts: { agentStepMs: 60_000, agentTicketMs: 90_000, judgeMs: 15_000, assistantMs: 30_000, documentsMs: 150_000 } }),
 }));
 const requestCompletion = vi.fn();
 vi.mock('@/lib/llm/openai-compatible', () => ({ requestCompletion: (...args: unknown[]) => requestCompletion(...args) }));

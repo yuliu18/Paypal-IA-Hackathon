@@ -63,7 +63,7 @@ export async function handleSalesChat(
     const guard = createPaymentGuard({
       upstream,
       task: { mandate: { customerEmail: task.customerEmail }, instructions: SALES_POLICY, untrustedInput: task.message },
-      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
+      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers, timeoutMs: llm.timeouts.judgeMs })),
       captures,
       orders: { catalogue: SHOP_CATALOGUE, shopOrigin, checkout: checkoutUrls(shopOrigin), binder },
       audit: inEnvironment(auditLog(), environment),
@@ -72,7 +72,8 @@ export async function handleSalesChat(
     });
     return withClient(guard, 'sales-agent', (tools) =>
       runSalesAgent({
-        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers }),
+        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: llm.timeouts.agentStepMs }),
+        deadlineMs: llm.timeouts.agentTicketMs,
         tools,
         task,
         shopOrigin,

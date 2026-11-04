@@ -58,7 +58,7 @@ export async function handleBillingTask(
     const guard = createPaymentGuard({
       upstream,
       task: { mandate: { customerEmail: task.customerEmail }, instructions: BILLING_POLICY, untrustedInput: task.message },
-      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers })),
+      judge: createLlmIntentJudge(openAiCompatibleChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.judgeModel, headers: llm.headers, timeoutMs: llm.timeouts.judgeMs })),
       captures,
       invoices,
       customers: seedCustomerDirectory,
@@ -69,7 +69,8 @@ export async function handleBillingTask(
     });
     return withClient(guard, 'billing-agent', (tools) =>
       runBillingAgent({
-        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers }),
+        chat: openAiCompatibleToolChat({ baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.agentModel, headers: llm.headers, timeoutMs: llm.timeouts.agentStepMs }),
+        deadlineMs: llm.timeouts.agentTicketMs,
         tools,
         task,
         instructions: mode === 'vulnerable' ? VULNERABLE_INSTRUCTIONS : BILLING_POLICY,

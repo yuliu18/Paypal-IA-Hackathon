@@ -31,7 +31,7 @@ vi.mock('@/lib/guard/guard', () => ({ decideHeldCall: (...args: unknown[]) => de
 vi.mock('@/lib/guard/runtime', () => ({ auditLog: () => AUDIT }));
 vi.mock('./in-memory-mcp', () => ({ withClient: (_server: unknown, name: string, work: (client: unknown) => unknown) => work(`client:${name}`) }));
 
-const { decideHeld } = await import('./handle-ticket');
+const { decideHeld, llmConfig } = await import('./handle-ticket');
 
 const deps = () => decideHeldCall.mock.calls[0][0] as Record<string, unknown>;
 
@@ -134,5 +134,16 @@ describe('decideHeld', () => {
     expect(accessToken).toHaveBeenCalledWith('sandbox');
     expect(toolkitSetup).toHaveBeenCalledWith({ accessToken: 'TOKEN-sandbox', context: { sandbox: true } });
     expect(deps().audit).toMatchObject({ environment: 'sandbox' });
+  });
+});
+
+describe('llmConfig', () => {
+  const ai = { provider: 'ollama', baseUrl: 'http://localhost:11434/v1', apiKey: 'ollama', agentModel: 'qwen3', judgeModel: '' };
+
+  it('waits longer for a model on this machine, and as before for a hosted one', async () => {
+    const { CLOUD_TIMEOUTS, LOCAL_TIMEOUTS } = await import('@/lib/llm/timeouts');
+
+    expect((await llmConfig(ai)).timeouts).toBe(LOCAL_TIMEOUTS);
+    expect((await llmConfig({ ...ai, provider: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-test' })).timeouts).toBe(CLOUD_TIMEOUTS);
   });
 });
