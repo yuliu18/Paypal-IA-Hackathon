@@ -5,9 +5,9 @@
 
 **A firewall between your shop's AI agents and your PayPal account.**
 
-▶ **[Demo video (3 min)](https://www.youtube.com/watch?v=RXazWgUL7os)** · **[Live demo](https://paypal-ia-hackathon.onrender.com)**
+▶ **[Demo video (3 min)](https://www.youtube.com/watch?v=YEMwqeiCaCo)** · **[Live demo](https://paypal-ia-hackathon.onrender.com)**
 
-[![Payment Guard demo video](https://img.youtube.com/vi/RXazWgUL7os/maxresdefault.jpg)](https://www.youtube.com/watch?v=RXazWgUL7os)
+[![Payment Guard demo video](https://img.youtube.com/vi/YEMwqeiCaCo/maxresdefault.jpg)](https://www.youtube.com/watch?v=YEMwqeiCaCo)
 
 ## The problem
 
